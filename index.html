@@ -630,41 +630,112 @@
     <button class="icon-btn" id="profileBackBtn">
       <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
     </button>
-    <h2 class="page-title">Meu Perfil</h2>
+    <h2 class="page-title">Configurações</h2>
     <div style="width:40px"></div>
   </div>
   <div class="scroll-content">
-    <div class="profile-card">
-      <div class="profile-avatar-lg" id="profileAvatarLg">
+
+    <!-- Cartão do perfil -->
+    <div class="settings-profile-card">
+      <div class="settings-avatar" id="settingsAvatar">
         <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
       </div>
-      <h3 class="profile-name" id="profileNameDisplay">—</h3>
-      <p class="profile-email" id="profileEmailDisplay">—</p>
-    </div>
-
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-val" id="statGames">0</div>
-        <div class="stat-lbl">Jogos</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="statBest">0</div>
-        <div class="stat-lbl">Melhor Nota</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="statStars">0</div>
-        <div class="stat-lbl">Estrelas</div>
+      <div class="settings-profile-info">
+        <div class="settings-profile-name" id="settingsName">—</div>
+        <div class="settings-profile-sub" id="settingsEmail">—</div>
       </div>
     </div>
 
-    <button class="btn-outline w-full mt-md" id="editProfileBtn">
-      <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-      EDITAR PERFIL
-    </button>
-    <button class="btn-danger w-full mt-sm" id="deleteAccountBtn">
-      <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-      ELIMINAR CONTA
-    </button>
+    <!-- Secção: Conta -->
+    <div class="settings-section">
+      <div class="settings-section-title">Conta</div>
+      <div class="settings-item" id="settingsEditProfile">
+        <div class="settings-item-icon">
+          <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </div>
+        <div class="settings-item-body">
+          <div class="settings-item-label">Editar Perfil</div>
+          <div class="settings-item-desc">Nome, foto, data de nascimento</div>
+        </div>
+        <div class="settings-item-right"><svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></div>
+      </div>
+      <div class="settings-item" id="settingsChangePass">
+        <div class="settings-item-icon blue">
+          <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+        </div>
+        <div class="settings-item-body">
+          <div class="settings-item-label">Alterar Senha</div>
+          <div class="settings-item-desc" id="changePassDesc">Alterar senha da conta</div>
+        </div>
+        <div class="settings-item-right"><svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></div>
+      </div>
+      <div class="settings-item" id="settingsRecovery">
+        <div class="settings-item-icon green">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        </div>
+        <div class="settings-item-body">
+          <div class="settings-item-label">Recuperar Conta</div>
+          <div class="settings-item-desc">Recuperar por email ou telefone</div>
+        </div>
+        <div class="settings-item-right"><svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></div>
+      </div>
+    </div>
+
+    <!-- Secção: Aparência -->
+    <div class="settings-section">
+      <div class="settings-section-title">Aparência</div>
+      <div class="settings-item">
+        <div class="settings-item-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+        </div>
+        <div class="settings-item-body">
+          <div class="settings-item-label">Modo Claro</div>
+          <div class="settings-item-desc" id="themeLabel">Tema escuro activo</div>
+        </div>
+        <div class="settings-item-right theme-toggle-wrap">
+          <label class="theme-switch">
+            <input type="checkbox" id="themeToggle">
+            <span class="theme-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Secção: Estatísticas -->
+    <div class="settings-section">
+      <div class="settings-section-title">Estatísticas</div>
+      <div class="stats-row" style="padding:16px;margin:0;">
+        <div class="stat-card">
+          <div class="stat-val" id="statGames">0</div>
+          <div class="stat-lbl">Jogos</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="statBest">0</div>
+          <div class="stat-lbl">Melhor Nota</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="statStars">0</div>
+          <div class="stat-lbl">Estrelas</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Secção: Perigo -->
+    <div class="settings-section">
+      <div class="settings-section-title">Zona de Perigo</div>
+      <div class="settings-item" id="settingsDeleteAccount">
+        <div class="settings-item-icon red">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </div>
+        <div class="settings-item-body">
+          <div class="settings-item-label" style="color:var(--red)">Eliminar Conta</div>
+          <div class="settings-item-desc">Apagar permanentemente todos os dados</div>
+        </div>
+        <div class="settings-item-right"><svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></div>
+      </div>
+    </div>
+
+    <div style="height:16px"></div>
   </div>
 </div>
 
@@ -783,6 +854,90 @@
     </div>
     <button class="btn-primary w-full mt-sm" id="phoneRegSubmitBtn">CRIAR CONTA</button>
     <button class="btn-outline w-full mt-sm" id="closePhoneRegModal">CANCELAR</button>
+  </div>
+</div>
+
+<!-- RECUPERAÇÃO DE CONTA MODAL -->
+<div class="modal-overlay" id="recoveryModal">
+  <div class="modal-box">
+    <h3 class="modal-title">Recuperar Conta</h3>
+    <p class="modal-msg">Escolha como pretende recuperar o acesso.</p>
+    <div class="recovery-tabs">
+      <button class="recovery-tab active" data-panel="email-rec">Por Email</button>
+      <button class="recovery-tab" data-panel="phone-rec">Por Telefone</button>
+    </div>
+    <!-- Email recovery -->
+    <div class="recovery-panel active" id="email-rec">
+      <div class="input-group">
+        <svg class="input-icon" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        <input type="email" id="recoveryEmail" class="field-input" placeholder="O seu email">
+      </div>
+      <button class="btn-primary w-full mt-sm" id="sendRecoveryEmailBtn">ENVIAR EMAIL DE RECUPERAÇÃO</button>
+    </div>
+    <!-- Phone recovery -->
+    <div class="recovery-panel" id="phone-rec">
+      <p style="font-size:0.82rem;color:var(--text2);margin-bottom:12px;line-height:1.5;">
+        Introduza o número de telefone e defina uma nova senha. A conta será actualizada se o número existir.
+      </p>
+      <div class="input-group">
+        <svg class="input-icon" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+        <input type="tel" id="recoveryPhone" class="field-input" placeholder="+244 900 000 000">
+      </div>
+      <div class="input-group mt-sm">
+        <svg class="input-icon" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+        <input type="password" id="recoveryNewPass" class="field-input" placeholder="Nova senha (mín. 6 caracteres)">
+      </div>
+      <div class="input-group mt-sm">
+        <svg class="input-icon" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+        <input type="password" id="recoveryNewPass2" class="field-input" placeholder="Confirmar nova senha">
+      </div>
+      <button class="btn-primary w-full mt-sm" id="recoverByPhoneBtn">REDEFINIR SENHA</button>
+    </div>
+    <button class="btn-outline w-full mt-sm" id="closeRecoveryModal">FECHAR</button>
+  </div>
+</div>
+
+<!-- ALTERAR SENHA EMAIL MODAL -->
+<div class="modal-overlay" id="changePassModal">
+  <div class="modal-box">
+    <h3 class="modal-title">Alterar Senha</h3>
+    <p class="modal-msg">Introduza a senha actual e a nova senha.</p>
+    <div class="input-group mt-sm">
+      <svg class="input-icon" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+      <input type="password" id="currentPass" class="field-input" placeholder="Senha actual">
+    </div>
+    <div class="input-group mt-sm">
+      <svg class="input-icon" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+      <input type="password" id="newPass" class="field-input" placeholder="Nova senha (mín. 6 caracteres)">
+    </div>
+    <div class="input-group mt-sm">
+      <svg class="input-icon" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+      <input type="password" id="newPass2" class="field-input" placeholder="Confirmar nova senha">
+    </div>
+    <button class="btn-primary w-full mt-sm" id="changePassSubmitBtn">ALTERAR SENHA</button>
+    <button class="btn-outline w-full mt-sm" id="closeChangePassModal">CANCELAR</button>
+  </div>
+</div>
+
+<!-- ALTERAR SENHA TELEFONE MODAL -->
+<div class="modal-overlay" id="changePhonePassModal">
+  <div class="modal-box">
+    <h3 class="modal-title">Alterar Senha</h3>
+    <p class="modal-msg">Introduza a senha actual e a nova senha.</p>
+    <div class="input-group mt-sm">
+      <svg class="input-icon" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+      <input type="password" id="phoneCurrentPass" class="field-input" placeholder="Senha actual">
+    </div>
+    <div class="input-group mt-sm">
+      <svg class="input-icon" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+      <input type="password" id="phoneNewPass" class="field-input" placeholder="Nova senha (mín. 6 caracteres)">
+    </div>
+    <div class="input-group mt-sm">
+      <svg class="input-icon" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+      <input type="password" id="phoneNewPass2" class="field-input" placeholder="Confirmar nova senha">
+    </div>
+    <button class="btn-primary w-full mt-sm" id="changePhonePassSubmitBtn">ALTERAR SENHA</button>
+    <button class="btn-outline w-full mt-sm" id="closeChangePhonePassModal">CANCELAR</button>
   </div>
 </div>
 
