@@ -628,6 +628,161 @@ $('deleteAccountBtn').onclick = () => {
   });
 };
 
+// ─── THEME TOGGLE ────────────────────────────────────────
+(function initTheme() {
+  const saved = LS.get('eq_theme') || 'dark';
+  if (saved === 'light') {
+    document.body.classList.add('light-mode');
+  }
+  updateThemeUI();
+})();
+
+function updateThemeUI() {
+  const isLight = document.body.classList.contains('light-mode');
+  const label = $('themeLabel');
+  const icon  = $('themeIcon');
+  if (label) label.textContent = isLight ? 'Modo Claro' : 'Modo Escuro';
+  if (icon) {
+    icon.innerHTML = isLight
+      ? '<path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"/>'
+      : '<path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>';
+  }
+}
+
+$('themeToggleBtn').onclick = () => {
+  document.body.classList.toggle('light-mode');
+  const isLight = document.body.classList.contains('light-mode');
+  LS.set('eq_theme', isLight ? 'light' : 'dark');
+  updateThemeUI();
+  showToast(isLight ? 'Modo claro activado' : 'Modo escuro activado');
+};
+
+// ─── CHANGE PASSWORD ──────────────────────────────────────
+$('changePasswordBtn').onclick = () => {
+  const user = State.user;
+  if (!user) return showToast('Sem sessão activa.');
+  // Check if phone user (anonymous)
+  if (user.isAnonymous) {
+    // Show phone password change - redirect to recover modal phone tab
+    $('recoverPhoneTab').click();
+    $('recoverModal').classList.add('show');
+    return;
+  }
+  // Email user
+  $('currentPassInput').value = '';
+  $('newPassInput').value = '';
+  $('newPassConfirmInput').value = '';
+  const email = user.email || '';
+  $('changePassMsg').textContent = email
+    ? `Conta: ${email}`
+    : 'Introduza a sua senha atual e a nova senha.';
+  $('changePassModal').classList.add('show');
+};
+
+$('closeChangePassModal').onclick = () => $('changePassModal').classList.remove('show');
+
+$('submitChangePassBtn').onclick = async () => {
+  const current = $('currentPassInput').value;
+  const newPass  = $('newPassInput').value;
+  const confirm  = $('newPassConfirmInput').value;
+  if (!current || !newPass || !confirm) return showToast('Preencha todos os campos.');
+  if (newPass.length < 6) return showToast('Nova senha deve ter mínimo 6 caracteres.');
+  if (newPass !== confirm) return showToast('As senhas não coincidem.');
+
+  showLoading('A alterar senha...');
+  $('changePassModal').classList.remove('show');
+  try {
+    const user = State.user;
+    const cred = firebase.auth.EmailAuthProvider.credential(user.email, current);
+    await user.reauthenticateWithCredential(cred);
+    await user.updatePassword(newPass);
+    hideLoading();
+    showToast('Senha alterada com sucesso!');
+  } catch (e) {
+    hideLoading();
+    if (e.code === 'auth/wrong-password') showToast('Senha atual incorrecta.');
+    else showToast('Erro ao alterar senha. Tente novamente.');
+  }
+};
+
+// ─── RECOVERY MODAL ───────────────────────────────────────
+$('recoverAccountBtn').onclick = () => {
+  $('recoverEmailInput').value  = '';
+  $('recoverPhoneInput').value  = '';
+  $('recoverPhoneNewPass').value  = '';
+  $('recoverPhoneNewPass2').value = '';
+  // default to email tab
+  $('recoverEmailTab').click();
+  $('recoverModal').classList.add('show');
+};
+
+$('closeRecoverModal').onclick = () => $('recoverModal').classList.remove('show');
+
+// Recovery tabs
+$('recoverEmailTab').onclick = () => {
+  $('recoverEmailTab').classList.add('active');
+  $('recoverPhoneTab').classList.remove('active');
+  $('recoverEmailPanel').style.display = '';
+  $('recoverPhonePanel').style.display = 'none';
+};
+$('recoverPhoneTab').onclick = () => {
+  $('recoverPhoneTab').classList.add('active');
+  $('recoverEmailTab').classList.remove('active');
+  $('recoverPhonePanel').style.display = '';
+  $('recoverEmailPanel').style.display = 'none';
+};
+
+$('sendRecoveryEmailBtn').onclick = async () => {
+  const email = $('recoverEmailInput').value.trim();
+  if (!email) return showToast('Introduza o email da conta.');
+  showLoading('A enviar email...');
+  $('recoverModal').classList.remove('show');
+  try {
+    await auth.sendPasswordResetEmail(email);
+    hideLoading();
+    showToast('Email de recuperação enviado! Verifique a caixa de entrada.');
+  } catch (e) {
+    hideLoading();
+    if (e.code === 'auth/user-not-found') showToast('Nenhuma conta encontrada com este email.');
+    else showToast('Erro ao enviar email. Verifique o endereço.');
+  }
+};
+
+$('resetPhonePassBtn').onclick = async () => {
+  const phone = $('recoverPhoneInput').value.trim();
+  const newP  = $('recoverPhoneNewPass').value;
+  const newP2 = $('recoverPhoneNewPass2').value;
+  if (!phone || !newP || !newP2) return showToast('Preencha todos os campos.');
+  if (newP.length < 6) return showToast('Senha deve ter mínimo 6 caracteres.');
+  if (newP !== newP2) return showToast('As senhas não coincidem.');
+
+  showLoading('A redefinir senha...');
+  $('recoverModal').classList.remove('show');
+  try {
+    const key  = phoneToKey(phone);
+    const snap = await db.ref('phoneUsers/' + key).once('value');
+    if (!snap.exists()) {
+      hideLoading();
+      return showToast('Número não encontrado. Verifique e tente novamente.');
+    }
+    const hash = await sha256(newP);
+    await db.ref('phoneUsers/' + key + '/passwordHash').set(hash);
+    hideLoading();
+    showToast('Senha de telefone redefinida com sucesso!');
+  } catch (e) {
+    hideLoading();
+    showToast('Erro ao redefinir senha: ' + e.message);
+  }
+};
+
+// ─── FORGOT PASSWORD (login screen) ──────────────────────
+$('forgotPassBtn').onclick = () => {
+  const email = $('loginEmail').value.trim();
+  if (email) $('recoverEmailInput').value = email;
+  $('recoverEmailTab').click();
+  $('recoverModal').classList.add('show');
+};
+
 // ─── MAIN MENU NAVIGATION ────────────────────────────────
 $('btnJogar').onclick   = () => showScreen('screen-modeselect');
 $('btnRanking').onclick = () => { loadRankingScreen('all'); showScreen('screen-ranking'); };
@@ -765,23 +920,44 @@ function renderQuestion() {
   // Estrelas na barra do jogo
   renderGameStars();
 
-  // Opções
-  const opts   = ['A','B','C','D'];
-  const texts  = [q.a, q.b, q.c, q.d];
+  // Construir lista de opções com posição original
+  const originalOpts = [
+    { letter: 'A', text: q.a },
+    { letter: 'B', text: q.b },
+    { letter: 'C', text: q.c },
+    { letter: 'D', text: q.d },
+  ].filter(o => o.text);
+
+  // Embaralhar as opções para apresentação aleatória
+  const shuffledOpts = shuffle(originalOpts);
+  const displayLetters = ['A','B','C','D'];
+
+  // Guardar mapeamento: displayLetter -> originalLetter & text
+  const optionMap = {};
+  shuffledOpts.forEach((opt, i) => {
+    if (i < displayLetters.length) {
+      optionMap[displayLetters[i]] = opt;
+    }
+  });
+
   const optWrap = $('gameOptions');
   optWrap.innerHTML = '';
 
-  opts.forEach((letter, i) => {
-    if (!texts[i]) return;
+  displayLetters.forEach((displayLetter, i) => {
+    const mappedOpt = optionMap[displayLetter];
+    if (!mappedOpt) return;
     const btn = document.createElement('button');
     btn.className = 'option-btn';
+    btn.dataset.displayLetter  = displayLetter;
+    btn.dataset.originalLetter = mappedOpt.letter;
+    btn.dataset.optionText     = mappedOpt.text;
     btn.innerHTML = `
-      <div class="option-badge">${letter}</div>
-      <span class="option-text">${texts[i]}</span>
+      <div class="option-badge">${displayLetter}</div>
+      <span class="option-text">${mappedOpt.text}</span>
       <svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-      <svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      <svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>
     `;
-    btn.onclick = () => handleAnswer(letter, btn);
+    btn.onclick = () => handleAnswer(displayLetter, btn, optionMap);
     optWrap.appendChild(btn);
   });
 
@@ -794,30 +970,104 @@ function renderQuestion() {
   } else {
     $('gameTimerWrap').style.display = 'none';
     $('timerRingWrap').style.display = 'none';
-    $('nextBtn').disabled = true; // Em modo livre, só habilita após responder
+    $('nextBtn').disabled = true;
     $('nextBtnText').textContent = 'PRÓXIMA';
   }
-
-  // Modo "Livre": o PRÓXIMA aparece após resposta. No timer: aparece automaticamente.
 }
 
-function handleAnswer(letter, clickedBtn) {
+// ─── AUDIO FEEDBACK ────────────────────────────────────────
+function playCorrectSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [523.25, 659.25, 783.99];
+    notes.forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.1);
+      gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + i * 0.1 + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.3);
+      osc.start(ctx.currentTime + i * 0.1);
+      osc.stop(ctx.currentTime + i * 0.1 + 0.35);
+    });
+    setTimeout(() => {
+      const utter = new SpeechSynthesisUtterance('Resposta certa');
+      utter.lang = 'pt-BR';
+      utter.rate = 1.0;
+      utter.pitch = 1.1;
+      window.speechSynthesis.speak(utter);
+    }, 400);
+  } catch (e) {}
+}
+
+function playWrongSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [300, 220];
+    notes.forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sawtooth';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.18);
+      gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + i * 0.18 + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.35);
+      osc.start(ctx.currentTime + i * 0.18);
+      osc.stop(ctx.currentTime + i * 0.18 + 0.4);
+    });
+    setTimeout(() => {
+      const utter = new SpeechSynthesisUtterance('Resposta errada');
+      utter.lang = 'pt-BR';
+      utter.rate = 1.0;
+      utter.pitch = 0.85;
+      window.speechSynthesis.speak(utter);
+    }, 450);
+  } catch (e) {}
+}
+
+function handleAnswer(displayLetter, clickedBtn, optionMap) {
   if (State.answered) return;
   State.answered = true;
 
   stopTimer();
 
   const q = State.questions[State.qIndex];
-  const correct = q.answer; // 'A','B','C','D'
-  const isRight = letter === correct;
+  const correctOriginalLetter = q.answer; // posição original na BD
+  const correctOriginalText   = q[correctOriginalLetter.toLowerCase()];
 
-  // Desabilitar todos os botões
+  const selectedOpt            = optionMap ? optionMap[displayLetter] : null;
+  const selectedOriginalLetter = selectedOpt ? selectedOpt.letter : displayLetter;
+  const selectedText           = selectedOpt ? selectedOpt.text   : '';
+
+  // Verificação dupla: posição original OU texto coincide
+  const isRight =
+    selectedOriginalLetter === correctOriginalLetter ||
+    (selectedText && correctOriginalText &&
+     selectedText.trim().toLowerCase() === correctOriginalText.trim().toLowerCase());
+
+  // Encontrar display letter que corresponde à resposta certa
+  let correctDisplayLetter = null;
+  $('gameOptions').querySelectorAll('.option-btn').forEach(btn => {
+    const btnOrigLetter = btn.dataset.originalLetter;
+    const btnText       = btn.dataset.optionText || '';
+    const isCorrectBtn  =
+      btnOrigLetter === correctOriginalLetter ||
+      (correctOriginalText && btnText.trim().toLowerCase() === correctOriginalText.trim().toLowerCase());
+    if (isCorrectBtn) correctDisplayLetter = btn.dataset.displayLetter;
+  });
+
+  // Aplicar estilos
   $('gameOptions').querySelectorAll('.option-btn').forEach(btn => {
     btn.disabled = true;
-    const badge = btn.querySelector('.option-badge').textContent;
-    if (badge === correct) {
+    const dl = btn.dataset.displayLetter;
+    if (dl === correctDisplayLetter) {
       btn.classList.add('correct');
-    } else if (badge === letter && !isRight) {
+    } else if (dl === displayLetter && !isRight) {
       btn.classList.add('wrong');
     }
   });
@@ -827,15 +1077,16 @@ function handleAnswer(letter, clickedBtn) {
     State.score += getPointsForMode();
     $('gameScoreBadge').textContent = State.score;
     renderGameStars();
+    playCorrectSound();
   } else {
     State.wrong++;
+    playWrongSound();
   }
 
   // Habilitar PRÓXIMA
   $('nextBtn').disabled = false;
   $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
 
-  // Se tem timer: avança automaticamente após mostrar a resposta por 1.5s
   if (State.timerSecs > 0) {
     setTimeout(() => {
       if (State.answered) advanceQuestion();
@@ -911,15 +1162,21 @@ function timeUp() {
   State.answered = true;
   State.wrong++;
   const q = State.questions[State.qIndex];
+  const correctOriginalLetter = q.answer;
+  const correctOriginalText   = q[correctOriginalLetter.toLowerCase()];
 
   $('gameOptions').querySelectorAll('.option-btn').forEach(btn => {
     btn.disabled = true;
-    if (btn.querySelector('.option-badge').textContent === q.answer) {
-      btn.classList.add('correct');
-    }
+    const btnOrigLetter = btn.dataset.originalLetter;
+    const btnText       = btn.dataset.optionText || '';
+    const isCorrectBtn  =
+      btnOrigLetter === correctOriginalLetter ||
+      (correctOriginalText && btnText.trim().toLowerCase() === correctOriginalText.trim().toLowerCase());
+    if (isCorrectBtn) btn.classList.add('correct');
   });
 
-  showToast('Tempo esgotado! A resposta correcta era ' + q.answer + '.');
+  playWrongSound();
+  showToast('Tempo esgotado! A resposta correcta era ' + correctOriginalLetter + '.');
 
   setTimeout(() => advanceQuestion(), 2000);
 }
