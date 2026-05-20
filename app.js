@@ -790,6 +790,8 @@ $('btnJogar').onclick   = () => showScreen('screen-modeselect');
 $('btnRanking').onclick = () => { loadRankingScreen('all'); showScreen('screen-ranking'); };
 $('btnCriar').onclick   = () => { loadLocalDB(); updateCreateCounter(); showScreen('screen-create'); };
 $('btnSync').onclick    = () => { loadSyncScreen(); showScreen('screen-sync'); };
+$('btnSobre').onclick   = () => showScreen('screen-sobre');
+$('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
 
 // ─── SPLASH ───────────────────────────────────────────────
 $('splashEnterBtn').onclick = () => {
@@ -837,6 +839,7 @@ document.querySelectorAll('.mode-card').forEach(card => {
 
     // Reset category
     State.currentCat = 'all';
+    injectCustomDiscsIntoSetup();   // Adicionar disciplinas personalizadas ao selector
     updateCategoryOptions('all');
 
     showScreen('screen-gamesetup');
@@ -1504,8 +1507,62 @@ function updateCreateCounter() {
   $('createCounter').textContent = State.localDB.length + ' perguntas guardadas localmente';
 }
 
+// Mostrar/ocultar campo de disciplina personalizada
+$('createDisc').onchange = () => {
+  const isOther = $('createDisc').value === 'Outros';
+  $('customDiscWrap').style.display = isOther ? 'block' : 'none';
+  if (!isOther) $('createDiscCustom').value = '';
+};
+
+// ─── DISCIPLINAS PERSONALIZADAS (localStorage) ─────────────
+const LS_CUSTOM_DISCS = 'eq_custom_discs';
+
+function loadCustomDiscs() {
+  return LS.get(LS_CUSTOM_DISCS) || [];
+}
+
+function saveCustomDisc(name) {
+  const discs = loadCustomDiscs();
+  if (!discs.includes(name)) {
+    discs.push(name);
+    LS.set(LS_CUSTOM_DISCS, discs);
+  }
+}
+
+// Injectar disciplinas personalizadas no selector do jogo
+function injectCustomDiscsIntoSetup() {
+  const sel = $('setupDisc');
+  if (!sel) return;
+  // Remover opções customizadas anteriores (têm data-custom)
+  sel.querySelectorAll('[data-custom]').forEach(o => o.remove());
+  const discs = loadCustomDiscs();
+  if (discs.length === 0) return;
+  // Separador
+  const sep = document.createElement('option');
+  sep.disabled = true;
+  sep.textContent = '── Minhas Disciplinas ──';
+  sep.setAttribute('data-custom', '1');
+  sel.appendChild(sep);
+  discs.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    o.setAttribute('data-custom', '1');
+    sel.appendChild(o);
+  });
+}
+
 $('saveQuestionBtn').onclick = () => {
-  const disc = $('createDisc').value.trim();
+  let disc = $('createDisc').value.trim();
+
+  // Se selecionou "Outros", usar o campo personalizado
+  if (disc === 'Outros') {
+    const custom = $('createDiscCustom').value.trim();
+    if (!custom) return showToast('Escreva o nome da nova disciplina.');
+    disc = custom;
+    saveCustomDisc(disc);           // Guardar disciplina personalizada
+    injectCustomDiscsIntoSetup();   // Actualizar selector do jogo
+  }
+
   const cat  = $('createCat').value.trim();
   const q    = $('createQ').value.trim();
   const a    = $('createA').value.trim();
@@ -1520,18 +1577,19 @@ $('saveQuestionBtn').onclick = () => {
 
   loadLocalDB();
   const entry = {
-    id:       'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    id:        'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     disc, cat, question: q,
     a, b, c, d,
-    answer:   ans,
+    answer:    ans,
+    diff:      'médio',
     createdAt: Date.now(),
-    uid:      State.user?.uid || 'anon'
+    uid:       State.user?.uid || 'anon'
   };
   State.localDB.push(entry);
   saveLocalDB(State.localDB);
   updateCreateCounter();
 
-  // Limpar campos
+  // Limpar campos (manter disciplina e categoria para facilitar inserção em série)
   $('createQ').value = '';
   $('createA').value = '';
   $('createB').value = '';
@@ -1539,33 +1597,14 @@ $('saveQuestionBtn').onclick = () => {
   $('createD').value = '';
   $('createAns').value = '';
 
-  showToast('Pergunta guardada!');
+  showToast(`Pergunta guardada! (${disc})`);
 };
 
-$('uploadToCloudBtn').onclick = async () => {
-  if (!navigator.onLine) return showToast('Sem ligação à internet.');
-  if (!State.user) return showToast('Precisa de estar autenticado.');
-  loadLocalDB();
-  const pending = State.localDB.filter(q => q.uid === State.user.uid && !q.synced);
-  if (pending.length === 0) return showToast('Nenhuma pergunta nova para enviar.');
-
-  showLoading(`A enviar ${pending.length} perguntas para a nuvem...`);
-  try {
-    const updates = {};
-    pending.forEach(q => {
-      updates['questions/' + q.id] = { ...q, synced: true };
-    });
-    await db.ref().update(updates);
-    // Marcar como sincronizadas
-    State.localDB.forEach(q => { if (q.uid === State.user.uid) q.synced = true; });
-    saveLocalDB(State.localDB);
-    hideLoading();
-    showToast(pending.length + ' perguntas enviadas para a nuvem!');
-  } catch (e) {
-    hideLoading();
-    showToast('Erro ao enviar: ' + e.message);
-  }
-};
+// ─── UPLOAD PARA NUVEM DESACTIVADO ────────────────────────
+// Perguntas criadas pelo utilizador ficam APENAS localmente.
+// O botão foi removido do interface; este handler é mantido
+// como salvaguarda caso seja invocado por outro meio.
+// $('uploadToCloudBtn') já não existe no DOM.
 
 // ─── SYNC SCREEN ──────────────────────────────────────────
 $('syncBackBtn').onclick = () => showScreen('screen-mainmenu');
@@ -1615,13 +1654,22 @@ async function downloadFromCloud() {
       hideLoading();
       return showToast('Nenhuma pergunta encontrada na nuvem.');
     }
-    const qs = Object.values(data);
-    saveLocalDB(qs);
+    const cloudQs = Object.values(data);
+
+    // Preservar as perguntas criadas localmente pelo utilizador (têm id a começar por 'local_')
+    loadLocalDB();
+    const userLocalQs = State.localDB.filter(q => q.id && q.id.startsWith('local_'));
+
+    // Mesclar: nuvem + locais do utilizador (sem duplicar IDs)
+    const cloudIds = new Set(cloudQs.map(q => q.id));
+    const merged = [...cloudQs, ...userLocalQs.filter(q => !cloudIds.has(q.id))];
+
+    saveLocalDB(merged);
     LS.set('eq_last_sync', Date.now());
     hideLoading();
-    $('localQCount').textContent  = qs.length;
+    $('localQCount').textContent  = merged.length;
     $('lastSyncDate').textContent = formatDate(Date.now());
-    showToast(qs.length + ' perguntas transferidas! O jogo funciona agora offline.');
+    showToast(`${cloudQs.length} perguntas transferidas da nuvem! (+ ${userLocalQs.length} suas locais preservadas)`);
   } catch (e) {
     hideLoading();
     showToast('Erro na transferência: ' + e.message);
@@ -1637,9 +1685,10 @@ async function checkCloudUpdates() {
     if (!data) return;
     const cloudCount = Object.keys(data).length;
     loadLocalDB();
-    const localCount = State.localDB.length;
-    if (cloudCount > localCount) {
-      showUpdateBanner(cloudCount - localCount);
+    // Contar apenas as perguntas da nuvem (excluir as criadas localmente pelo utilizador)
+    const syncedCount = State.localDB.filter(q => !q.id || !q.id.startsWith('local_')).length;
+    if (cloudCount > syncedCount) {
+      showUpdateBanner(cloudCount - syncedCount);
     }
   } catch {}
 }
@@ -1672,6 +1721,6 @@ window.addEventListener('offline', () => showToast('Sem ligação à internet.')
 (function init() {
   loadLocalDB();
   loadRankingLocal();
-  // Carregar a app começa no splash
+  injectCustomDiscsIntoSetup(); // Carregar disciplinas personalizadas no selector do jogo
   showScreen('screen-splash');
 })();

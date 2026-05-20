@@ -620,6 +620,7 @@ select.field-input { cursor: pointer; }
 .btn-ranking::before { background: var(--blue); }
 .btn-criar::before  { background: var(--purple); }
 .btn-sync::before   { background: var(--green); }
+.btn-sobre::before  { background: #06B6D4; }
 .menu-card:active { transform: scale(0.98); background: var(--card2); }
 
 .menu-card-icon {
@@ -636,12 +637,108 @@ select.field-input { cursor: pointer; }
 .btn-criar  .menu-card-icon svg { fill: var(--purple); }
 .btn-sync   .menu-card-icon { background: rgba(34,197,94,0.15); }
 .btn-sync   .menu-card-icon svg { fill: var(--green); }
+.btn-sobre  .menu-card-icon { background: rgba(6,182,212,0.15); }
+.btn-sobre  .menu-card-icon svg { fill: #06B6D4; }
 .menu-card-icon svg { width: 22px; height: 22px; }
 
 .menu-card-text { flex: 1; }
 .menu-card-title { display: block; font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--text); letter-spacing: 0.03em; }
 .menu-card-sub   { display: block; font-size: 0.78rem; color: var(--text2); margin-top: 2px; }
 .menu-card-arrow { width: 18px; height: 18px; fill: var(--text3); flex-shrink: 0; }
+
+/* ── SOBRE SCREEN ─────────────────────────── */
+.sobre-content { padding-bottom: 32px; }
+.sobre-hero {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 24px 16px 20px;
+  text-align: center;
+}
+.sobre-logo-wrap {
+  width: 64px; height: 64px;
+  background: rgba(6,182,212,0.12);
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+}
+.sobre-icon { width: 36px; height: 36px; fill: #06B6D4; }
+.sobre-title {
+  font-family: var(--font-display);
+  font-size: 1.6rem; font-weight: 800;
+  letter-spacing: 0.06em;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 6px;
+}
+.sobre-tagline { font-size: 0.88rem; color: var(--text2); font-style: italic; }
+
+.sobre-card {
+  background: var(--card); border: 1px solid var(--border2);
+  border-radius: var(--radius); padding: 16px;
+  margin: 0 16px 14px;
+}
+.sobre-text { font-size: 0.88rem; color: var(--text2); line-height: 1.7; margin-bottom: 10px; }
+.sobre-text:last-child { margin-bottom: 0; }
+.sobre-text strong { color: var(--text); }
+
+.sobre-section-title {
+  font-family: var(--font-display);
+  font-size: 1rem; font-weight: 700;
+  color: var(--gold);
+  padding: 4px 16px 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sobre-feature-card {
+  display: flex; align-items: flex-start; gap: 14px;
+  background: var(--card); border: 1px solid var(--border2);
+  border-radius: var(--radius); padding: 14px 16px;
+  margin: 0 16px 10px;
+}
+.sobre-feature-icon {
+  width: 40px; height: 40px; flex-shrink: 0;
+  background: rgba(6,182,212,0.12);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.sobre-feature-icon svg { width: 22px; height: 22px; fill: #06B6D4; }
+.sobre-feature-text h4 {
+  font-family: var(--font-display);
+  font-size: 0.95rem; font-weight: 700;
+  color: var(--text); margin-bottom: 4px;
+}
+.sobre-feature-text p { font-size: 0.83rem; color: var(--text2); line-height: 1.55; }
+
+.sobre-tags {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 0 16px 4px;
+}
+.sobre-tag {
+  background: rgba(6,182,212,0.1);
+  border: 1px solid rgba(6,182,212,0.25);
+  color: #06B6D4;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.78rem; font-weight: 600;
+}
+
+.sobre-obj-title {
+  font-family: var(--font-display);
+  font-size: 1rem; font-weight: 700;
+  color: var(--text); margin-bottom: 10px;
+}
+.sobre-footer {
+  text-align: center;
+  padding: 20px 16px 8px;
+  color: var(--text3);
+  font-size: 0.82rem;
+}
+.sobre-footer strong { color: var(--gold); }
+.sobre-version { font-size: 0.75rem; margin-top: 4px; opacity: 0.6; }
+
+/* Custom discipline input */
+#customDiscWrap { animation: fadeIn 0.2s ease; }
 
 .logout-btn {
   display: flex; align-items: center; justify-content: center; gap: 8px;
