@@ -823,11 +823,11 @@ $('modeBackBtn').onclick = () => showScreen('screen-mainmenu');
 document.querySelectorAll('.mode-card').forEach(card => {
   card.onclick = () => {
     State.currentMode = card.dataset.mode;
-    const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar' };
+    const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar', imagem: 'Quiz por Imagem' };
     $('setupModeBadge').textContent = modeNames[State.currentMode] || State.currentMode;
     $('setupTitle').textContent = 'Configurar: ' + (modeNames[State.currentMode] || '');
 
-    const defaults = { aprendizado: 0, concurso: 30, prova: 60 };
+    const defaults = { aprendizado: 0, concurso: 30, prova: 60, imagem: 0 };
     setTimerDefault(defaults[State.currentMode] || 0);
 
     // Mostrar dificuldade em todos os modos
@@ -935,6 +935,12 @@ function buildPool(db) {
     const diffFilter = State.currentDiff.toLowerCase();
     pool = pool.filter(q => (q.diff || '').toLowerCase() === diffFilter);
   }
+  // For image mode, only show image questions; for other modes, exclude image-only questions
+  if (State.currentMode === 'imagem') {
+    pool = pool.filter(q => q.mode === 'imagem' || q.imgA);
+  } else {
+    pool = pool.filter(q => q.mode !== 'imagem' && !q.imgA);
+  }
   return pool;
 }
 
@@ -971,7 +977,7 @@ function startGame(pool) {
   State.correct = 0;
   State.wrong   = 0;
 
-  const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar' };
+  const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar', imagem: 'Quiz por Imagem' };
   $('gameModeLabel').textContent = modeNames[State.currentMode] || State.currentMode;
 
   showScreen('screen-game');
@@ -997,11 +1003,11 @@ function renderQuestion() {
 
   // Construir lista de opções com posição original
   const originalOpts = [
-    { letter: 'A', text: q.a },
-    { letter: 'B', text: q.b },
-    { letter: 'C', text: q.c },
-    { letter: 'D', text: q.d },
-  ].filter(o => o.text);
+    { letter: 'A', text: q.a, img: q.imgA },
+    { letter: 'B', text: q.b, img: q.imgB },
+    { letter: 'C', text: q.c, img: q.imgC },
+    { letter: 'D', text: q.d, img: q.imgD },
+  ].filter(o => o.text || o.img);
 
   // Embaralhar as opções para apresentação aleatória
   const shuffledOpts = shuffle(originalOpts);
@@ -1018,20 +1024,43 @@ function renderQuestion() {
   const optWrap = $('gameOptions');
   optWrap.innerHTML = '';
 
+  const isImageMode = State.currentMode === 'imagem' || (q.imgA || q.imgB || q.imgC || q.imgD);
+  optWrap.classList.toggle('image-mode', isImageMode);
+
+  // Show/hide question image
+  const qImgWrap = $('questionImageWrap');
+  const qImg = $('questionImage');
+  if (q.questionImg) {
+    qImg.src = q.questionImg;
+    qImgWrap.style.display = 'block';
+  } else {
+    qImgWrap.style.display = 'none';
+  }
+
   displayLetters.forEach((displayLetter, i) => {
     const mappedOpt = optionMap[displayLetter];
     if (!mappedOpt) return;
     const btn = document.createElement('button');
-    btn.className = 'option-btn';
+    btn.className = isImageMode ? 'option-btn image-option' : 'option-btn';
     btn.dataset.displayLetter  = displayLetter;
     btn.dataset.originalLetter = mappedOpt.letter;
-    btn.dataset.optionText     = mappedOpt.text;
-    btn.innerHTML = `
-      <div class="option-badge">${displayLetter}</div>
-      <span class="option-text">${mappedOpt.text}</span>
-      <svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-      <svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>
-    `;
+    btn.dataset.optionText     = mappedOpt.text || '';
+
+    if (isImageMode && mappedOpt.img) {
+      btn.innerHTML = `
+        <div class="option-badge">${displayLetter}</div>
+        <img class="option-img" src="${mappedOpt.img}" alt="Opção ${displayLetter}">
+        <svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        <svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>
+      `;
+    } else {
+      btn.innerHTML = `
+        <div class="option-badge">${displayLetter}</div>
+        <span class="option-text">${mappedOpt.text}</span>
+        <svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        <svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>
+      `;
+    }
     btn.onclick = () => handleAnswer(displayLetter, btn, optionMap);
     optWrap.appendChild(btn);
   });
@@ -1112,6 +1141,7 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
   const q = State.questions[State.qIndex];
   const correctOriginalLetter = q.answer; // posição original na BD
   const correctOriginalText   = q[correctOriginalLetter.toLowerCase()];
+  const correctOriginalImg    = q['img' + correctOriginalLetter]; // imgA, imgB, imgC, imgD
 
   const selectedOpt            = optionMap ? optionMap[displayLetter] : null;
   const selectedOriginalLetter = selectedOpt ? selectedOpt.letter : displayLetter;
@@ -1551,6 +1581,51 @@ function injectCustomDiscsIntoSetup() {
   });
 }
 
+// ─── CREATE QUIZ: MODE SELECTOR ───────────────────────────
+let createQuizMode = 'aprendizado';
+
+document.querySelectorAll('.create-mode-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.create-mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    createQuizMode = btn.dataset.mode;
+    const isImage = createQuizMode === 'imagem';
+    $('textOptionsGrid').style.display  = isImage ? 'none' : 'grid';
+    $('imageOptionsGrid').style.display = isImage ? 'block' : 'none';
+  };
+});
+
+// ─── IMAGE UPLOAD PREVIEWS ────────────────────────────────
+const imgInputIds = ['A','B','C','D'];
+const _imgData = { A: null, B: null, C: null, D: null };
+
+imgInputIds.forEach(letter => {
+  const input   = $('imgInput' + letter);
+  const preview = $('imgPreview' + letter);
+  if (!input) return;
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Imagem muito grande. Use imagens até 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      _imgData[letter] = ev.target.result;
+      preview.classList.add('has-image');
+      // Remove old img if any
+      const oldImg = preview.querySelector('img');
+      if (oldImg) oldImg.remove();
+      const img = document.createElement('img');
+      img.src = ev.target.result;
+      img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  };
+});
+
 $('saveQuestionBtn').onclick = () => {
   let disc = $('createDisc').value.trim();
 
@@ -1565,13 +1640,56 @@ $('saveQuestionBtn').onclick = () => {
 
   const cat  = $('createCat').value.trim();
   const q    = $('createQ').value.trim();
+  const ans  = $('createAns').value;
+
+  if (!q || !ans) {
+    return showToast('Preencha a pergunta e a resposta correcta.');
+  }
+
+  const isImage = createQuizMode === 'imagem';
+
+  if (isImage) {
+    // Image mode: validate image uploads
+    if (!_imgData.A || !_imgData.B || !_imgData.C || !_imgData.D) {
+      return showToast('Carregue imagens para todas as alternativas (A, B, C e D).');
+    }
+    loadLocalDB();
+    const entry = {
+      id:         'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      disc, cat, question: q,
+      a: 'Imagem A', b: 'Imagem B', c: 'Imagem C', d: 'Imagem D',
+      imgA: _imgData.A, imgB: _imgData.B, imgC: _imgData.C, imgD: _imgData.D,
+      answer: ans,
+      diff: 'médio',
+      mode: 'imagem',
+      createdAt: Date.now(),
+      uid: State.user?.uid || 'anon'
+    };
+    State.localDB.push(entry);
+    saveLocalDB(State.localDB);
+    updateCreateCounter();
+
+    // Limpar imagens
+    imgInputIds.forEach(letter => {
+      _imgData[letter] = null;
+      const preview = $('imgPreview' + letter);
+      preview.classList.remove('has-image');
+      const img = preview.querySelector('img');
+      if (img) img.remove();
+      $('imgInput' + letter).value = '';
+    });
+    $('createQ').value = '';
+    $('createAns').value = '';
+    showToast(`Pergunta de imagem guardada! (${disc})`);
+    return;
+  }
+
   const a    = $('createA').value.trim();
   const b    = $('createB').value.trim();
   const c    = $('createC').value.trim();
   const d    = $('createD').value.trim();
-  const ans  = $('createAns').value;
 
-  if (!q || !a || !b || !c || !d || !ans) {
+  if (!a || !b || !c || !d) {
     return showToast('Preencha todos os campos da pergunta.');
   }
 
@@ -1582,6 +1700,7 @@ $('saveQuestionBtn').onclick = () => {
     a, b, c, d,
     answer:    ans,
     diff:      'médio',
+    mode:      createQuizMode,
     createdAt: Date.now(),
     uid:       State.user?.uid || 'anon'
   };

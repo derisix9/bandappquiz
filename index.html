@@ -448,6 +448,21 @@
           </div>
         </div>
       </button>
+
+      <button class="mode-card" data-mode="imagem">
+        <div class="mode-card-icon mode-image">
+          <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+        </div>
+        <div class="mode-card-info">
+          <h3>Quiz por Imagem</h3>
+          <p>As alternativas são imagens! Identifique a imagem correta entre as quatro opções visuais.</p>
+          <div class="mode-tags">
+            <span class="tag">Imagens</span>
+            <span class="tag">Visual</span>
+            <span class="tag">Identificação</span>
+          </div>
+        </div>
+      </button>
     </div>
   </div>
 </div>
@@ -550,6 +565,9 @@
   <div class="game-question-card">
     <div class="question-num" id="questionNum">Questão 1</div>
     <p class="question-text" id="questionText">A carregar...</p>
+    <div id="questionImageWrap" style="display:none" class="question-image-wrap">
+      <img id="questionImage" class="question-image" src="" alt="Imagem da pergunta">
+    </div>
   </div>
 
   <div class="game-options" id="gameOptions"></div>
@@ -632,6 +650,7 @@
     <button class="rank-filter" data-filter="aprendizado">Aprendizado</button>
     <button class="rank-filter" data-filter="concurso">Concurso</button>
     <button class="rank-filter" data-filter="prova">Prova</button>
+    <button class="rank-filter" data-filter="imagem">Imagem</button>
   </div>
   <div class="scroll-content" id="rankingList">
     <div class="empty-state">
@@ -654,6 +673,26 @@
   </div>
   <div class="scroll-content">
     <div class="create-counter" id="createCounter">0 perguntas guardadas</div>
+
+    <label class="field-label">Modo do Quiz</label>
+    <div class="create-mode-selector" id="createModeSelector">
+      <button class="create-mode-btn active" data-mode="aprendizado">
+        <svg viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.91V17h2V9M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>
+        <span>Aprendizado</span>
+      </button>
+      <button class="create-mode-btn" data-mode="concurso">
+        <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+        <span>Concurso</span>
+      </button>
+      <button class="create-mode-btn" data-mode="prova">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        <span>Prova</span>
+      </button>
+      <button class="create-mode-btn" data-mode="imagem">
+        <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+        <span>Imagem</span>
+      </button>
+    </div>
 
     <label class="field-label">Disciplina</label>
     <select class="field-input mb-sm" id="createDisc">
@@ -678,7 +717,7 @@
     <label class="field-label">Pergunta</label>
     <textarea class="field-input mb-sm" id="createQ" rows="3" placeholder="Escreva a sua pergunta aqui..."></textarea>
 
-    <div class="options-grid">
+    <div class="options-grid" id="textOptionsGrid">
       <div class="option-input-wrap">
         <span class="option-badge-label">A</span>
         <input type="text" class="field-input" id="createA" placeholder="Alternativa A">
@@ -694,6 +733,53 @@
       <div class="option-input-wrap">
         <span class="option-badge-label">D</span>
         <input type="text" class="field-input" id="createD" placeholder="Alternativa D">
+      </div>
+    </div>
+
+    <!-- IMAGE MODE OPTIONS (shown only when mode = imagem) -->
+    <div id="imageOptionsGrid" style="display:none">
+      <p class="image-options-hint">Carregue uma imagem para cada alternativa (obrigatório)</p>
+      <div class="image-options-wrap">
+        <div class="image-opt-card" id="imgOptA">
+          <div class="image-opt-badge">A</div>
+          <label class="image-opt-upload" for="imgInputA">
+            <input type="file" id="imgInputA" accept="image/*" style="display:none">
+            <div class="image-opt-preview" id="imgPreviewA">
+              <svg viewBox="0 0 24 24"><path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/></svg>
+              <span>Toque para carregar</span>
+            </div>
+          </label>
+        </div>
+        <div class="image-opt-card" id="imgOptB">
+          <div class="image-opt-badge">B</div>
+          <label class="image-opt-upload" for="imgInputB">
+            <input type="file" id="imgInputB" accept="image/*" style="display:none">
+            <div class="image-opt-preview" id="imgPreviewB">
+              <svg viewBox="0 0 24 24"><path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/></svg>
+              <span>Toque para carregar</span>
+            </div>
+          </label>
+        </div>
+        <div class="image-opt-card" id="imgOptC">
+          <div class="image-opt-badge">C</div>
+          <label class="image-opt-upload" for="imgInputC">
+            <input type="file" id="imgInputC" accept="image/*" style="display:none">
+            <div class="image-opt-preview" id="imgPreviewC">
+              <svg viewBox="0 0 24 24"><path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/></svg>
+              <span>Toque para carregar</span>
+            </div>
+          </label>
+        </div>
+        <div class="image-opt-card" id="imgOptD">
+          <div class="image-opt-badge">D</div>
+          <label class="image-opt-upload" for="imgInputD">
+            <input type="file" id="imgInputD" accept="image/*" style="display:none">
+            <div class="image-opt-preview" id="imgPreviewD">
+              <svg viewBox="0 0 24 24"><path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/></svg>
+              <span>Toque para carregar</span>
+            </div>
+          </label>
+        </div>
       </div>
     </div>
 

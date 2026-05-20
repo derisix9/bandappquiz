@@ -776,6 +776,121 @@ select.field-input { cursor: pointer; }
 .mode-learn   { background: linear-gradient(135deg, #22C55E, #16A34A); }
 .mode-contest { background: linear-gradient(135deg, #3B82F6, #1D4ED8); }
 .mode-exam    { background: linear-gradient(135deg, #F59E0B, #D97706); }
+.mode-image   { background: linear-gradient(135deg, #EC4899, #9333EA); }
+
+/* ── CREATE QUIZ MODE SELECTOR ──────────────────────────── */
+.create-mode-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.create-mode-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: var(--card); border: 1.5px solid var(--border2);
+  border-radius: var(--radius); padding: 14px 8px;
+  cursor: pointer; transition: all 0.2s;
+  color: var(--text2); font-size: 0.78rem; font-weight: 700;
+  font-family: var(--font-body);
+  letter-spacing: 0.03em;
+}
+.create-mode-btn svg { width: 22px; height: 22px; fill: currentColor; }
+.create-mode-btn.active {
+  border-color: var(--gold); background: var(--gold-dim); color: var(--gold);
+}
+.create-mode-btn:active { transform: scale(0.97); }
+
+/* ── IMAGE OPTIONS GRID ─────────────────────────────────── */
+.image-options-hint {
+  font-size: 0.8rem; color: var(--text2);
+  margin-bottom: 12px;
+  background: rgba(236,72,153,0.1);
+  border: 1px solid rgba(236,72,153,0.25);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+.image-options-wrap {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-bottom: 4px;
+}
+.image-opt-card {
+  display: flex; flex-direction: column;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1.5px solid var(--border2);
+  background: var(--card);
+}
+.image-opt-badge {
+  background: var(--gold); color: #0B0F1A;
+  font-family: var(--font-display); font-size: 0.9rem; font-weight: 800;
+  padding: 4px 0; text-align: center;
+  letter-spacing: 0.05em;
+}
+.image-opt-upload {
+  cursor: pointer; display: block;
+}
+.image-opt-preview {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 6px; min-height: 110px;
+  padding: 10px;
+  color: var(--text3); font-size: 0.72rem; text-align: center;
+  position: relative; overflow: hidden;
+}
+.image-opt-preview svg { width: 28px; height: 28px; fill: var(--text3); }
+.image-opt-preview img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+}
+.image-opt-preview.has-image svg,
+.image-opt-preview.has-image span { display: none; }
+
+/* ── GAME: IMAGE OPTIONS GRID ───────────────────────────── */
+.game-options.image-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px 14px;
+}
+.option-btn.image-option {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+  height: auto;
+  gap: 0;
+}
+.option-btn.image-option .option-badge {
+  width: 100%; height: 32px;
+  border-radius: 0;
+  font-size: 0.9rem;
+}
+.option-btn.image-option .option-img {
+  width: 100%; aspect-ratio: 1;
+  object-fit: cover; display: block;
+}
+.option-btn.image-option .option-text { display: none; }
+.option-btn.image-option .option-icon {
+  position: absolute; top: 36px; right: 6px;
+  width: 28px; height: 28px;
+  background: rgba(0,0,0,0.55);
+  border-radius: 50%; padding: 4px;
+}
+.option-btn.image-option { position: relative; }
+
+/* ── GAME: Question image ───────────────────────────────── */
+.question-image-wrap {
+  margin-top: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.question-image {
+  width: 100%; max-height: 180px;
+  object-fit: cover; display: block;
+}
 .mode-card-info h3 { font-family: var(--font-display); font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; letter-spacing: 0.02em; }
 .mode-card-info p  { font-size: 0.8rem; color: var(--text2); line-height: 1.45; margin-bottom: 10px; }
 .mode-tags { display: flex; flex-wrap: wrap; gap: 6px; }
