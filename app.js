@@ -828,8 +828,8 @@ document.querySelectorAll('.mode-card').forEach(card => {
     const defaults = { aprendizado: 0, concurso: 30, prova: 60 };
     setTimerDefault(defaults[State.currentMode] || 0);
 
-    // Mostrar dificuldade apenas em concurso e prova
-    $('difficultyWrap').style.display = (State.currentMode !== 'aprendizado') ? 'block' : 'none';
+    // Mostrar dificuldade em todos os modos
+    $('difficultyWrap').style.display = 'block';
     State.currentDiff = 'all';
     document.querySelectorAll('#difficultyOptions .timer-opt').forEach(o => {
       o.classList.toggle('active', o.dataset.diff === 'all');
@@ -928,7 +928,7 @@ function buildPool(db) {
   let pool = [...db];
   if (State.currentDisc !== 'all') pool = pool.filter(q => q.disc === State.currentDisc);
   if (State.currentCat  !== 'all') pool = pool.filter(q => q.cat  === State.currentCat);
-  if (State.currentDiff !== 'all' && State.currentMode !== 'aprendizado') {
+  if (State.currentDiff !== 'all') {
     const diffFilter = State.currentDiff.toLowerCase();
     pool = pool.filter(q => (q.diff || '').toLowerCase() === diffFilter);
   }
@@ -1035,12 +1035,10 @@ function renderQuestion() {
 
   // Timer
   if (State.timerSecs > 0) {
-    $('gameTimerWrap').style.display  = 'flex';
     $('timerRingWrap').style.display  = 'flex';
     $('nextBtn').disabled = (State.currentMode !== 'aprendizado');
     startTimer(State.timerSecs);
   } else {
-    $('gameTimerWrap').style.display = 'none';
     $('timerRingWrap').style.display = 'none';
     $('nextBtn').disabled = true;
     $('nextBtnText').textContent = 'PRÓXIMA';
@@ -1198,14 +1196,14 @@ function startTimer(secs) {
   const numEl  = $('timerRingNum');
   const total  = 2 * Math.PI * 23; // r=23
 
-  $('gameTimerDisplay').textContent = secs + 's';
+  // Inicializar o círculo completo
+  circle.style.strokeDasharray  = total;
+  circle.style.strokeDashoffset = 0;
 
   function tick() {
     const pct = State.timerLeft / secs;
     circle.style.strokeDashoffset = total * (1 - pct);
-
     numEl.textContent = State.timerLeft;
-    $('gameTimerDisplay').textContent = State.timerLeft + 's';
 
     if (State.timerLeft <= 5) {
       circle.classList.add('danger');
@@ -1217,10 +1215,7 @@ function startTimer(secs) {
 
     if (State.timerLeft <= 0) {
       stopTimer();
-      if (!State.answered) {
-        // Tempo esgotado — mostrar resposta certa e avançar
-        timeUp();
-      }
+      if (!State.answered) timeUp();
       return;
     }
     State.timerLeft--;
