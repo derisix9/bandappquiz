@@ -754,7 +754,11 @@ select.field-input { cursor: pointer; }
 }
 
 .game-meta-bar {
-  display: none;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .game-meta-item {
   display: flex; align-items: center; gap: 5px;
