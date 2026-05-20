@@ -43,6 +43,8 @@ const State = {
   profile:      null,
   currentMode:  null,   // 'aprendizado' | 'concurso' | 'prova'
   currentDisc:  'all',
+  currentCat:   'all',
+  currentDiff:  'all',
   timerSecs:    0,      // 0 = livre
   questions:    [],     // perguntas da rodada (50)
   qIndex:       0,
@@ -819,78 +821,148 @@ $('modeBackBtn').onclick = () => showScreen('screen-mainmenu');
 document.querySelectorAll('.mode-card').forEach(card => {
   card.onclick = () => {
     State.currentMode = card.dataset.mode;
-    // Actualizar badge e título no setup
     const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar' };
     $('setupModeBadge').textContent = modeNames[State.currentMode] || State.currentMode;
     $('setupTitle').textContent = 'Configurar: ' + (modeNames[State.currentMode] || '');
 
-    // No modo "aprendizado", timer padrão = Livre
-    // No modo "concurso", timer padrão = 30s
-    // No modo "prova", timer padrão = 1min
     const defaults = { aprendizado: 0, concurso: 30, prova: 60 };
     setTimerDefault(defaults[State.currentMode] || 0);
+
+    // Mostrar dificuldade apenas em concurso e prova
+    $('difficultyWrap').style.display = (State.currentMode !== 'aprendizado') ? 'block' : 'none';
+    State.currentDiff = 'all';
+    document.querySelectorAll('#difficultyOptions .timer-opt').forEach(o => {
+      o.classList.toggle('active', o.dataset.diff === 'all');
+    });
+
+    // Reset category
+    State.currentCat = 'all';
+    updateCategoryOptions('all');
 
     showScreen('screen-gamesetup');
   };
 });
 
 function setTimerDefault(secs) {
-  document.querySelectorAll('.timer-opt').forEach(opt => {
+  document.querySelectorAll('.timer-opt[data-seconds]').forEach(opt => {
     opt.classList.toggle('active', parseInt(opt.dataset.seconds) === secs);
   });
   State.timerSecs = secs;
 }
 
+// Populate category dropdown based on selected discipline
+function updateCategoryOptions(disc) {
+  const catSel = $('setupCat');
+  catSel.innerHTML = '<option value="all">Todas as Categorias</option>';
+
+  // Gather categories from local DB
+  let pool = State.localDB;
+  if (disc !== 'all') pool = pool.filter(q => q.disc === disc);
+  const cats = [...new Set(pool.map(q => q.cat).filter(Boolean))].sort();
+  cats.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    catSel.appendChild(o);
+  });
+}
+
 // ─── GAME SETUP ───────────────────────────────────────────
 $('setupBackBtn').onclick = () => showScreen('screen-modeselect');
 
-document.querySelectorAll('.timer-opt').forEach(opt => {
+$('setupDisc').onchange = () => {
+  loadLocalDB();
+  updateCategoryOptions($('setupDisc').value);
+  State.currentCat = 'all';
+};
+
+document.querySelectorAll('.timer-opt[data-seconds]').forEach(opt => {
   opt.onclick = () => {
-    document.querySelectorAll('.timer-opt').forEach(o => o.classList.remove('active'));
+    document.querySelectorAll('.timer-opt[data-seconds]').forEach(o => o.classList.remove('active'));
     opt.classList.add('active');
     State.timerSecs = parseInt(opt.dataset.seconds);
   };
 });
 
-$('startGameBtn').onclick = () => {
+document.querySelectorAll('#difficultyOptions .timer-opt').forEach(opt => {
+  opt.onclick = () => {
+    document.querySelectorAll('#difficultyOptions .timer-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    State.currentDiff = opt.dataset.diff;
+  };
+});
+
+$('startGameBtn').onclick = async () => {
   State.currentDisc = $('setupDisc').value;
+  State.currentCat  = $('setupCat').value;
   loadLocalDB();
   loadUsedToday();
-  startGame();
-};
 
-// ─── GAME LOGIC ───────────────────────────────────────────
-function startGame() {
-  let pool = [...State.localDB];
-  if (State.currentDisc !== 'all') {
-    pool = pool.filter(q => q.disc === State.currentDisc);
+  // Se não há perguntas locais suficientes, tentar carregar da nuvem
+  let pool = buildPool(State.localDB);
+  if (pool.length < 5 && navigator.onLine) {
+    showLoading('A carregar perguntas da nuvem...');
+    try {
+      const snap = await db.ref('questions').once('value');
+      const data = snap.val();
+      if (data) {
+        const cloudQs = Object.values(data);
+        // Mesclar com local (sem duplicar IDs)
+        const localIds = new Set(State.localDB.map(q => q.id));
+        const merged = [...State.localDB, ...cloudQs.filter(q => !localIds.has(q.id))];
+        saveLocalDB(merged);
+        pool = buildPool(merged);
+      }
+    } catch (e) {}
+    hideLoading();
   }
 
-  if (pool.length < 10) {
+  if (pool.length < 1) {
+    showToast('Nenhuma pergunta disponível. Sincronize a base de dados primeiro.');
+    return;
+  }
+
+  startGame(pool);
+};
+
+function buildPool(db) {
+  let pool = [...db];
+  if (State.currentDisc !== 'all') pool = pool.filter(q => q.disc === State.currentDisc);
+  if (State.currentCat  !== 'all') pool = pool.filter(q => q.cat  === State.currentCat);
+  if (State.currentDiff !== 'all' && State.currentMode !== 'aprendizado') {
+    const diffFilter = State.currentDiff.toLowerCase();
+    pool = pool.filter(q => (q.diff || '').toLowerCase() === diffFilter);
+  }
+  return pool;
+}
+
+// ─── GAME LOGIC ───────────────────────────────────────────
+function startGame(pool) {
+  if (!pool) {
+    loadLocalDB();
+    pool = buildPool(State.localDB);
+  }
+
+  if (pool.length < 1) {
     showToast('Poucas perguntas disponíveis. Sincronize a base de dados primeiro.');
     return;
   }
 
-  // Filtrar as usadas hoje (se pool > 50)
+  // Filtrar as usadas hoje
   let available = pool.filter(q => !State.usedTodayIds.includes(q.id));
-  if (available.length < 10) {
-    // Resetar o registo do dia se ficaram poucas
+  if (available.length < 1) {
     State.usedTodayIds = [];
     saveUsedToday();
     available = [...pool];
   }
 
-  // Embaralhar e pegar 50 (ou todas se < 50)
   const shuffled = shuffle(available);
   State.questions = shuffled.slice(0, Math.min(50, shuffled.length));
 
-  // Marcar como usadas
   State.questions.forEach(q => {
     if (!State.usedTodayIds.includes(q.id)) State.usedTodayIds.push(q.id);
   });
   saveUsedToday();
 
-  // Resetar estado do jogo
   State.qIndex  = 0;
   State.score   = 0;
   State.correct = 0;
@@ -913,7 +985,7 @@ function renderQuestion() {
   const pct = ((State.qIndex) / State.questions.length) * 100;
   $('gameProgressFill').style.width = Math.max(2, pct) + '%';
   $('gameProgressLabel').textContent = (State.qIndex + 1) + ' / ' + State.questions.length;
-  $('gameScoreBadge').textContent    = State.score;
+  $('gameScoreBadge').textContent    = formatScore(State.score) + 'v';
   $('questionNum').textContent       = 'Questão ' + (State.qIndex + 1);
   $('questionText').textContent      = q.question;
 
@@ -1075,7 +1147,7 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
   if (isRight) {
     State.correct++;
     State.score += getPointsForMode();
-    $('gameScoreBadge').textContent = State.score;
+    $('gameScoreBadge').textContent = formatScore(State.score) + 'v';
     renderGameStars();
     playCorrectSound();
   } else {
@@ -1095,8 +1167,15 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
 }
 
 function getPointsForMode() {
-  const pts = { aprendizado: 10, concurso: 20, prova: 15 };
-  return pts[State.currentMode] || 10;
+  // 0.5 valores por pergunta — guardado como 5 (×10) para evitar decimais no display
+  // 50 perguntas certas = 250 pontos internos = 25/10 = 25... mas queremos 20 valores
+  // Portanto: cada pergunta = 0.5 valores → usamos 5 internamente (dividir por 10 para mostrar)
+  return 5; // 5 pontos internos = 0.5 valores
+}
+
+function formatScore(score) {
+  // Converte pontos internos para valores (divde por 10)
+  return (score / 10).toFixed(1).replace('.', ',');
 }
 
 function renderGameStars() {
@@ -1224,7 +1303,7 @@ function endGame() {
   saveResult(stars, pct);
 
   // Renderizar ecrã de resultado
-  $('resultScore').textContent         = State.score;
+  $('resultScore').textContent = formatScore(State.score) + ' val';
   $('resultCorrect').textContent       = State.correct;
   $('resultWrong').textContent         = State.wrong;
   $('resultTotal').textContent         = totalQ;
@@ -1290,7 +1369,7 @@ function getClassification(pct, mode) {
 $('resultPlayAgain').onclick = () => {
   loadLocalDB();
   loadUsedToday();
-  startGame();
+  startGame(buildPool(State.localDB));
 };
 $('resultMenu').onclick = () => showScreen('screen-mainmenu');
 
@@ -1411,7 +1490,7 @@ function loadRankingScreen(filter) {
         <div class="rank-meta">${modeTag} · ${r.date} ${r.time || ''} · ${r.correct}/${r.total} acertos</div>
       </div>
       <div class="rank-right">
-        <div class="rank-score">${r.score}</div>
+        <div class="rank-score">${formatScore(r.score)} val</div>
         <div class="rank-stars">${starsHtml}</div>
       </div>
     `;
