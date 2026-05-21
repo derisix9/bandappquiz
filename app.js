@@ -2050,7 +2050,7 @@ $('btnEnviarComprovativo').onclick = () => {
 $('btnComprarPacote').onclick = () => { if (pacoteAtual) abrirPagamento(pacoteAtual); };
 
 $('lojaBackBtn').onclick   = () => showScreen('screen-home');
-$('pacoteBackBtn').onclick = () => showScreen('screen-loja');
+$('pacoteBackBtn').onclick = () => abrirLoja();
 $('pagBackBtn').onclick    = () => showScreen('screen-pacote');
 $('btnLoja').onclick       = () => abrirLoja();
 
