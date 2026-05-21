@@ -1024,7 +1024,7 @@ function renderQuestion() {
   const optWrap = $('gameOptions');
   optWrap.innerHTML = '';
 
-  const isImageMode = State.currentMode === 'imagem' || (q.imgA || q.imgB || q.imgC || q.imgD);
+  const isImageMode = State.currentMode === 'imagem';
   optWrap.classList.toggle('image-mode', isImageMode);
 
   // Show/hide question image
