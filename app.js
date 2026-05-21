@@ -1840,8 +1840,6 @@ window.addEventListener('offline', () => showToast('Sem ligação à internet.')
 // LOJA DE PACOTES
 // ══════════════════════════════════════════════════════════
 
-// Pacotes definidos aqui pelo admin — basta adicionar objetos neste array
-// para que apareçam automaticamente na loja e os utilizadores recebam notificação.
 const PACOTES_CATALOGO = [
   {
     id: 'pac_001',
@@ -1859,7 +1857,6 @@ const PACOTES_CATALOGO = [
       'Atualizado com editais de 2023 e 2024',
     ],
     novo: true,
-    lancamento: '2025-01-15',
   },
   {
     id: 'pac_002',
@@ -1877,7 +1874,6 @@ const PACOTES_CATALOGO = [
       'Simulados organizados por nível de dificuldade',
     ],
     novo: false,
-    lancamento: '2024-10-01',
   },
   {
     id: 'pac_003',
@@ -1895,43 +1891,36 @@ const PACOTES_CATALOGO = [
       'Foco nos temas mais recorrentes nos últimos 5 anos',
     ],
     novo: true,
-    lancamento: '2025-02-01',
   },
 ];
 
-// Chave no localStorage para rastrear notificações já vistas
 const LOJA_NOTIF_KEY = 'bandapp_loja_notif_seen';
-
 let lojaFiltroAtual = 'todos';
 let pacoteAtual = null;
 
-// ── Abre a loja ──────────────────────────────────────────
 function abrirLoja() {
   showScreen('screen-loja');
   renderLojaGrid(lojaFiltroAtual);
-  verificarNotifNovoPacote();
 }
 
-// ── Render da grelha de pacotes ──────────────────────────
 function renderLojaGrid(filtro) {
   const grid = $('lojaGrid');
   const loading = $('lojaLoading');
   if (loading) loading.style.display = 'none';
 
-  const lista = filtro === 'todos'
-    ? PACOTES_CATALOGO
-    : PACOTES_CATALOGO.filter(p => p.categoria === filtro);
-
-  // Remover cards antigos (preservar loading div se existir)
+  // Remover cards antigos
   Array.from(grid.children).forEach(c => {
     if (!c.id || c.id !== 'lojaLoading') c.remove();
   });
 
+  const lista = filtro === 'todos'
+    ? PACOTES_CATALOGO
+    : PACOTES_CATALOGO.filter(p => p.categoria === filtro);
+
   if (lista.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'loja-empty';
-    empty.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 6h-2c0-2.76-2.24-5-5-5S7 3.24 7 6H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7-3c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3z"/></svg>
-      <p>Nenhum pacote nesta categoria ainda.</p>`;
+    empty.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 6h-2c0-2.76-2.24-5-5-5S7 3.24 7 6H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7-3c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3z"/></svg><p>Nenhum pacote nesta categoria ainda.</p>`;
     grid.appendChild(empty);
     return;
   }
@@ -1941,14 +1930,12 @@ function renderLojaGrid(filtro) {
     card.className = 'pacote-card';
     card.dataset.id = p.id;
 
-    const tagClass = { concurso: 'tag-concurso', prova: 'tag-prova', exame: 'tag-exame', todos: 'tag-todos' }[p.categoria] || 'tag-todos';
+    const tagClass = { concurso: 'tag-concurso', prova: 'tag-prova', exame: 'tag-exame' }[p.categoria] || 'tag-todos';
     const tagLabel = { concurso: 'Concurso', prova: 'Prova', exame: 'Exame' }[p.categoria] || p.categoria;
 
     const capaHTML = p.capa
       ? `<img src="${p.capa}" alt="${p.titulo}" class="pacote-card-cover">`
-      : `<div class="pacote-card-cover-placeholder">
-           <svg viewBox="0 0 24 24"><path d="M19 6h-2c0-2.76-2.24-5-5-5S7 3.24 7 6H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7-3c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3zm0 10c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
-         </div>`;
+      : `<div class="pacote-card-cover-placeholder"><svg viewBox="0 0 24 24"><path d="M19 6h-2c0-2.76-2.24-5-5-5S7 3.24 7 6H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7-3c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3zm0 10c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg></div>`;
 
     card.innerHTML = `
       ${capaHTML}
@@ -1962,10 +1949,7 @@ function renderLojaGrid(filtro) {
             <span>Preço</span>
             ${p.preco.toLocaleString('pt-AO')} AOA
           </div>
-          <button class="btn-ver-pacote">
-            Ver
-            <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
-          </button>
+          <button class="btn-ver-pacote">Ver <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></button>
         </div>
       </div>`;
 
@@ -1974,7 +1958,6 @@ function renderLojaGrid(filtro) {
   });
 }
 
-// ── Filtros da loja ──────────────────────────────────────
 document.querySelectorAll('.loja-filter').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('.loja-filter').forEach(b => b.classList.remove('active'));
@@ -1984,11 +1967,9 @@ document.querySelectorAll('.loja-filter').forEach(btn => {
   };
 });
 
-// ── Abre detalhe do pacote ───────────────────────────────
 function abrirDetalhe(pacote) {
   pacoteAtual = pacote;
 
-  // Capa
   const coverImg = $('pacoteCoverImg');
   if (pacote.capa) {
     coverImg.src = pacote.capa;
@@ -1998,18 +1979,13 @@ function abrirDetalhe(pacote) {
     coverImg.style.display = 'none';
   }
 
-  // Badge categoria
-  const badge = $('pacoteCoverBadge');
-  badge.textContent = { concurso: 'Concurso', prova: 'Prova', exame: 'Exame' }[pacote.categoria] || pacote.categoria;
-  badge.className = 'pacote-cover-badge';
-
+  $('pacoteCoverBadge').textContent = { concurso: 'Concurso', prova: 'Prova', exame: 'Exame' }[pacote.categoria] || pacote.categoria;
   $('pacoteDetailTitle').textContent = pacote.titulo;
   $('pacoteQtd').innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg> ${pacote.qtd} questões`;
   $('pacoteDisc').innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.91V17h2V9M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg> ${pacote.disciplina}`;
   $('pacoteDesc').textContent = pacote.descricao;
   $('pacotePrice').textContent = `${pacote.preco.toLocaleString('pt-AO')} AOA`;
 
-  // Lista "o que inclui"
   const ul = $('pacoteIncludesList');
   ul.innerHTML = '';
   pacote.inclui.forEach(item => {
@@ -2021,17 +1997,14 @@ function abrirDetalhe(pacote) {
   showScreen('screen-pacote');
 }
 
-// ── Abre ecrã de pagamento ───────────────────────────────
 function abrirPagamento(pacote) {
-  // Resumo topo
   const coverEl = $('pagPacoteCover');
   if (pacote.capa) { coverEl.src = pacote.capa; coverEl.style.display = 'block'; }
-  else { coverEl.src = ''; coverEl.style.display = 'none'; }
+  else { coverEl.style.display = 'none'; }
 
   $('pagPacoteTitle').textContent = pacote.titulo;
   $('pagPacotePrice').textContent = `${pacote.preco.toLocaleString('pt-AO')} AOA`;
 
-  // Gerar referências únicas pseudo-aleatórias baseadas no ID do pacote + timestamp
   const ts = Date.now().toString().slice(-6);
   const mcxRefVal = `${ts.slice(0,3)} ${ts.slice(3)} ${Math.floor(Math.random()*900+100)}`;
   const atmRefVal = `${Math.floor(Math.random()*900+100)} ${Math.floor(Math.random()*900000+100000)}`;
@@ -2044,7 +2017,6 @@ function abrirPagamento(pacote) {
   $('trfAmount').textContent = `${pacote.preco.toLocaleString('pt-AO')} AOA`;
   $('trfDesc').textContent = `BANDAPP-${pacote.id.toUpperCase()}-${ts}`;
 
-  // Reset accordions: apenas MCX aberto por padrão
   $('bodyMCX').style.display = 'block';
   $('pagMethodMCX').classList.add('open');
   $('bodyATM').style.display = 'none';
@@ -2055,14 +2027,12 @@ function abrirPagamento(pacote) {
   showScreen('screen-pagamento');
 }
 
-// ── Acordeão dos métodos de pagamento ───────────────────
 ['MCX','ATM','TRF'].forEach(m => {
   const card = $('pagMethod' + m);
   const body = $('body' + m);
   if (!card || !body) return;
   card.querySelector('.pag-method-header').onclick = () => {
     const isOpen = card.classList.contains('open');
-    // Fechar todos
     ['MCX','ATM','TRF'].forEach(x => {
       $('pagMethod' + x).classList.remove('open');
       $('body' + x).style.display = 'none';
@@ -2074,7 +2044,6 @@ function abrirPagamento(pacote) {
   };
 });
 
-// ── Botões de copiar ─────────────────────────────────────
 function copyToClipboard(text, btn) {
   navigator.clipboard.writeText(text).then(() => {
     const orig = btn.innerHTML;
@@ -2087,7 +2056,6 @@ $('copyMcxRef').onclick = () => copyToClipboard($('mcxRef').textContent.trim(), 
 $('copyAtmRef').onclick = () => copyToClipboard(`Entidade: ${$('atmEntidade').textContent} | Ref: ${$('atmRef').textContent}`, $('copyAtmRef'));
 $('copyIban').onclick   = () => copyToClipboard($('ttrfIban').textContent.trim(), $('copyIban'));
 
-// ── Enviar comprovativo WhatsApp ─────────────────────────
 $('btnEnviarComprovativo').onclick = () => {
   const titulo = pacoteAtual ? pacoteAtual.titulo : 'Pacote';
   const valor  = pacoteAtual ? `${pacoteAtual.preco.toLocaleString('pt-AO')} AOA` : '';
@@ -2096,34 +2064,25 @@ $('btnEnviarComprovativo').onclick = () => {
   window.open(`https://wa.me/244900000000?text=${msg}`, '_blank');
 };
 
-// ── Botão Comprar no detalhe ─────────────────────────────
 $('btnComprarPacote').onclick = () => {
   if (pacoteAtual) abrirPagamento(pacoteAtual);
 };
 
-// ── Navegação: botões back ───────────────────────────────
-$('lojaBackBtn').onclick  = () => showScreen('screen-home');
+$('lojaBackBtn').onclick   = () => showScreen('screen-home');
 $('pacoteBackBtn').onclick = () => showScreen('screen-loja');
-$('pagBackBtn').onclick   = () => showScreen('screen-pacote');
+$('pagBackBtn').onclick    = () => showScreen('screen-pacote');
+$('btnLoja').onclick       = () => abrirLoja();
 
-// ── Botão Loja no menu ───────────────────────────────────
-$('btnLoja').onclick = () => abrirLoja();
-
-// ── Notificação de novo pacote ───────────────────────────
 function verificarNotifNovoPacote() {
   const seen = JSON.parse(localStorage.getItem(LOJA_NOTIF_KEY) || '[]');
   const novos = PACOTES_CATALOGO.filter(p => p.novo && !seen.includes(p.id));
   if (novos.length === 0) return;
-
-  // Mostrar notificação do primeiro pacote novo ainda não visto
-  const p = novos[0];
-  mostrarNotifPacote(p);
+  mostrarNotifPacote(novos[0]);
 }
 
 function mostrarNotifPacote(pacote) {
   const banner = $('notifPacoteBanner');
   if (!banner) return;
-
   banner.querySelector('.notif-pacote-text strong').textContent = `Novo pacote: ${pacote.titulo}`;
   banner.querySelector('.notif-pacote-text span').textContent = `${pacote.preco.toLocaleString('pt-AO')} AOA · ${pacote.qtd} questões`;
   banner.classList.add('show');
@@ -2137,20 +2096,14 @@ function mostrarNotifPacote(pacote) {
     banner.classList.remove('show');
     marcarNotifVista(pacote.id);
   };
-
-  // Auto-fechar após 8s
   setTimeout(() => banner.classList.remove('show'), 8000);
 }
 
 function marcarNotifVista(id) {
   const seen = JSON.parse(localStorage.getItem(LOJA_NOTIF_KEY) || '[]');
-  if (!seen.includes(id)) {
-    seen.push(id);
-    localStorage.setItem(LOJA_NOTIF_KEY, JSON.stringify(seen));
-  }
+  if (!seen.includes(id)) { seen.push(id); localStorage.setItem(LOJA_NOTIF_KEY, JSON.stringify(seen)); }
 }
 
-// Mostrar notif quando a app abre (após um pequeno delay)
 setTimeout(() => verificarNotifNovoPacote(), 3000);
 
 // ─── INIT ─────────────────────────────────────────────────
