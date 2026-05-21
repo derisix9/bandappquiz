@@ -31,6 +31,21 @@
   </button>
 </div>
 
+<!-- NOTIFICAÇÃO DE NOVO PACOTE NA LOJA -->
+<div class="notif-pacote-banner" id="notifPacoteBanner">
+  <div class="notif-pacote-icon">
+    <svg viewBox="0 0 24 24"><path d="M19 6h-2c0-2.76-2.24-5-5-5S7 3.24 7 6H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7-3c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3zm0 10c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+  </div>
+  <div class="notif-pacote-text">
+    <strong>Novo pacote disponível!</strong>
+    <span>Toque para ver detalhes</span>
+  </div>
+  <button class="notif-pacote-btn">Ver</button>
+  <button class="notif-pacote-close">
+    <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+  </button>
+</div>
+
 <!-- ══════════════════════════════════════════ -->
 <!-- SCREEN: SPLASH -->
 <!-- ══════════════════════════════════════════ -->
@@ -264,6 +279,17 @@
         <div class="menu-card-text">
           <span class="menu-card-title">Criar Quiz</span>
           <span class="menu-card-sub">Adicionar perguntas</span>
+        </div>
+        <svg class="menu-card-arrow" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+      </button>
+
+      <button class="menu-card btn-loja" id="btnLoja">
+        <div class="menu-card-icon">
+          <svg viewBox="0 0 24 24"><path d="M20 4H4v2l8 5 8-5V4zm0 4.45L12 14 4 8.45V20h16V8.45zM2 4v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2H4C2.9 2 2 2.9 2 4zm10 7.5L3.5 6h17L12 11.5z"/></svg>
+        </div>
+        <div class="menu-card-text">
+          <span class="menu-card-title">Loja de Pacotes</span>
+          <span class="menu-card-sub">Comprar pacotes de questões</span>
         </div>
         <svg class="menu-card-arrow" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
       </button>
@@ -1067,6 +1093,249 @@
     </div>
     <button class="btn-primary w-full mt-sm" id="submitChangePassBtn">ALTERAR SENHA</button>
     <button class="btn-outline w-full mt-sm" id="closeChangePassModal">CANCELAR</button>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCREEN: LOJA DE PACOTES                   -->
+<!-- ══════════════════════════════════════════ -->
+<div class="screen" id="screen-loja">
+  <div class="page-header">
+    <button class="icon-btn" id="lojaBackBtn">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <h2 class="page-title">Loja de Pacotes</h2>
+    <div style="width:40px"></div>
+  </div>
+
+  <div class="loja-hero">
+    <div class="loja-hero-icon">
+      <svg viewBox="0 0 24 24"><path d="M19 6h-2c0-2.76-2.24-5-5-5S7 3.24 7 6H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7-3c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3zm0 10c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+    </div>
+    <div class="loja-hero-text">
+      <h3>Pacotes Oficiais</h3>
+      <p>Questões preparadas para provas e concursos em Angola</p>
+    </div>
+  </div>
+
+  <div class="loja-filter-bar">
+    <button class="loja-filter active" data-filter="todos">Todos</button>
+    <button class="loja-filter" data-filter="concurso">Concurso</button>
+    <button class="loja-filter" data-filter="prova">Provas</button>
+    <button class="loja-filter" data-filter="exame">Exames</button>
+  </div>
+
+  <div class="scroll-content" style="padding-top:8px">
+    <div class="loja-grid" id="lojaGrid">
+      <!-- Preenchido dinamicamente -->
+      <div class="loja-loading" id="lojaLoading">
+        <div class="loja-spinner"></div>
+        <p>A carregar pacotes...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCREEN: DETALHE DO PACOTE                 -->
+<!-- ══════════════════════════════════════════ -->
+<div class="screen" id="screen-pacote">
+  <div class="pacote-cover-wrap">
+    <img id="pacoteCoverImg" src="" alt="Capa do pacote" class="pacote-cover-img">
+    <div class="pacote-cover-overlay"></div>
+    <button class="icon-btn pacote-back-btn" id="pacoteBackBtn">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <div class="pacote-cover-badge" id="pacoteCoverBadge">Concurso</div>
+  </div>
+
+  <div class="scroll-content pacote-detail-content">
+    <h2 class="pacote-detail-title" id="pacoteDetailTitle">Título do Pacote</h2>
+    <div class="pacote-meta-row">
+      <span class="pacote-meta-chip" id="pacoteQtd">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        0 questões
+      </span>
+      <span class="pacote-meta-chip" id="pacoteDisc">
+        <svg viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.91V17h2V9M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>
+        Disciplina
+      </span>
+    </div>
+
+    <p class="pacote-desc" id="pacoteDesc">Descrição do pacote.</p>
+
+    <div class="pacote-includes">
+      <h4 class="pacote-includes-title">O que inclui:</h4>
+      <ul class="pacote-includes-list" id="pacoteIncludesList"></ul>
+    </div>
+
+    <div class="pacote-price-bar">
+      <div class="pacote-price-wrap">
+        <span class="pacote-price-label">Preço</span>
+        <span class="pacote-price-value" id="pacotePrice">0 AOA</span>
+      </div>
+      <button class="btn-comprar" id="btnComprarPacote">
+        <svg viewBox="0 0 24 24"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>
+        COMPRAR PACOTE
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCREEN: PAGAMENTO                         -->
+<!-- ══════════════════════════════════════════ -->
+<div class="screen" id="screen-pagamento">
+  <div class="page-header">
+    <button class="icon-btn" id="pagBackBtn">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <h2 class="page-title">Pagamento</h2>
+    <div style="width:40px"></div>
+  </div>
+
+  <div class="scroll-content">
+    <!-- Resumo do pacote -->
+    <div class="pag-resumo">
+      <img id="pagPacoteCover" src="" alt="" class="pag-resumo-img">
+      <div class="pag-resumo-info">
+        <div class="pag-resumo-title" id="pagPacoteTitle">Pacote</div>
+        <div class="pag-resumo-price" id="pagPacotePrice">0 AOA</div>
+      </div>
+    </div>
+
+    <h4 class="pag-section-title">Escolha o método de pagamento</h4>
+
+    <!-- Multicaixa Express -->
+    <div class="pag-method-card" id="pagMethodMCX">
+      <div class="pag-method-header">
+        <div class="pag-method-logo mcx-logo">
+          <svg viewBox="0 0 40 24" fill="none">
+            <rect width="40" height="24" rx="6" fill="#E30613"/>
+            <text x="4" y="17" font-family="Arial" font-size="10" font-weight="bold" fill="white">MCX</text>
+            <text x="22" y="17" font-family="Arial" font-size="7" fill="white">Express</text>
+          </svg>
+        </div>
+        <span class="pag-method-name">Multicaixa Express</span>
+        <svg class="pag-method-chevron" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+      </div>
+      <div class="pag-method-body" id="bodyMCX">
+        <p class="pag-instruction">Abra o app <strong>Multicaixa Express</strong> no seu telefone e siga os passos:</p>
+        <ol class="pag-steps">
+          <li>Acesse <strong>Pagamentos → Serviços</strong></li>
+          <li>Procure <strong>"BandApp Quiz"</strong></li>
+          <li>Introduza o número de referência abaixo</li>
+          <li>Confirme o valor e autorize o pagamento</li>
+        </ol>
+        <div class="pag-ref-box">
+          <span class="pag-ref-label">Referência</span>
+          <span class="pag-ref-value" id="mcxRef">--- --- ---</span>
+          <button class="pag-copy-btn" id="copyMcxRef">
+            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            Copiar
+          </button>
+        </div>
+        <div class="pag-amount-box">
+          <span>Valor a pagar:</span>
+          <strong id="mcxAmount">0 AOA</strong>
+        </div>
+        <p class="pag-note">⏱ Referência válida por <strong>48 horas</strong>. Após o pagamento, as questões serão adicionadas automaticamente.</p>
+      </div>
+    </div>
+
+    <!-- Pagamento por Referência (ATM) -->
+    <div class="pag-method-card" id="pagMethodATM">
+      <div class="pag-method-header">
+        <div class="pag-method-logo atm-logo">
+          <svg viewBox="0 0 40 24" fill="none">
+            <rect width="40" height="24" rx="6" fill="#003087"/>
+            <text x="6" y="17" font-family="Arial" font-size="9" font-weight="bold" fill="white">ATM</text>
+            <text x="20" y="17" font-family="Arial" font-size="7" fill="white">Referência</text>
+          </svg>
+        </div>
+        <span class="pag-method-name">Pagamento por Referência</span>
+        <svg class="pag-method-chevron" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+      </div>
+      <div class="pag-method-body" id="bodyATM" style="display:none">
+        <p class="pag-instruction">Use qualquer caixa ATM ou internet banking para pagar por referência:</p>
+        <div class="pag-ref-grid">
+          <div class="pag-ref-item">
+            <span class="pag-ref-item-label">Entidade</span>
+            <span class="pag-ref-item-value" id="atmEntidade">00000</span>
+          </div>
+          <div class="pag-ref-item">
+            <span class="pag-ref-item-label">Referência</span>
+            <span class="pag-ref-item-value" id="atmRef">000 000 000</span>
+          </div>
+          <div class="pag-ref-item full">
+            <span class="pag-ref-item-label">Valor</span>
+            <span class="pag-ref-item-value gold" id="atmAmount">0 AOA</span>
+          </div>
+        </div>
+        <button class="pag-copy-btn block" id="copyAtmRef">
+          <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          Copiar Referência
+        </button>
+        <p class="pag-note">⏱ Referência válida por <strong>48 horas</strong>. Após confirmação do pagamento, as questões serão adicionadas em até <strong>24h</strong>.</p>
+      </div>
+    </div>
+
+    <!-- Transferência Bancária -->
+    <div class="pag-method-card" id="pagMethodTRF">
+      <div class="pag-method-header">
+        <div class="pag-method-logo trf-logo">
+          <svg viewBox="0 0 40 24" fill="none">
+            <rect width="40" height="24" rx="6" fill="#1A7A4A"/>
+            <text x="4" y="17" font-family="Arial" font-size="8" font-weight="bold" fill="white">BANCO</text>
+          </svg>
+        </div>
+        <span class="pag-method-name">Transferência Bancária</span>
+        <svg class="pag-method-chevron" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+      </div>
+      <div class="pag-method-body" id="bodyTRF" style="display:none">
+        <p class="pag-instruction">Faça uma transferência bancária para a conta abaixo e envie o comprovativo:</p>
+        <div class="pag-bank-info">
+          <div class="pag-bank-row">
+            <span class="pag-bank-label">Banco</span>
+            <span class="pag-bank-value">Banco de Fomento Angola (BFA)</span>
+          </div>
+          <div class="pag-bank-row">
+            <span class="pag-bank-label">Titular</span>
+            <span class="pag-bank-value">BandApp Lda.</span>
+          </div>
+          <div class="pag-bank-row">
+            <span class="pag-bank-label">IBAN</span>
+            <span class="pag-bank-value" id="ttrfIban">AO06 0006 0000 0000 0000 0000 0</span>
+          </div>
+          <div class="pag-bank-row">
+            <span class="pag-bank-label">Valor</span>
+            <span class="pag-bank-value gold" id="trfAmount">0 AOA</span>
+          </div>
+          <div class="pag-bank-row full">
+            <span class="pag-bank-label">Referência / Descritivo</span>
+            <span class="pag-bank-value" id="trfDesc">BANDAPP-000000</span>
+          </div>
+        </div>
+        <button class="pag-copy-btn block" id="copyIban">
+          <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          Copiar IBAN
+        </button>
+        <div class="pag-comprovativo">
+          <p class="pag-instruction" style="margin-bottom:8px">📎 Após transferir, envie o comprovativo:</p>
+          <button class="btn-comprovativo" id="btnEnviarComprovativo">
+            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            Enviar Comprovativo via WhatsApp
+          </button>
+        </div>
+        <p class="pag-note">⏱ Após confirmação do comprovativo, as questões serão ativadas em até <strong>2 horas</strong>.</p>
+      </div>
+    </div>
+
+    <div class="pag-footer-note">
+      <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4c1.4 0 2.8 1.22 2.8 2.2v.2c.84.28 2.2.95 2.2 2.8v5H7V10.2c0-1.85 1.36-2.52 2.2-2.8V7.2c0-.98 1.4-2.2 2.8-2.2zm0 1c-.66 0-1.2.56-1.2 1.2h2.4c0-.64-.54-1.2-1.2-1.2z"/></svg>
+      <span>Pagamento seguro. Em caso de dúvidas contacte o suporte.</span>
+    </div>
   </div>
 </div>
 
