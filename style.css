@@ -620,6 +620,7 @@ select.field-input { cursor: pointer; }
 .btn-ranking::before { background: var(--blue); }
 .btn-criar::before  { background: var(--purple); }
 .btn-sync::before   { background: var(--green); }
+.btn-loja::before   { background: #F59E0B; }
 .btn-sobre::before  { background: #06B6D4; }
 .menu-card:active { transform: scale(0.98); background: var(--card2); }
 
@@ -1527,7 +1528,8 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
    LOJA DE PACOTES
    ══════════════════════════════════════════════════════════ */
 
-.btn-loja .menu-card-icon { background: linear-gradient(135deg, #F59E0B, #D97706); }
+.btn-loja .menu-card-icon { background: rgba(245,158,11,0.15); }
+.btn-loja .menu-card-icon svg { fill: #F59E0B; }
 
 .loja-hero {
   display: flex; align-items: center; gap: 14px;

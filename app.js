@@ -1840,82 +1840,58 @@ window.addEventListener('offline', () => showToast('Sem ligação à internet.')
 // LOJA DE PACOTES
 // ══════════════════════════════════════════════════════════
 
-const PACOTES_CATALOGO = [
-  {
-    id: 'pac_001',
-    titulo: 'Concurso Público – Gestão e Administração',
-    descricao: 'Pacote completo com questões de concursos públicos angolanos das áreas de gestão, administração pública, direito administrativo e economia.',
-    categoria: 'concurso',
-    disciplina: 'Administração',
-    qtd: 250,
-    preco: 2500,
-    capa: '',
-    inclui: [
-      '250 questões comentadas de concursos reais',
-      'Cobertura de Direito Administrativo e Constitucional',
-      'Questões de Economia e Gestão Pública',
-      'Atualizado com editais de 2023 e 2024',
-    ],
-    novo: true,
-  },
-  {
-    id: 'pac_002',
-    titulo: 'Exame de Acesso à Universidade – Matemática',
-    descricao: 'Questões dos exames de acesso das principais universidades angolanas. Cobre todos os tópicos do programa do ensino médio com soluções detalhadas.',
-    categoria: 'exame',
-    disciplina: 'Matemática',
-    qtd: 300,
-    preco: 1800,
-    capa: '',
-    inclui: [
-      '300 questões dos exames da UAN, UJES e PUNIV',
-      'Álgebra, Geometria, Trigonometria e Cálculo',
-      'Soluções passo a passo para cada questão',
-      'Simulados organizados por nível de dificuldade',
-    ],
-    novo: false,
-  },
-  {
-    id: 'pac_003',
-    titulo: 'Prova de Ingresso – FMUAN (Medicina)',
-    descricao: 'Preparação intensiva para a prova de ingresso à Faculdade de Medicina da UAN. Biologia, Química, Física e Português ao nível exigido.',
-    categoria: 'prova',
-    disciplina: 'Ciências da Saúde',
-    qtd: 400,
-    preco: 3500,
-    capa: '',
-    inclui: [
-      '400 questões de Biologia, Química e Física',
-      'Questões de Português e Cultura Geral',
-      'Simulados cronometrados com pontuação',
-      'Foco nos temas mais recorrentes nos últimos 5 anos',
-    ],
-    novo: true,
-  },
-];
+// Dados de pagamento fixos
+const PAG_INFO = {
+  mcxNumero:   '938 882 190',
+  atmEntidade: '00930',
+  atmRef:      '938 882 190',
+  banco:       'Banco BAI (Banco Angolano de Investimento)',
+  titular:     'Dário Faustino Bande',
+  whatsapp:    '244938882190',
+};
 
 const LOJA_NOTIF_KEY = 'bandapp_loja_notif_seen';
 let lojaFiltroAtual = 'todos';
 let pacoteAtual = null;
+let _catalogoCache = null;
+
+// ── Carregar pacotes do Firebase ─────────────────────────
+async function carregarCatalogo() {
+  if (_catalogoCache) return _catalogoCache;
+  try {
+    const snap = await db.ref('pacotes').once('value');
+    const data = snap.val();
+    if (!data) return [];
+    _catalogoCache = Object.values(data).sort((a, b) => (b.lancamento || '').localeCompare(a.lancamento || ''));
+    return _catalogoCache;
+  } catch (e) {
+    console.error('Erro ao carregar pacotes:', e);
+    return [];
+  }
+}
 
 function abrirLoja() {
   showScreen('screen-loja');
+  _catalogoCache = null; // forçar reload ao abrir
   renderLojaGrid(lojaFiltroAtual);
 }
 
-function renderLojaGrid(filtro) {
+async function renderLojaGrid(filtro) {
   const grid = $('lojaGrid');
   const loading = $('lojaLoading');
-  if (loading) loading.style.display = 'none';
+  if (loading) loading.style.display = 'flex';
 
-  // Remover cards antigos
+  // Limpar cards antigos
   Array.from(grid.children).forEach(c => {
     if (!c.id || c.id !== 'lojaLoading') c.remove();
   });
 
+  const catalogo = await carregarCatalogo();
+  if (loading) loading.style.display = 'none';
+
   const lista = filtro === 'todos'
-    ? PACOTES_CATALOGO
-    : PACOTES_CATALOGO.filter(p => p.categoria === filtro);
+    ? catalogo
+    : catalogo.filter(p => p.categoria === filtro);
 
   if (lista.length === 0) {
     const empty = document.createElement('div');
@@ -1947,7 +1923,7 @@ function renderLojaGrid(filtro) {
         <div class="pacote-card-footer">
           <div class="pacote-card-price">
             <span>Preço</span>
-            ${p.preco.toLocaleString('pt-AO')} AOA
+            ${Number(p.preco).toLocaleString('pt-AO')} AOA
           </div>
           <button class="btn-ver-pacote">Ver <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></button>
         </div>
@@ -1984,11 +1960,14 @@ function abrirDetalhe(pacote) {
   $('pacoteQtd').innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg> ${pacote.qtd} questões`;
   $('pacoteDisc').innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.91V17h2V9M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg> ${pacote.disciplina}`;
   $('pacoteDesc').textContent = pacote.descricao;
-  $('pacotePrice').textContent = `${pacote.preco.toLocaleString('pt-AO')} AOA`;
+  $('pacotePrice').textContent = `${Number(pacote.preco).toLocaleString('pt-AO')} AOA`;
 
   const ul = $('pacoteIncludesList');
   ul.innerHTML = '';
-  pacote.inclui.forEach(item => {
+  const inclui = Array.isArray(pacote.inclui)
+    ? pacote.inclui
+    : Object.values(pacote.inclui || {});
+  inclui.forEach(item => {
     const li = document.createElement('li');
     li.textContent = item;
     ul.appendChild(li);
@@ -2003,20 +1982,24 @@ function abrirPagamento(pacote) {
   else { coverEl.style.display = 'none'; }
 
   $('pagPacoteTitle').textContent = pacote.titulo;
-  $('pagPacotePrice').textContent = `${pacote.preco.toLocaleString('pt-AO')} AOA`;
+  $('pagPacotePrice').textContent = `${Number(pacote.preco).toLocaleString('pt-AO')} AOA`;
 
   const ts = Date.now().toString().slice(-6);
-  const mcxRefVal = `${ts.slice(0,3)} ${ts.slice(3)} ${Math.floor(Math.random()*900+100)}`;
-  const atmRefVal = `${Math.floor(Math.random()*900+100)} ${Math.floor(Math.random()*900000+100000)}`;
 
-  $('mcxRef').textContent = mcxRefVal;
-  $('mcxAmount').textContent = `${pacote.preco.toLocaleString('pt-AO')} AOA`;
-  $('atmEntidade').textContent = '11540';
-  $('atmRef').textContent = atmRefVal;
-  $('atmAmount').textContent = `${pacote.preco.toLocaleString('pt-AO')} AOA`;
-  $('trfAmount').textContent = `${pacote.preco.toLocaleString('pt-AO')} AOA`;
-  $('trfDesc').textContent = `BANDAPP-${pacote.id.toUpperCase()}-${ts}`;
+  // Multicaixa Express — número fixo
+  $('mcxRef').textContent = PAG_INFO.mcxNumero;
+  $('mcxAmount').textContent = `${Number(pacote.preco).toLocaleString('pt-AO')} AOA`;
 
+  // ATM — entidade e referência fixas
+  $('atmEntidade').textContent = PAG_INFO.atmEntidade;
+  $('atmRef').textContent = PAG_INFO.atmRef;
+  $('atmAmount').textContent = `${Number(pacote.preco).toLocaleString('pt-AO')} AOA`;
+
+  // Transferência bancária
+  $('trfAmount').textContent = `${Number(pacote.preco).toLocaleString('pt-AO')} AOA`;
+  $('trfDesc').textContent = `BANDAPP-${(pacote.id || 'PKT').toUpperCase()}-${ts}`;
+
+  // Abrir MCX por defeito
   $('bodyMCX').style.display = 'block';
   $('pagMethodMCX').classList.add('open');
   $('bodyATM').style.display = 'none';
@@ -2058,24 +2041,24 @@ $('copyIban').onclick   = () => copyToClipboard($('ttrfIban').textContent.trim()
 
 $('btnEnviarComprovativo').onclick = () => {
   const titulo = pacoteAtual ? pacoteAtual.titulo : 'Pacote';
-  const valor  = pacoteAtual ? `${pacoteAtual.preco.toLocaleString('pt-AO')} AOA` : '';
+  const valor  = pacoteAtual ? `${Number(pacoteAtual.preco).toLocaleString('pt-AO')} AOA` : '';
   const desc   = $('trfDesc').textContent;
   const msg = encodeURIComponent(`Olá! Gostaria de enviar o comprovativo de pagamento.\n\nPacote: ${titulo}\nValor: ${valor}\nReferência: ${desc}`);
-  window.open(`https://wa.me/244900000000?text=${msg}`, '_blank');
+  window.open(`https://wa.me/${PAG_INFO.whatsapp}?text=${msg}`, '_blank');
 };
 
-$('btnComprarPacote').onclick = () => {
-  if (pacoteAtual) abrirPagamento(pacoteAtual);
-};
+$('btnComprarPacote').onclick = () => { if (pacoteAtual) abrirPagamento(pacoteAtual); };
 
 $('lojaBackBtn').onclick   = () => showScreen('screen-home');
 $('pacoteBackBtn').onclick = () => showScreen('screen-loja');
 $('pagBackBtn').onclick    = () => showScreen('screen-pacote');
 $('btnLoja').onclick       = () => abrirLoja();
 
-function verificarNotifNovoPacote() {
+// ── Notificação de novo pacote ───────────────────────────
+async function verificarNotifNovoPacote() {
+  const catalogo = await carregarCatalogo();
   const seen = JSON.parse(localStorage.getItem(LOJA_NOTIF_KEY) || '[]');
-  const novos = PACOTES_CATALOGO.filter(p => p.novo && !seen.includes(p.id));
+  const novos = catalogo.filter(p => p.novo && !seen.includes(p.id));
   if (novos.length === 0) return;
   mostrarNotifPacote(novos[0]);
 }
@@ -2084,7 +2067,7 @@ function mostrarNotifPacote(pacote) {
   const banner = $('notifPacoteBanner');
   if (!banner) return;
   banner.querySelector('.notif-pacote-text strong').textContent = `Novo pacote: ${pacote.titulo}`;
-  banner.querySelector('.notif-pacote-text span').textContent = `${pacote.preco.toLocaleString('pt-AO')} AOA · ${pacote.qtd} questões`;
+  banner.querySelector('.notif-pacote-text span').textContent = `${Number(pacote.preco).toLocaleString('pt-AO')} AOA · ${pacote.qtd} questões`;
   banner.classList.add('show');
 
   banner.querySelector('.notif-pacote-btn').onclick = () => {
