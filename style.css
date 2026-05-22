@@ -260,17 +260,21 @@ select.field-input { cursor: pointer; }
   background: var(--card2);
   color: var(--text);
   padding: 11px 20px;
-  border-radius: 30px;
-  font-size: 0.88rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
   font-weight: 600;
   border: 1px solid var(--border);
   z-index: 9000;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s, transform 0.25s;
-  white-space: nowrap;
-  max-width: 90vw;
+  white-space: normal;
+  word-break: break-word;
+  max-width: 88vw;
+  width: max-content;
+  max-width: min(88vw, 360px);
   text-align: center;
+  line-height: 1.45;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -2152,6 +2156,11 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
 .flashcard-front-text, .flashcard-back-text {
   font-size: 1.02rem; font-weight: 600;
   text-align: center; line-height: 1.55; color: var(--text);
+  word-break: break-word;
+  overflow-wrap: break-word;
+  width: 100%;
+  max-height: 160px;
+  overflow-y: auto;
 }
 .flashcard-tap-hint {
   font-size: 0.73rem; color: var(--text3); margin-top: 6px;
@@ -2225,3 +2234,25 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
   margin-top: 2px;
   opacity: 0.75;
 }
+
+/* ─── FONTE DE DADOS: Local / Nuvem ─────────────────────── */
+.db-source-selector {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  margin-bottom: 20px;
+}
+.db-source-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 14px 10px; border-radius: var(--radius-sm);
+  background: var(--card); border: 1.5px solid var(--border2);
+  color: var(--text2); font-family: var(--font-body); font-size: 0.78rem;
+  font-weight: 700; cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.db-source-btn svg { width: 22px; height: 22px; fill: currentColor; }
+.db-source-btn.active {
+  background: var(--gold-dim); border-color: var(--gold); color: var(--gold);
+}
+.db-source-btn .db-source-sub {
+  font-size: 0.65rem; font-weight: 600; color: var(--text3); margin-top: 1px;
+}
+.db-source-btn.active .db-source-sub { color: inherit; opacity: 0.7; }
+.db-source-btn:active { transform: scale(0.97); }

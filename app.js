@@ -46,6 +46,7 @@ const State = {
   currentCat:   'all',
   currentDiff:  'all',
   currentAnswerType: 'todos', // 'todos'|'multipla'|'vf'|'lacunas'|'flashcard'
+  dbSource:     'local',  // 'local'|'cloud'
   timerSecs:    0,
   questions:    [],     // perguntas da rodada (50)
   qIndex:       0,
@@ -846,6 +847,12 @@ document.querySelectorAll('.mode-card').forEach(card => {
     // Flashcard só disponível no modo Aprendizado
     updateSetupFlashcardVisibility();
 
+    // Reset fonte de dados para Local
+    State.dbSource = 'local';
+    document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.source === 'local');
+    });
+
     showScreen('screen-gamesetup');
   };
 });
@@ -927,22 +934,62 @@ document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(b
   };
 });
 
+// ─── GAME SETUP: DB SOURCE SELECTOR ────────────────────────
+document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    State.dbSource = btn.dataset.source;
+  };
+});
+
 $('startGameBtn').onclick = async () => {
   State.currentDisc = $('setupDisc').value;
   State.currentCat  = $('setupCat').value;
   loadLocalDB();
   loadUsedToday();
 
-  // Se não há perguntas locais suficientes, tentar carregar da nuvem
-  let pool = buildPool(State.localDB);
-  if (pool.length < 5 && navigator.onLine) {
+  if (State.dbSource === 'cloud') {
+    // Jogar directo da nuvem
+    if (!navigator.onLine) {
+      showToast('Sem conexão. Ligue à internet para jogar na Nuvem, ou escolha Local.');
+      return;
+    }
     showLoading('A carregar perguntas da nuvem...');
+    try {
+      const snap = await db.ref('questions').once('value');
+      const data = snap.val();
+      if (!data) {
+        hideLoading();
+        showToast('Sem perguntas na nuvem. Tente sincronizar primeiro.');
+        return;
+      }
+      const cloudQs = Object.values(data);
+      const pool = buildPool(cloudQs);
+      hideLoading();
+      if (pool.length < 1) {
+        showToast('Nenhuma pergunta disponível com esses filtros na nuvem.');
+        return;
+      }
+      startGame(pool);
+    } catch (e) {
+      hideLoading();
+      showToast('Erro ao carregar da nuvem: ' + e.message);
+    }
+    return;
+  }
+
+  // Jogar com perguntas locais (padrão)
+  let pool = buildPool(State.localDB);
+
+  // Se local vazio, oferecer fallback automático para nuvem
+  if (pool.length < 1 && navigator.onLine) {
+    showLoading('Sem dados locais. A tentar carregar da nuvem...');
     try {
       const snap = await db.ref('questions').once('value');
       const data = snap.val();
       if (data) {
         const cloudQs = Object.values(data);
-        // Mesclar com local (sem duplicar IDs)
         const localIds = new Set(State.localDB.map(q => q.id));
         const merged = [...State.localDB, ...cloudQs.filter(q => !localIds.has(q.id))];
         saveLocalDB(merged);
@@ -953,7 +1000,7 @@ $('startGameBtn').onclick = async () => {
   }
 
   if (pool.length < 1) {
-    showToast('Nenhuma pergunta disponível. Sincronize a base de dados primeiro.');
+    showToast('Nenhuma pergunta disponível. Sincronize a base de dados ou escolha "Nuvem".');
     return;
   }
 
