@@ -1875,3 +1875,147 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
   color: var(--text3); font-size: 0.88rem;
 }
 .loja-empty svg { width: 48px; height: 48px; fill: var(--text3); opacity: 0.3; display: block; margin: 0 auto 12px; }
+
+/* ══════════════════════════════════════════════════════════
+   NOVOS TIPOS DE QUIZ — Adicionados
+   ══════════════════════════════════════════════════════════ */
+
+/* ─── CREATE: TYPE SELECTOR ─────────────────────────────── */
+.create-mode-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.create-mode-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 12px 8px; border-radius: var(--radius-sm);
+  background: var(--card); border: 1.5px solid var(--border2);
+  color: var(--text2); font-family: var(--font-body); font-size: 0.72rem;
+  font-weight: 700; cursor: pointer; transition: all 0.2s;
+  text-align: center;
+}
+.create-mode-btn svg { width: 20px; height: 20px; fill: currentColor; }
+.create-mode-btn.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold); }
+
+/* ─── CREATE: DESTINATION ───────────────────────────────── */
+.create-dest-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;
+}
+.create-dest-btn {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 12px 10px; border-radius: var(--radius-sm);
+  background: var(--card); border: 1.5px solid var(--border2);
+  color: var(--text2); font-family: var(--font-body); font-size: 0.78rem;
+  font-weight: 700; cursor: pointer; transition: all 0.2s;
+}
+.create-dest-btn svg { width: 16px; height: 16px; fill: currentColor; }
+.create-dest-btn.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold); }
+
+/* ─── VF PREVIEW (no create form) ──────────────────────── */
+.vf-preview-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.vf-preview-btn {
+  padding: 12px; border-radius: var(--radius-sm); font-weight: 700; text-align: center;
+  font-size: 0.88rem;
+}
+.vf-preview-btn.vf-true  { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+.vf-preview-btn.vf-false { background: rgba(239,68,68,0.12); color: var(--red);   border: 1px solid rgba(239,68,68,0.2); }
+
+/* ─── VF GAME SCREEN ────────────────────────────────────── */
+.vf-buttons-wrap {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  padding: 20px 16px;
+}
+.vf-game-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: 28px 10px; border-radius: var(--radius);
+  font-family: var(--font-display); font-size: 1.05rem; font-weight: 700;
+  cursor: pointer; border: 2px solid transparent; transition: all 0.2s;
+  letter-spacing: 0.04em;
+}
+.vf-game-btn svg { width: 32px; height: 32px; fill: currentColor; }
+.vf-true-btn  { background: rgba(34,197,94,0.15); color: var(--green); border-color: rgba(34,197,94,0.3); }
+.vf-false-btn { background: rgba(239,68,68,0.12); color: var(--red);   border-color: rgba(239,68,68,0.2); }
+.vf-game-btn.vf-correct { background: rgba(34,197,94,0.3);  border-color: var(--green); transform: scale(1.03); }
+.vf-game-btn.vf-wrong   { background: rgba(239,68,68,0.25); border-color: var(--red);   opacity: 0.7; }
+.vf-game-btn:disabled   { cursor: not-allowed; }
+
+/* ─── LACUNA GAME SCREEN ────────────────────────────────── */
+.lacuna-input-wrap {
+  padding: 20px 16px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.lacuna-input {
+  width: 100%; padding: 16px; border-radius: var(--radius-sm);
+  background: var(--card2); border: 2px solid var(--border);
+  color: var(--text); font-family: var(--font-body); font-size: 1rem;
+  outline: none; text-align: center; letter-spacing: 0.04em;
+  transition: border-color 0.2s;
+}
+.lacuna-input:focus { border-color: var(--gold); }
+.lacuna-feedback { text-align: center; font-weight: 700; font-size: 0.9rem; padding: 10px; border-radius: 10px; min-height: 40px; }
+.lacuna-feedback.lacuna-correct { background: rgba(34,197,94,0.15); color: var(--green); }
+.lacuna-feedback.lacuna-wrong   { background: rgba(239,68,68,0.12); color: var(--red); }
+
+/* ─── FLASHCARD GAME SCREEN ─────────────────────────────── */
+.flash-card-scene {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 20px 16px; perspective: 1200px;
+}
+.flash-card {
+  width: 100%; max-width: 420px; min-height: 240px;
+  position: relative; transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(.4,0,.2,1);
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+.flash-card.flipped { transform: rotateY(180deg); }
+.flash-card-front, .flash-card-back {
+  position: absolute; inset: 0;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  border-radius: var(--radius); padding: 28px 20px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.flash-card-front {
+  background: linear-gradient(135deg, var(--card2), #1e2a45);
+  border: 1.5px solid var(--border);
+}
+.flash-card-back {
+  background: linear-gradient(135deg, #1a2e1a, #142214);
+  border: 1.5px solid rgba(34,197,94,0.3);
+  transform: rotateY(180deg);
+}
+.flash-card-label {
+  font-family: var(--font-display); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.12em; opacity: 0.5; text-transform: uppercase;
+}
+.flash-card-text {
+  font-size: 1.05rem; font-weight: 600; text-align: center; line-height: 1.5;
+  color: var(--text);
+}
+.flash-tap-hint {
+  font-size: 0.75rem; color: var(--text3); margin-top: 8px;
+}
+.flash-verdict-wrap {
+  padding: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center;
+}
+.flash-verdict-label {
+  font-size: 0.82rem; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.flash-verdict-btns {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; width: 100%;
+}
+.flash-verdict-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 14px 8px; border-radius: var(--radius-sm);
+  font-family: var(--font-body); font-size: 0.72rem; font-weight: 700;
+  cursor: pointer; border: 1.5px solid transparent; transition: all 0.2s;
+}
+.flash-verdict-btn svg { width: 20px; height: 20px; fill: currentColor; }
+.flash-no     { background: rgba(239,68,68,0.12); color: var(--red);   border-color: rgba(239,68,68,0.25); }
+.flash-almost { background: rgba(245,158,11,0.12); color: #FBBF24;     border-color: rgba(245,158,11,0.25); }
+.flash-yes    { background: rgba(34,197,94,0.12);  color: var(--green); border-color: rgba(34,197,94,0.25); }
+
+/* ─── mb-md utility ─────────────────────────────────────── */
+.mb-md { margin-bottom: 16px; }
