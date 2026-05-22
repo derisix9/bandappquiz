@@ -1749,8 +1749,7 @@ function saveResult(stars, pct) {
     pct:       pct,
     timestamp: Date.now(),
     date:      new Date().toLocaleDateString('pt-AO', { day:'2-digit', month:'2-digit', year:'numeric' }),
-    time:      new Date().toLocaleTimeString('pt-AO', { hour:'2-digit', minute:'2-digit' }),
-    history:   State.roundHistory.slice()
+    time:      new Date().toLocaleTimeString('pt-AO', { hour:'2-digit', minute:'2-digit' })
   };
 
   // Guardar local
@@ -1842,7 +1841,6 @@ function loadRankingScreen(filter) {
 
     const div = document.createElement('div');
     div.className = 'ranking-item';
-    const hasHistory = r.history && r.history.length > 0;
     div.innerHTML = `
       <div class="rank-pos ${posClass}">${pos}</div>
       <div class="rank-info">
@@ -1852,15 +1850,8 @@ function loadRankingScreen(filter) {
       <div class="rank-right">
         <div class="rank-score">${formatScore(r.score)} val</div>
         <div class="rank-stars">${starsHtml}</div>
-        ${hasHistory ? `<button class="rank-revisao-btn">
-          <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-          Revisão
-        </button>` : ''}
       </div>
     `;
-    if (hasHistory) {
-      div.querySelector('.rank-revisao-btn').onclick = () => abrirRevisao(r);
-    }
     container.appendChild(div);
   });
 }
@@ -1868,73 +1859,6 @@ function loadRankingScreen(filter) {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-
-// ─── REVISÃO DA RODADA ────────────────────────────────────
-function abrirRevisao(entry) {
-  const history = entry.history || [];
-  const modeTag = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar', imagem: 'Quiz por Imagem' }[entry.mode] || entry.mode;
-
-  $('revisaoTitle').textContent = 'Revisão — ' + modeTag;
-  $('revisaoMeta').textContent  = entry.date + (entry.time ? ' ' + entry.time : '') + ' · ' + entry.correct + '/' + entry.total + ' acertos · ' + formatScore(entry.score) + ' val';
-
-  const container = $('revisaoList');
-  container.innerHTML = '';
-
-  if (history.length === 0) {
-    container.innerHTML = '<p style="text-align:center;opacity:0.5;padding:32px">Sem histórico disponível.</p>';
-  } else {
-    history.forEach((item, i) => {
-      const card = document.createElement('div');
-      card.className = 'revisao-card ' + (item.isRight ? 'revisao-right' : 'revisao-wrong');
-
-      const badge = item.isRight
-        ? `<span class="revisao-badge revisao-badge-right"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Correcto</span>`
-        : `<span class="revisao-badge revisao-badge-wrong"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg> Errado</span>`;
-
-      let detailsHtml = '';
-      if (!item.isRight) {
-        detailsHtml = `
-          <div class="revisao-answer-row revisao-user-ans">
-            <span class="revisao-ans-label">A tua resposta:</span>
-            <span class="revisao-ans-text wrong-text">${escHtml(item.userAnswer || '—')}</span>
-          </div>
-          <div class="revisao-answer-row revisao-correct-ans">
-            <span class="revisao-ans-label">Resposta certa:</span>
-            <span class="revisao-ans-text right-text">${escHtml(item.correctAnswer || '—')}</span>
-          </div>`;
-      } else {
-        detailsHtml = `
-          <div class="revisao-answer-row revisao-correct-ans">
-            <span class="revisao-ans-label">Resposta:</span>
-            <span class="revisao-ans-text right-text">${escHtml(item.correctAnswer || item.userAnswer || '—')}</span>
-          </div>`;
-      }
-
-      const typeLabels = { multipla: 'Múltipla Escolha', vf: 'V/F', lacunas: 'Lacuna', flashcard: 'Flashcard' };
-      const typeLabel = typeLabels[item.answerType] || item.answerType || '';
-
-      const explanationHtml = item.explanation
-        ? `<div class="revisao-explanation"><svg viewBox="0 0 24 24"><path d="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 9h2V7h-2v2z"/></svg>${escHtml(item.explanation)}</div>`
-        : '';
-
-      card.innerHTML = `
-        <div class="revisao-card-header">
-          <span class="revisao-qnum">Q${i + 1}</span>
-          ${badge}
-          <span class="revisao-type-badge">${escHtml(typeLabel)}</span>
-        </div>
-        <div class="revisao-question">${escHtml(item.question || '—')}</div>
-        ${detailsHtml}
-        ${explanationHtml}
-      `;
-      container.appendChild(card);
-    });
-  }
-
-  showScreen('screen-revisao');
-}
-
-$('revisaoBackBtn').onclick = () => showScreen('screen-ranking');
 
 // ─── CREATE QUIZ ──────────────────────────────────────────
 $('createBackBtn').onclick = () => showScreen('screen-mainmenu');
