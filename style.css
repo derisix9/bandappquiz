@@ -1619,12 +1619,12 @@ select.field-input       { cursor: pointer; }
 .rev-result-fail { background: rgba(239, 68, 68, 0.15); color: #EF4444; }
 
 .rev-question-img  { width: 100%; max-height: 160px; object-fit: contain; border-radius: 10px; margin-bottom: 8px; }
-.rev-card-question { font-size: 0.9rem; color: var(--text); line-height: 1.45; margin-bottom: 10px; font-weight: 500; }
+.rev-card-question { font-size: 0.9rem; color: var(--text); line-height: 1.45; margin-bottom: 10px; font-weight: 500; word-break: break-word; overflow-wrap: anywhere; white-space: normal; }
 
 .rev-card-answers { display: flex; flex-direction: column; gap: 6px; }
 .rev-answer       { display: flex; flex-direction: column; gap: 2px; }
 .rev-answer-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text3); }
-.rev-answer-text  { font-size: 0.88rem; font-weight: 600; padding: 6px 10px; border-radius: 10px; }
+.rev-answer-text  { font-size: 0.88rem; font-weight: 600; padding: 6px 10px; border-radius: 10px; word-break: break-word; overflow-wrap: anywhere; white-space: normal; }
 .wrong-text       { background: rgba(239, 68, 68, 0.13); color: #EF4444; }
 .correct-text     { background: rgba(34, 197, 94, 0.13); color: #22C55E; }
 
