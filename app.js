@@ -843,9 +843,32 @@ document.querySelectorAll('.mode-card').forEach(card => {
     injectCustomDiscsIntoSetup();   // Adicionar disciplinas personalizadas ao selector
     updateCategoryOptions('all');
 
+    // Flashcard só disponível no modo Aprendizado
+    updateSetupFlashcardVisibility();
+
     showScreen('screen-gamesetup');
   };
 });
+
+function updateSetupFlashcardVisibility() {
+  const isAprendizado = State.currentMode === 'aprendizado';
+  const fcBtn = document.querySelector('#setupAnswerTypeSelector .answer-type-btn[data-atype="flashcard"]');
+  if (!fcBtn) return;
+  if (isAprendizado) {
+    fcBtn.style.display = '';
+    fcBtn.disabled = false;
+    fcBtn.title = '';
+  } else {
+    fcBtn.style.display = 'none';
+    // If flashcard was selected, reset to 'todos'
+    if (State.currentAnswerType === 'flashcard') {
+      State.currentAnswerType = 'todos';
+      document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.atype === 'todos');
+      });
+    }
+  }
+}
 
 function setTimerDefault(secs) {
   document.querySelectorAll('.timer-opt[data-seconds]').forEach(opt => {
@@ -951,13 +974,52 @@ function buildPool(db) {
   } else {
     pool = pool.filter(q => q.mode !== 'imagem' && !q.imgA);
   }
-  // Answer type filter
+
+  // Flashcard only allowed in Aprendizado mode
+  if (State.currentMode !== 'aprendizado') {
+    pool = pool.filter(q => (q.answerType || 'multipla') !== 'flashcard');
+  }
+
   const atype = State.currentAnswerType;
   if (atype && atype !== 'todos') {
-    // Filter for specific answer type; questions with no answerType default to 'multipla'
     pool = pool.filter(q => (q.answerType || 'multipla') === atype);
+  } else if (atype === 'todos') {
+    // Mix all types: group by answerType then interleave for a balanced 50-question round
+    const isAprendizado = State.currentMode === 'aprendizado';
+    const allowedTypes = isAprendizado
+      ? ['multipla', 'vf', 'lacunas', 'flashcard']
+      : ['multipla', 'vf', 'lacunas'];
+
+    // Separate pool into buckets per type
+    const buckets = {};
+    allowedTypes.forEach(t => { buckets[t] = []; });
+    pool.forEach(q => {
+      const t = q.answerType || 'multipla';
+      if (buckets[t]) buckets[t].push(q);
+      // Questions with no known type fall into multipla bucket
+      else if (buckets['multipla']) buckets['multipla'].push(q);
+    });
+
+    // Shuffle each bucket
+    allowedTypes.forEach(t => { buckets[t] = shuffle(buckets[t]); });
+
+    // Interleave: round-robin through available buckets until we have enough
+    const mixed = [];
+    let safetyLimit = 0;
+    while (mixed.length < pool.length && safetyLimit < 10000) {
+      safetyLimit++;
+      let added = false;
+      for (const t of allowedTypes) {
+        if (buckets[t].length > 0) {
+          mixed.push(buckets[t].shift());
+          added = true;
+        }
+      }
+      if (!added) break;
+    }
+    return mixed;
   }
-  // If "todos" mode and no typed questions exist yet, fallback to all
+
   return pool;
 }
 
@@ -1784,8 +1846,29 @@ document.querySelectorAll('.create-mode-btn').forEach(btn => {
     $('textOptionsGrid').style.display  = isImage ? 'none' : 'grid';
     $('imageOptionsGrid').style.display = isImage ? 'block' : 'none';
     updateCreateFormForAnswerType();
+    updateCreateFlashcardVisibility();
   };
 });
+
+function updateCreateFlashcardVisibility() {
+  const isAprendizado = createQuizMode === 'aprendizado';
+  const fcBtn = document.querySelector('#createAnswerTypeSelector .answer-type-btn[data-atype="flashcard"]');
+  if (!fcBtn) return;
+  if (isAprendizado) {
+    fcBtn.style.display = '';
+    fcBtn.disabled = false;
+  } else {
+    fcBtn.style.display = 'none';
+    // If flashcard was selected, revert to multipla
+    if (createAnswerType === 'flashcard') {
+      createAnswerType = 'multipla';
+      document.querySelectorAll('#createAnswerTypeSelector .answer-type-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.atype === 'multipla');
+      });
+      updateCreateFormForAnswerType();
+    }
+  }
+}
 
 // ─── CREATE QUIZ: ANSWER TYPE SELECTOR ───────────────────
 document.querySelectorAll('#createAnswerTypeSelector .answer-type-btn').forEach(btn => {

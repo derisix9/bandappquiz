@@ -2214,3 +2214,14 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ─── FLASHCARD: só Aprendizado ─────────────────────────── */
+.answer-type-btn[data-atype="flashcard"]:not([style*="none"])::after {
+  content: '★ Aprendizado';
+  display: block;
+  font-size: 0.58rem;
+  color: var(--text3);
+  font-weight: 600;
+  margin-top: 2px;
+  opacity: 0.75;
+}
