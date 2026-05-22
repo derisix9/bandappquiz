@@ -61,7 +61,6 @@ const State = {
   rankingList:  [],
   confirmCallback: null,
   phoneUser: null,        // dados do utilizador de telefone (RTDB)
-  roundHistory: [],     // histórico de respostas da rodada actual [{q, userAnswer, correctAnswer, isRight, type}]
 };
 
 // ─── PAÍSES (completo) ────────────────────────────────────
@@ -1091,8 +1090,15 @@ function startGame(pool) {
     available = [...pool];
   }
 
-  const shuffled = shuffle(available);
-  State.questions = shuffled.slice(0, Math.min(50, shuffled.length));
+  // Se "todos os tipos" foi seleccionado, o buildPool já devolveu a lista
+  // intercalada por tipo (round-robin). Não re-embaralhar — apenas cortar a 50.
+  // Para qualquer outro filtro, embaralhar normalmente.
+  const alreadyMixed = State.currentAnswerType === 'todos';
+  const final = alreadyMixed
+    ? available.slice(0, Math.min(50, available.length))
+    : shuffle(available).slice(0, Math.min(50, available.length));
+
+  State.questions = final;
 
   State.questions.forEach(q => {
     if (!State.usedTodayIds.includes(q.id)) State.usedTodayIds.push(q.id);
@@ -1103,7 +1109,6 @@ function startGame(pool) {
   State.score   = 0;
   State.correct = 0;
   State.wrong   = 0;
-  State.roundHistory = [];
 
   const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar', imagem: 'Quiz por Imagem' };
   $('gameModeLabel').textContent = modeNames[State.currentMode] || State.currentMode;
@@ -1263,15 +1268,6 @@ function renderVF(q) {
         vfWrap.querySelectorAll('.vf-btn').forEach(b => { if (b.dataset.displayLetter === q.answer) b.classList.add('correct'); });
         State.wrong++; playWrongSound();
       }
-      State.roundHistory.push({
-        question:      q.question,
-        answerType:    'vf',
-        userAnswer:    opt.label,
-        correctAnswer: q.answer === 'A' ? 'Verdadeiro' : 'Falso',
-        isRight,
-        options: [{ key:'A', text:'Verdadeiro' }, { key:'B', text:'Falso' }],
-        explanation:   q.explanation || q.explicacao || '',
-      });
       State.answered = true; stopTimer();
       $('nextBtn').disabled = false;
       $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
@@ -1338,15 +1334,6 @@ function checkLacunaAnswer(q) {
     fb.textContent = '✗ Errado! A resposta correcta era: ' + (q.lacunaResposta || q.a);
     State.wrong++; playWrongSound();
   }
-  State.roundHistory.push({
-    question:      q.lacunaFrase || q.question,
-    answerType:    'lacunas',
-    userAnswer:    userAns,
-    correctAnswer: q.lacunaResposta || q.a,
-    isRight,
-    options: [],
-    explanation:   q.explanation || q.explicacao || '',
-  });
   $('nextBtn').disabled = false;
   $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
   if (State.timerSecs > 0) setTimeout(() => { if (State.answered) advanceQuestion(); }, 2000);
@@ -1504,17 +1491,6 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
     State.wrong++;
     playWrongSound();
   }
-
-  // Guardar no histórico da rodada
-  State.roundHistory.push({
-    question:      q.question,
-    answerType:    q.answerType || 'multipla',
-    userAnswer:    selectedText || displayLetter,
-    correctAnswer: correctOriginalText || correctOriginalLetter,
-    isRight,
-    options: ['a','b','c','d'].filter(k => q[k]).map(k => ({ key: k.toUpperCase(), text: q[k] })),
-    explanation:   q.explanation || q.explicacao || '',
-  });
 
   // Habilitar PRÓXIMA
   $('nextBtn').disabled = false;
@@ -2428,6 +2404,9 @@ async function renderLojaGrid(filtro) {
 
     card.onclick = () => abrirDetalhe(p);
     grid.appendChild(card);
+
+    // Verificar acesso e actualizar botão do card de forma assíncrona
+    if (State.user) atualizarBotaoCard(card, p);
   });
 }
 
@@ -2469,6 +2448,22 @@ function abrirDetalhe(pacote) {
     li.textContent = item;
     ul.appendChild(li);
   });
+
+  // Mostrar/esconder botão Jogar vs Comprar conforme acesso do utilizador
+  const btnJogar   = $('btnJogarPacote');
+  const btnComprar = $('btnComprarPacote');
+  if (btnJogar && btnComprar) {
+    btnJogar.style.display   = 'none';
+    btnComprar.style.display = '';
+    if (State.user) {
+      verificarAcessoPacote(pacote.id).then(ativo => {
+        if (ativo) {
+          btnJogar.style.display   = '';
+          btnComprar.style.display = 'none';
+        }
+      });
+    }
+  }
 
   showScreen('screen-pacote');
 }
