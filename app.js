@@ -279,7 +279,7 @@ function updateProfileUI() {
   // Stats
   const stats = LS.get('eq_stats_' + State.user.uid) || { games: 0, best: 0, stars: 0 };
   $('statGames').textContent = stats.games;
-  $('statBest').textContent  = stats.best;
+  $('statBest').textContent  = stats.best > 0 ? formatScore(stats.best) + ' val' : '0';
   $('statStars').textContent = stats.stars;
 }
 
