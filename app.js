@@ -61,6 +61,7 @@ const State = {
   rankingList:  [],
   confirmCallback: null,
   phoneUser: null,        // dados do utilizador de telefone (RTDB)
+  roundHistory: [],       // histórico de respostas da rodada actual
 };
 
 // ─── PAÍSES (completo) ────────────────────────────────────
@@ -1109,6 +1110,7 @@ function startGame(pool) {
   State.score   = 0;
   State.correct = 0;
   State.wrong   = 0;
+  State.roundHistory = [];
 
   const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar', imagem: 'Quiz por Imagem' };
   $('gameModeLabel').textContent = modeNames[State.currentMode] || State.currentMode;
@@ -1268,6 +1270,16 @@ function renderVF(q) {
         vfWrap.querySelectorAll('.vf-btn').forEach(b => { if (b.dataset.displayLetter === q.answer) b.classList.add('correct'); });
         State.wrong++; playWrongSound();
       }
+      // Registar no histórico
+      const _vfCorrectText = q.answer === 'A' ? (q.a || 'Verdadeiro') : (q.b || 'Falso');
+      State.roundHistory.push({
+        qIndex: State.qIndex, question: q.question || '',
+        answerType: 'vf',
+        correctAnswer: _vfCorrectText,
+        userAnswer: opt.label,
+        isRight: isRight,
+        disc: q.disc || '', cat: q.cat || '', questionImg: q.questionImg || null,
+      });
       State.answered = true; stopTimer();
       $('nextBtn').disabled = false;
       $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
@@ -1334,6 +1346,15 @@ function checkLacunaAnswer(q) {
     fb.textContent = '✗ Errado! A resposta correcta era: ' + (q.lacunaResposta || q.a);
     State.wrong++; playWrongSound();
   }
+  // Registar no histórico
+  State.roundHistory.push({
+    qIndex: State.qIndex, question: q.lacunaFrase || q.question || '',
+    answerType: 'lacunas',
+    correctAnswer: q.lacunaResposta || q.a || '',
+    userAnswer: $('lacunasInput').value.trim(),
+    isRight: isRight,
+    disc: q.disc || '', cat: q.cat || '', questionImg: null,
+  });
   $('nextBtn').disabled = false;
   $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
   if (State.timerSecs > 0) setTimeout(() => { if (State.answered) advanceQuestion(); }, 2000);
@@ -1378,6 +1399,18 @@ function handleFlashcardResult(result) {
   } else {
     State.wrong++; playWrongSound();
   }
+  // Registar no histórico
+  const _fcQ = State.questions[State.qIndex];
+  const _fcResultLabel = { good: 'Sabia!', hard: 'Difícil', wrong: 'Errei' }[result] || result;
+  State.roundHistory.push({
+    qIndex: State.qIndex,
+    question: _fcQ.flashFront || _fcQ.question || '',
+    answerType: 'flashcard',
+    correctAnswer: _fcQ.flashBack || _fcQ.a || '',
+    userAnswer: _fcResultLabel,
+    isRight: result === 'good' || result === 'hard',
+    disc: _fcQ.disc || '', cat: _fcQ.cat || '', questionImg: null,
+  });
   $('nextBtn').disabled = false;
   $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
   if (State.timerSecs > 0) setTimeout(() => advanceQuestion(), 1400);
@@ -1492,6 +1525,19 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
     playWrongSound();
   }
 
+  // Registar no histórico da rodada
+  State.roundHistory.push({
+    qIndex:        State.qIndex,
+    question:      q.question || '',
+    answerType:    q.answerType || 'multipla',
+    correctAnswer: correctOriginalText || correctOriginalLetter,
+    userAnswer:    selectedOpt ? (selectedOpt.text || selectedOpt.letter) : displayLetter,
+    isRight:       isRight,
+    disc:          q.disc || '',
+    cat:           q.cat  || '',
+    questionImg:   q.questionImg || null,
+  });
+
   // Habilitar PRÓXIMA
   $('nextBtn').disabled = false;
   $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
@@ -1590,6 +1636,17 @@ function timeUp() {
 
   playWrongSound();
   showToast('Tempo esgotado! A resposta correcta era ' + correctOriginalLetter + '.');
+
+  // Registar no histórico como sem resposta
+  State.roundHistory.push({
+    qIndex: State.qIndex,
+    question: q.question || '',
+    answerType: q.answerType || 'multipla',
+    correctAnswer: correctOriginalText || correctOriginalLetter,
+    userAnswer: '(sem resposta — tempo esgotado)',
+    isRight: false,
+    disc: q.disc || '', cat: q.cat || '', questionImg: q.questionImg || null,
+  });
 
   setTimeout(() => advanceQuestion(), 2000);
 }
@@ -1725,7 +1782,8 @@ function saveResult(stars, pct) {
     pct:       pct,
     timestamp: Date.now(),
     date:      new Date().toLocaleDateString('pt-AO', { day:'2-digit', month:'2-digit', year:'numeric' }),
-    time:      new Date().toLocaleTimeString('pt-AO', { hour:'2-digit', minute:'2-digit' })
+    time:      new Date().toLocaleTimeString('pt-AO', { hour:'2-digit', minute:'2-digit' }),
+    history:   JSON.parse(JSON.stringify(State.roundHistory || []))
   };
 
   // Guardar local
@@ -1817,19 +1875,101 @@ function loadRankingScreen(filter) {
 
     const div = document.createElement('div');
     div.className = 'ranking-item';
+    const hasHistory = r.history && r.history.length > 0;
     div.innerHTML = `
       <div class="rank-pos ${posClass}">${pos}</div>
       <div class="rank-info">
         <div class="rank-name">${escHtml(r.name)}</div>
         <div class="rank-meta">${modeTag} · ${r.date} ${r.time || ''} · ${r.correct}/${r.total} acertos</div>
+        ${hasHistory ? `<button class="btn-revisao" data-entry-id="${escHtml(r.id)}">
+          <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+          Rever Rodada
+        </button>` : ''}
       </div>
       <div class="rank-right">
         <div class="rank-score">${formatScore(r.score)} val</div>
         <div class="rank-stars">${starsHtml}</div>
       </div>
     `;
+    if (hasHistory) {
+      div.querySelector('.btn-revisao').onclick = (e) => {
+        e.stopPropagation();
+        abrirRevisao(r);
+      };
+    }
     container.appendChild(div);
   });
+}
+
+// ─── REVISÃO DA RODADA ────────────────────────────────────
+$('revisaoBackBtn').onclick = () => showScreen('screen-ranking');
+
+function abrirRevisao(entry) {
+  const modeTag = { aprendizado: 'Aprendizado', concurso: 'Concurso', prova: 'Prova', imagem: 'Imagem' }[entry.mode] || entry.mode || '';
+  $('revisaoTitle').textContent = 'Revisão · ' + modeTag;
+
+  // Meta bar
+  $('revisaoMeta').innerHTML = `
+    <span class="rev-meta-item rev-correct"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>${entry.correct} Certas</span>
+    <span class="rev-meta-item rev-wrong"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>${entry.wrong} Erradas</span>
+    <span class="rev-meta-item rev-score">${formatScore(entry.score)} val</span>
+    <span class="rev-meta-item rev-date">${entry.date} ${entry.time || ''}</span>
+  `;
+
+  const list = $('revisaoList');
+  list.innerHTML = '';
+
+  const history = entry.history || [];
+  if (history.length === 0) {
+    list.innerHTML = '<div class="empty-state"><p>Sem histórico detalhado para esta rodada.</p></div>';
+    showScreen('screen-revisao');
+    return;
+  }
+
+  history.forEach((h, i) => {
+    const card = document.createElement('div');
+    card.className = 'rev-card ' + (h.isRight ? 'rev-card-correct' : 'rev-card-wrong');
+
+    const typeLabelMap = { multipla: 'Múltipla Escolha', vf: 'Verdadeiro/Falso', lacunas: 'Lacuna', flashcard: 'Flashcard' };
+    const typeLabel = typeLabelMap[h.answerType] || h.answerType;
+
+    const qText = escHtml(h.question || '');
+    const userAns = escHtml(h.userAnswer || '—');
+    const corrAns = escHtml(h.correctAnswer || '—');
+
+    let imgHtml = '';
+    if (h.questionImg) {
+      imgHtml = `<img class="rev-question-img" src="${escHtml(h.questionImg)}" alt="imagem">`;
+    }
+
+    card.innerHTML = `
+      <div class="rev-card-header">
+        <span class="rev-card-num">Q${i + 1}</span>
+        <span class="rev-card-type">${escHtml(typeLabel)}</span>
+        <span class="rev-card-result ${h.isRight ? 'rev-result-ok' : 'rev-result-fail'}">
+          ${h.isRight
+            ? '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Certo'
+            : '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg> Errado'}
+        </span>
+      </div>
+      ${imgHtml}
+      <div class="rev-card-question">${qText}</div>
+      <div class="rev-card-answers">
+        ${!h.isRight ? `<div class="rev-answer rev-answer-user">
+          <span class="rev-answer-label">A tua resposta</span>
+          <span class="rev-answer-text wrong-text">${userAns}</span>
+        </div>` : ''}
+        <div class="rev-answer rev-answer-correct">
+          <span class="rev-answer-label">${h.isRight ? 'Resposta' : 'Resposta certa'}</span>
+          <span class="rev-answer-text correct-text">${corrAns}</span>
+        </div>
+      </div>
+      ${h.disc || h.cat ? `<div class="rev-card-tags">${h.disc ? `<span class="rev-tag">${escHtml(h.disc)}</span>` : ''}${h.cat ? `<span class="rev-tag">${escHtml(h.cat)}</span>` : ''}</div>` : ''}
+    `;
+    list.appendChild(card);
+  });
+
+  showScreen('screen-revisao');
 }
 
 function escHtml(s) {
