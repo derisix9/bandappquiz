@@ -2397,6 +2397,9 @@ async function renderLojaGrid(filtro) {
 
     card.onclick = () => abrirDetalhe(p);
     grid.appendChild(card);
+
+    // Verificar acesso e actualizar botão do card de forma assíncrona
+    if (State.user) atualizarBotaoCard(card, p);
   });
 }
 
@@ -2438,6 +2441,24 @@ function abrirDetalhe(pacote) {
     li.textContent = item;
     ul.appendChild(li);
   });
+
+  // Mostrar/esconder botão Jogar vs Comprar conforme acesso do utilizador
+  const btnJogar  = $('btnJogarPacote');
+  const btnComprar = $('btnComprarPacote');
+  if (btnJogar && btnComprar) {
+    // Estado inicial: esconder Jogar, mostrar Comprar
+    btnJogar.style.display  = 'none';
+    btnComprar.style.display = '';
+    // Verificar acesso em background
+    if (State.user) {
+      verificarAcessoPacote(pacote.id).then(ativo => {
+        if (ativo) {
+          btnJogar.style.display   = '';
+          btnComprar.style.display = 'none';
+        }
+      });
+    }
+  }
 
   showScreen('screen-pacote');
 }
