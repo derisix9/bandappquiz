@@ -2555,7 +2555,152 @@ function marcarNotifVista(id) {
 
 setTimeout(() => verificarNotifNovoPacote(), 3000);
 
-// ─── INIT ─────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// JOGO DE PACOTE
+// ══════════════════════════════════════════════════════════
+
+// Estado do jogo de pacote
+const PacoteGame = {
+  timerSecs: 0,
+  maxQtd: 20,
+};
+
+// Selectors do modal de setup
+document.querySelectorAll('.pkg-timer').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.pkg-timer').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    PacoteGame.timerSecs = parseInt(btn.dataset.seconds);
+  };
+});
+document.querySelectorAll('.pkg-qtd').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.pkg-qtd').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    PacoteGame.maxQtd = parseInt(btn.dataset.qtd); // 0 = todas
+  };
+});
+$('pacoteSetupCancelar').onclick = () => $('pacoteSetupOverlay').classList.remove('show');
+$('pacoteSetupOverlay').onclick  = (e) => { if (e.target === $('pacoteSetupOverlay')) $('pacoteSetupOverlay').classList.remove('show'); };
+
+$('pacoteSetupConfirmar').onclick = () => {
+  $('pacoteSetupOverlay').classList.remove('show');
+  iniciarJogoPacote();
+};
+
+// Verificar se o utilizador tem acesso a um pacote
+async function verificarAcessoPacote(pkgId) {
+  const uid  = State.user?.uid;
+  const email = State.profile?.email || State.user?.email || '';
+  const phone = State.profile?.phone || '';
+  if (!uid) return false;
+
+  // Verificar via userAccess (chave composta por identifier__pkgId)
+  const identifiers = [uid, email, phone].filter(Boolean);
+  for (const id of identifiers) {
+    const key = id.replace(/[@.+#$[\]/]/g, '_') + '__' + pkgId;
+    const snap = await db.ref('userAccess/' + key).once('value');
+    if (snap.exists() && snap.val().status === 'active') return true;
+  }
+  return false;
+}
+
+// Abrir modal de setup de jogo do pacote
+async function jogarPacote(pacote) {
+  $('pacoteSetupTitle').textContent = pacote.titulo || 'Jogar Pacote';
+  $('pacoteSetupMsg').textContent   = `${pacote.qtd || '?'} questões disponíveis neste pacote.`;
+  // Reset defaults
+  PacoteGame.timerSecs = 0;
+  PacoteGame.maxQtd    = 20;
+  document.querySelectorAll('.pkg-timer').forEach(b => b.classList.toggle('active', b.dataset.seconds === '0'));
+  document.querySelectorAll('.pkg-qtd').forEach(b => b.classList.toggle('active', b.dataset.qtd === '20'));
+  $('pacoteSetupOverlay').classList.add('show');
+}
+
+// Iniciar o jogo depois de confirmar no modal
+async function iniciarJogoPacote() {
+  if (!pacoteAtual) return;
+  const pkgId = pacoteAtual.id;
+  showLoading('A carregar questões do pacote...');
+  try {
+    const snap = await db.ref('pacoteQuestions/' + pkgId).once('value');
+    const data = snap.val();
+    if (!data) {
+      hideLoading();
+      showToast('Este pacote ainda não tem questões carregadas.');
+      return;
+    }
+
+    let qs = Object.values(data);
+
+    // Misturar todos os tipos aleatoriamente (multipla, vf, lacunas, flashcard)
+    const allowedTypes = ['multipla', 'vf', 'lacunas', 'flashcard'];
+    const buckets = {};
+    allowedTypes.forEach(t => { buckets[t] = []; });
+    qs.forEach(q => {
+      const t = q.answerType || 'multipla';
+      if (buckets[t]) buckets[t].push(q);
+      else buckets['multipla'].push(q);
+    });
+    allowedTypes.forEach(t => { buckets[t] = shuffle(buckets[t]); });
+
+    // Intercalar (round-robin) para mistura equilibrada
+    const mixed = [];
+    let safety = 0;
+    while (mixed.length < qs.length && safety < 50000) {
+      safety++;
+      let added = false;
+      for (const t of allowedTypes) {
+        if (buckets[t].length > 0) { mixed.push(buckets[t].shift()); added = true; }
+      }
+      if (!added) break;
+    }
+
+    // Limitar pelo nº de perguntas configurado
+    const max = PacoteGame.maxQtd > 0 ? PacoteGame.maxQtd : mixed.length;
+    const pool = mixed.slice(0, max);
+
+    hideLoading();
+    if (pool.length === 0) {
+      showToast('Nenhuma questão disponível neste pacote.');
+      return;
+    }
+
+    // Guardar config do timer no State global para o motor de jogo usar
+    State.timerSecs    = PacoteGame.timerSecs;
+    State.currentMode  = pacoteAtual.categoria || 'aprendizado';
+    State.currentMode  = State.currentMode === 'exame' ? 'prova' : State.currentMode;
+    // Flashcards só em aprendizado/exame; para concurso filtrar
+    let finalPool = pool;
+    if (State.currentMode === 'concurso') {
+      finalPool = pool.filter(q => (q.answerType || 'multipla') !== 'flashcard');
+    }
+    if (finalPool.length === 0) finalPool = pool; // fallback
+
+    startGame(finalPool);
+  } catch (e) {
+    hideLoading();
+    showToast('Erro ao carregar questões: ' + e.message);
+  }
+}
+
+// ── Injectar botão Jogar no card da loja (quando ativado) ──
+async function atualizarBotaoCard(card, pacote) {
+  const ativo = await verificarAcessoPacote(pacote.id);
+  const btn = card.querySelector('.btn-ver-pacote');
+  if (!btn) return;
+  if (ativo) {
+    btn.classList.add('btn-ver-pacote-jogar');
+    btn.innerHTML = `Jogar <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+    btn.onclick = (e) => { e.stopPropagation(); pacoteAtual = pacote; jogarPacote(pacote); };
+  } else {
+    btn.onclick = (e) => { e.stopPropagation(); abrirDetalhe(pacote); };
+  }
+}
+
+$('btnJogarPacote').onclick = () => { if (pacoteAtual) jogarPacote(pacoteAtual); };
+
+
 (function init() {
   loadLocalDB();
   loadRankingLocal();
