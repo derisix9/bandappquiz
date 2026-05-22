@@ -61,6 +61,7 @@ const State = {
   rankingList:  [],
   confirmCallback: null,
   phoneUser: null,        // dados do utilizador de telefone (RTDB)
+  roundHistory: [],     // histórico de respostas da rodada actual [{q, userAnswer, correctAnswer, isRight, type}]
 };
 
 // ─── PAÍSES (completo) ────────────────────────────────────
@@ -1090,15 +1091,8 @@ function startGame(pool) {
     available = [...pool];
   }
 
-  // Se "todos os tipos" foi seleccionado, o buildPool já devolveu a lista
-  // intercalada por tipo (round-robin). Não re-embaralhar — apenas cortar a 50.
-  // Para qualquer outro filtro, embaralhar normalmente.
-  const alreadyMixed = State.currentAnswerType === 'todos';
-  const final = alreadyMixed
-    ? available.slice(0, Math.min(50, available.length))
-    : shuffle(available).slice(0, Math.min(50, available.length));
-
-  State.questions = final;
+  const shuffled = shuffle(available);
+  State.questions = shuffled.slice(0, Math.min(50, shuffled.length));
 
   State.questions.forEach(q => {
     if (!State.usedTodayIds.includes(q.id)) State.usedTodayIds.push(q.id);
@@ -1109,6 +1103,7 @@ function startGame(pool) {
   State.score   = 0;
   State.correct = 0;
   State.wrong   = 0;
+  State.roundHistory = [];
 
   const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar', imagem: 'Quiz por Imagem' };
   $('gameModeLabel').textContent = modeNames[State.currentMode] || State.currentMode;
@@ -1268,6 +1263,15 @@ function renderVF(q) {
         vfWrap.querySelectorAll('.vf-btn').forEach(b => { if (b.dataset.displayLetter === q.answer) b.classList.add('correct'); });
         State.wrong++; playWrongSound();
       }
+      State.roundHistory.push({
+        question:      q.question,
+        answerType:    'vf',
+        userAnswer:    opt.label,
+        correctAnswer: q.answer === 'A' ? 'Verdadeiro' : 'Falso',
+        isRight,
+        options: [{ key:'A', text:'Verdadeiro' }, { key:'B', text:'Falso' }],
+        explanation:   q.explanation || q.explicacao || '',
+      });
       State.answered = true; stopTimer();
       $('nextBtn').disabled = false;
       $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
@@ -1334,6 +1338,15 @@ function checkLacunaAnswer(q) {
     fb.textContent = '✗ Errado! A resposta correcta era: ' + (q.lacunaResposta || q.a);
     State.wrong++; playWrongSound();
   }
+  State.roundHistory.push({
+    question:      q.lacunaFrase || q.question,
+    answerType:    'lacunas',
+    userAnswer:    userAns,
+    correctAnswer: q.lacunaResposta || q.a,
+    isRight,
+    options: [],
+    explanation:   q.explanation || q.explicacao || '',
+  });
   $('nextBtn').disabled = false;
   $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
   if (State.timerSecs > 0) setTimeout(() => { if (State.answered) advanceQuestion(); }, 2000);
@@ -1491,6 +1504,17 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
     State.wrong++;
     playWrongSound();
   }
+
+  // Guardar no histórico da rodada
+  State.roundHistory.push({
+    question:      q.question,
+    answerType:    q.answerType || 'multipla',
+    userAnswer:    selectedText || displayLetter,
+    correctAnswer: correctOriginalText || correctOriginalLetter,
+    isRight,
+    options: ['a','b','c','d'].filter(k => q[k]).map(k => ({ key: k.toUpperCase(), text: q[k] })),
+    explanation:   q.explanation || q.explicacao || '',
+  });
 
   // Habilitar PRÓXIMA
   $('nextBtn').disabled = false;
@@ -1725,7 +1749,8 @@ function saveResult(stars, pct) {
     pct:       pct,
     timestamp: Date.now(),
     date:      new Date().toLocaleDateString('pt-AO', { day:'2-digit', month:'2-digit', year:'numeric' }),
-    time:      new Date().toLocaleTimeString('pt-AO', { hour:'2-digit', minute:'2-digit' })
+    time:      new Date().toLocaleTimeString('pt-AO', { hour:'2-digit', minute:'2-digit' }),
+    history:   State.roundHistory.slice()
   };
 
   // Guardar local
@@ -1817,6 +1842,7 @@ function loadRankingScreen(filter) {
 
     const div = document.createElement('div');
     div.className = 'ranking-item';
+    const hasHistory = r.history && r.history.length > 0;
     div.innerHTML = `
       <div class="rank-pos ${posClass}">${pos}</div>
       <div class="rank-info">
@@ -1826,8 +1852,15 @@ function loadRankingScreen(filter) {
       <div class="rank-right">
         <div class="rank-score">${formatScore(r.score)} val</div>
         <div class="rank-stars">${starsHtml}</div>
+        ${hasHistory ? `<button class="rank-revisao-btn">
+          <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+          Revisão
+        </button>` : ''}
       </div>
     `;
+    if (hasHistory) {
+      div.querySelector('.rank-revisao-btn').onclick = () => abrirRevisao(r);
+    }
     container.appendChild(div);
   });
 }
@@ -1835,6 +1868,73 @@ function loadRankingScreen(filter) {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+// ─── REVISÃO DA RODADA ────────────────────────────────────
+function abrirRevisao(entry) {
+  const history = entry.history || [];
+  const modeTag = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar', imagem: 'Quiz por Imagem' }[entry.mode] || entry.mode;
+
+  $('revisaoTitle').textContent = 'Revisão — ' + modeTag;
+  $('revisaoMeta').textContent  = entry.date + (entry.time ? ' ' + entry.time : '') + ' · ' + entry.correct + '/' + entry.total + ' acertos · ' + formatScore(entry.score) + ' val';
+
+  const container = $('revisaoList');
+  container.innerHTML = '';
+
+  if (history.length === 0) {
+    container.innerHTML = '<p style="text-align:center;opacity:0.5;padding:32px">Sem histórico disponível.</p>';
+  } else {
+    history.forEach((item, i) => {
+      const card = document.createElement('div');
+      card.className = 'revisao-card ' + (item.isRight ? 'revisao-right' : 'revisao-wrong');
+
+      const badge = item.isRight
+        ? `<span class="revisao-badge revisao-badge-right"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Correcto</span>`
+        : `<span class="revisao-badge revisao-badge-wrong"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg> Errado</span>`;
+
+      let detailsHtml = '';
+      if (!item.isRight) {
+        detailsHtml = `
+          <div class="revisao-answer-row revisao-user-ans">
+            <span class="revisao-ans-label">A tua resposta:</span>
+            <span class="revisao-ans-text wrong-text">${escHtml(item.userAnswer || '—')}</span>
+          </div>
+          <div class="revisao-answer-row revisao-correct-ans">
+            <span class="revisao-ans-label">Resposta certa:</span>
+            <span class="revisao-ans-text right-text">${escHtml(item.correctAnswer || '—')}</span>
+          </div>`;
+      } else {
+        detailsHtml = `
+          <div class="revisao-answer-row revisao-correct-ans">
+            <span class="revisao-ans-label">Resposta:</span>
+            <span class="revisao-ans-text right-text">${escHtml(item.correctAnswer || item.userAnswer || '—')}</span>
+          </div>`;
+      }
+
+      const typeLabels = { multipla: 'Múltipla Escolha', vf: 'V/F', lacunas: 'Lacuna', flashcard: 'Flashcard' };
+      const typeLabel = typeLabels[item.answerType] || item.answerType || '';
+
+      const explanationHtml = item.explanation
+        ? `<div class="revisao-explanation"><svg viewBox="0 0 24 24"><path d="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 9h2V7h-2v2z"/></svg>${escHtml(item.explanation)}</div>`
+        : '';
+
+      card.innerHTML = `
+        <div class="revisao-card-header">
+          <span class="revisao-qnum">Q${i + 1}</span>
+          ${badge}
+          <span class="revisao-type-badge">${escHtml(typeLabel)}</span>
+        </div>
+        <div class="revisao-question">${escHtml(item.question || '—')}</div>
+        ${detailsHtml}
+        ${explanationHtml}
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  showScreen('screen-revisao');
+}
+
+$('revisaoBackBtn').onclick = () => showScreen('screen-ranking');
 
 // ─── CREATE QUIZ ──────────────────────────────────────────
 $('createBackBtn').onclick = () => showScreen('screen-mainmenu');
@@ -2404,9 +2504,6 @@ async function renderLojaGrid(filtro) {
 
     card.onclick = () => abrirDetalhe(p);
     grid.appendChild(card);
-
-    // Verificar acesso e actualizar botão do card de forma assíncrona
-    if (State.user) atualizarBotaoCard(card, p);
   });
 }
 
@@ -2448,22 +2545,6 @@ function abrirDetalhe(pacote) {
     li.textContent = item;
     ul.appendChild(li);
   });
-
-  // Mostrar/esconder botão Jogar vs Comprar conforme acesso do utilizador
-  const btnJogar   = $('btnJogarPacote');
-  const btnComprar = $('btnComprarPacote');
-  if (btnJogar && btnComprar) {
-    btnJogar.style.display   = 'none';
-    btnComprar.style.display = '';
-    if (State.user) {
-      verificarAcessoPacote(pacote.id).then(ativo => {
-        if (ativo) {
-          btnJogar.style.display   = '';
-          btnComprar.style.display = 'none';
-        }
-      });
-    }
-  }
 
   showScreen('screen-pacote');
 }
