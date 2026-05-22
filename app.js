@@ -1090,8 +1090,15 @@ function startGame(pool) {
     available = [...pool];
   }
 
-  const shuffled = shuffle(available);
-  State.questions = shuffled.slice(0, Math.min(50, shuffled.length));
+  // Se "todos os tipos" foi seleccionado, o buildPool já devolveu a lista
+  // intercalada por tipo (round-robin). Não re-embaralhar — apenas cortar a 50.
+  // Para qualquer outro filtro, embaralhar normalmente.
+  const alreadyMixed = State.currentAnswerType === 'todos';
+  const final = alreadyMixed
+    ? available.slice(0, Math.min(50, available.length))
+    : shuffle(available).slice(0, Math.min(50, available.length));
+
+  State.questions = final;
 
   State.questions.forEach(q => {
     if (!State.usedTodayIds.includes(q.id)) State.usedTodayIds.push(q.id);
@@ -2443,13 +2450,11 @@ function abrirDetalhe(pacote) {
   });
 
   // Mostrar/esconder botão Jogar vs Comprar conforme acesso do utilizador
-  const btnJogar  = $('btnJogarPacote');
+  const btnJogar   = $('btnJogarPacote');
   const btnComprar = $('btnComprarPacote');
   if (btnJogar && btnComprar) {
-    // Estado inicial: esconder Jogar, mostrar Comprar
-    btnJogar.style.display  = 'none';
+    btnJogar.style.display   = 'none';
     btnComprar.style.display = '';
-    // Verificar acesso em background
     if (State.user) {
       verificarAcessoPacote(pacote.id).then(ativo => {
         if (ativo) {
