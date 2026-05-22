@@ -41,13 +41,12 @@ function phoneToKey(p) {
 const State = {
   user:         null,
   profile:      null,
-  currentMode:  null,   // 'aprendizado' | 'concurso' | 'prova'
+  currentMode:  null,
   currentDisc:  'all',
   currentCat:   'all',
   currentDiff:  'all',
-  currentQType: 'all',  // 'all' | 'multipla' | 'vf' | 'lacuna' | 'flashcard' | 'imagem'
-  currentSource:'local',// 'local' | 'cloud' | 'both'
-  timerSecs:    0,      // 0 = livre
+  currentAnswerType: 'todos', // 'todos'|'multipla'|'vf'|'lacunas'|'flashcard'
+  timerSecs:    0,
   questions:    [],     // perguntas da rodada (50)
   qIndex:       0,
   score:        0,
@@ -874,24 +873,6 @@ function updateCategoryOptions(disc) {
 // ─── GAME SETUP ───────────────────────────────────────────
 $('setupBackBtn').onclick = () => showScreen('screen-modeselect');
 
-// Quiz type options
-document.querySelectorAll('#quizTypeOptions .timer-opt').forEach(opt => {
-  opt.onclick = () => {
-    document.querySelectorAll('#quizTypeOptions .timer-opt').forEach(o => o.classList.remove('active'));
-    opt.classList.add('active');
-    State.currentQType = opt.dataset.qtype;
-  };
-});
-
-// Source options
-document.querySelectorAll('#sourceOptions .timer-opt').forEach(opt => {
-  opt.onclick = () => {
-    document.querySelectorAll('#sourceOptions .timer-opt').forEach(o => o.classList.remove('active'));
-    opt.classList.add('active');
-    State.currentSource = opt.dataset.source;
-  };
-});
-
 $('setupDisc').onchange = () => {
   loadLocalDB();
   updateCategoryOptions($('setupDisc').value);
@@ -914,38 +895,39 @@ document.querySelectorAll('#difficultyOptions .timer-opt').forEach(opt => {
   };
 });
 
+// ─── GAME SETUP: ANSWER TYPE SELECTOR ──────────────────────
+document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    State.currentAnswerType = btn.dataset.atype;
+  };
+});
+
 $('startGameBtn').onclick = async () => {
-  State.currentDisc   = $('setupDisc').value;
-  State.currentCat    = $('setupCat').value;
-  State.currentQType  = (document.querySelector('#quizTypeOptions .timer-opt.active') || {}).dataset?.qtype || 'all';
-  State.currentSource = (document.querySelector('#sourceOptions .timer-opt.active') || {}).dataset?.source || 'local';
+  State.currentDisc = $('setupDisc').value;
+  State.currentCat  = $('setupCat').value;
   loadLocalDB();
   loadUsedToday();
 
-  let pool = [];
-
-  // Carregar fonte
-  if (State.currentSource === 'local' || State.currentSource === 'both') {
-    pool = [...State.localDB];
-  }
-  if ((State.currentSource === 'cloud' || State.currentSource === 'both') && navigator.onLine) {
+  // Se não há perguntas locais suficientes, tentar carregar da nuvem
+  let pool = buildPool(State.localDB);
+  if (pool.length < 5 && navigator.onLine) {
     showLoading('A carregar perguntas da nuvem...');
     try {
       const snap = await db.ref('questions').once('value');
       const data = snap.val();
       if (data) {
-        const cloudQs  = Object.values(data);
-        const localIds = new Set(pool.map(q => q.id));
-        pool = [...pool, ...cloudQs.filter(q => !localIds.has(q.id))];
+        const cloudQs = Object.values(data);
+        // Mesclar com local (sem duplicar IDs)
+        const localIds = new Set(State.localDB.map(q => q.id));
+        const merged = [...State.localDB, ...cloudQs.filter(q => !localIds.has(q.id))];
+        saveLocalDB(merged);
+        pool = buildPool(merged);
       }
     } catch (e) {}
     hideLoading();
-  } else if ((State.currentSource === 'cloud') && !navigator.onLine) {
-    showToast('Sem ligação à internet. A usar perguntas locais.');
-    pool = [...State.localDB];
   }
-
-  pool = buildPool(pool);
 
   if (pool.length < 1) {
     showToast('Nenhuma pergunta disponível. Sincronize a base de dados primeiro.');
@@ -963,24 +945,19 @@ function buildPool(db) {
     const diffFilter = State.currentDiff.toLowerCase();
     pool = pool.filter(q => (q.diff || '').toLowerCase() === diffFilter);
   }
-  // Filtro por tipo de quiz
-  if (State.currentQType !== 'all') {
-    if (State.currentQType === 'multipla') {
-      // múltipla = qtype=='multipla' OU sem qtype (legado) e não é imagem/vf/lacuna/flash
-      pool = pool.filter(q => q.qtype === 'multipla' || (!q.qtype && q.mode !== 'imagem' && q.a && q.b && q.c && q.d));
-    } else if (State.currentQType === 'imagem') {
-      pool = pool.filter(q => q.qtype === 'imagem' || q.mode === 'imagem' || q.imgA);
-    } else {
-      pool = pool.filter(q => q.qtype === State.currentQType);
-    }
-  }
-  // Para modo imagem legado
-  if (State.currentMode === 'imagem' && State.currentQType === 'all') {
+  // Image mode filter
+  if (State.currentMode === 'imagem') {
     pool = pool.filter(q => q.mode === 'imagem' || q.imgA);
-  } else if (State.currentMode !== 'imagem' && State.currentQType === 'all') {
-    // Excluir imagem se não selecionado explicitamente
-    // (mantém comportamento legado para quem não selecionou tipo)
+  } else {
+    pool = pool.filter(q => q.mode !== 'imagem' && !q.imgA);
   }
+  // Answer type filter
+  const atype = State.currentAnswerType;
+  if (atype && atype !== 'todos') {
+    // Filter for specific answer type; questions with no answerType default to 'multipla'
+    pool = pool.filter(q => (q.answerType || 'multipla') === atype);
+  }
+  // If "todos" mode and no typed questions exist yet, fallback to all
   return pool;
 }
 
@@ -996,6 +973,7 @@ function startGame(pool) {
     return;
   }
 
+  // Filtrar as usadas hoje
   let available = pool.filter(q => !State.usedTodayIds.includes(q.id));
   if (available.length < 1) {
     State.usedTodayIds = [];
@@ -1005,7 +983,10 @@ function startGame(pool) {
 
   const shuffled = shuffle(available);
   State.questions = shuffled.slice(0, Math.min(50, shuffled.length));
-  State.questions.forEach(q => { if (!State.usedTodayIds.includes(q.id)) State.usedTodayIds.push(q.id); });
+
+  State.questions.forEach(q => {
+    if (!State.usedTodayIds.includes(q.id)) State.usedTodayIds.push(q.id);
+  });
   saveUsedToday();
 
   State.qIndex  = 0;
@@ -1013,23 +994,11 @@ function startGame(pool) {
   State.correct = 0;
   State.wrong   = 0;
 
-  // Determinar o ecrã de jogo baseado no tipo das perguntas
-  const firstQ = State.questions[0];
-  const detectedType = State.currentQType !== 'all' ? State.currentQType : (firstQ.qtype || 'multipla');
+  const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar', imagem: 'Quiz por Imagem' };
+  $('gameModeLabel').textContent = modeNames[State.currentMode] || State.currentMode;
 
-  if (detectedType === 'vf') {
-    startVFGame();
-  } else if (detectedType === 'lacuna') {
-    startLacunaGame();
-  } else if (detectedType === 'flashcard') {
-    startFlashGame();
-  } else {
-    // múltipla escolha e imagem — ecrã original
-    const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar', imagem: 'Quiz por Imagem' };
-    $('gameModeLabel').textContent = modeNames[State.currentMode] || State.currentMode;
-    showScreen('screen-game');
-    renderQuestion();
-  }
+  showScreen('screen-game');
+  renderQuestion();
 }
 
 function renderQuestion() {
@@ -1038,80 +1007,55 @@ function renderQuestion() {
 
   State.answered = false;
 
+  // Cleanup V/F wrap from previous question
+  const oldVfWrap = document.querySelector('.vf-options');
+  if (oldVfWrap) oldVfWrap.remove();
+
   // Barra de progresso
   const pct = ((State.qIndex) / State.questions.length) * 100;
   $('gameProgressFill').style.width = Math.max(2, pct) + '%';
   $('gameProgressLabel').textContent = (State.qIndex + 1) + ' / ' + State.questions.length;
   $('gameScoreBadge').textContent    = formatScore(State.score) + 'v';
-  $('questionNum').textContent       = 'Questão ' + (State.qIndex + 1);
-  $('questionText').textContent      = q.question;
 
-  // Estrelas na barra do jogo
   renderGameStars();
 
-  // Construir lista de opções com posição original
-  const originalOpts = [
-    { letter: 'A', text: q.a, img: q.imgA },
-    { letter: 'B', text: q.b, img: q.imgB },
-    { letter: 'C', text: q.c, img: q.imgC },
-    { letter: 'D', text: q.d, img: q.imgD },
-  ].filter(o => o.text || o.img);
+  // Determine answer type
+  const atype = q.answerType || 'multipla';
+  const typeBadgeMap = {
+    multipla:  { label: 'Múltipla Escolha', cls: 'type-multipla',  icon: '<path d="M18 7l-1.41-1.41-6.34 6.34-2.83-2.83L6 10.5l4.24 4.24L18 7z"/>' },
+    vf:        { label: 'Verdadeiro/Falso',  cls: 'type-vf',        icon: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>' },
+    lacunas:   { label: 'Preencher Lacuna',  cls: 'type-lacunas',   icon: '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>' },
+    flashcard: { label: 'Flashcard',         cls: 'type-flashcard', icon: '<path d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.51 15.5 0 12.36 0c-1.9 0-3.56.98-4.56 2.44L6.5 4.5 4.18 2.18A2.5 2.5 0 000 4v16a2 2 0 002 2h16l4-4V8a2 2 0 00-2-2zm-9 11l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/>' },
+  };
+  const tb = typeBadgeMap[atype] || typeBadgeMap.multipla;
+  $('questionNum').innerHTML = `Questão ${State.qIndex + 1} <span class="qtype-badge ${tb.cls}"><svg viewBox="0 0 24 24">${tb.icon}</svg>${tb.label}</span>`;
+  $('questionText').textContent = (atype === 'lacunas' || atype === 'flashcard') ? '' : q.question;
 
-  // Embaralhar as opções para apresentação aleatória
-  const shuffledOpts = shuffle(originalOpts);
-  const displayLetters = ['A','B','C','D'];
-
-  // Guardar mapeamento: displayLetter -> originalLetter & text
-  const optionMap = {};
-  shuffledOpts.forEach((opt, i) => {
-    if (i < displayLetters.length) {
-      optionMap[displayLetters[i]] = opt;
-    }
-  });
-
-  const optWrap = $('gameOptions');
-  optWrap.innerHTML = '';
-
-  const isImageMode = State.currentMode === 'imagem';
-  optWrap.classList.toggle('image-mode', isImageMode);
+  // Reset areas
+  $('gameOptions').innerHTML = '';
+  $('gameOptions').style.display = '';
+  $('gameOptions').classList.remove('image-mode');
+  $('lacunasArea').style.display = 'none';
+  $('flashcardArea').style.display = 'none';
 
   // Show/hide question image
-  const qImgWrap = $('questionImageWrap');
-  const qImg = $('questionImage');
   if (q.questionImg) {
-    qImg.src = q.questionImg;
-    qImgWrap.style.display = 'block';
+    $('questionImage').src = q.questionImg;
+    $('questionImageWrap').style.display = 'block';
   } else {
-    qImgWrap.style.display = 'none';
+    $('questionImageWrap').style.display = 'none';
   }
 
-  displayLetters.forEach((displayLetter, i) => {
-    const mappedOpt = optionMap[displayLetter];
-    if (!mappedOpt) return;
-    const btn = document.createElement('button');
-    btn.className = isImageMode ? 'option-btn image-option' : 'option-btn';
-    btn.dataset.displayLetter  = displayLetter;
-    btn.dataset.originalLetter = mappedOpt.letter;
-    btn.dataset.optionText     = mappedOpt.text || '';
-
-    if (isImageMode && mappedOpt.img) {
-      btn.innerHTML = `
-        <div class="option-badge">${displayLetter}</div>
-        <img class="option-img" src="${mappedOpt.img}" alt="Opção ${displayLetter}">
-        <svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-        <svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>
-      `;
-    } else {
-      btn.innerHTML = `
-        <div class="option-badge">${displayLetter}</div>
-        <span class="option-text">${mappedOpt.text}</span>
-        <svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-        <svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>
-      `;
-    }
-    btn.onclick = () => handleAnswer(displayLetter, btn, optionMap);
-    optWrap.appendChild(btn);
-  });
+  // Dispatch
+  if (atype === 'flashcard') {
+    renderFlashcard(q);
+  } else if (atype === 'lacunas') {
+    renderLacunas(q);
+  } else if (atype === 'vf') {
+    renderVF(q);
+  } else {
+    renderMultipla(q);
+  }
 
   // Timer
   if (State.timerSecs > 0) {
@@ -1123,6 +1067,204 @@ function renderQuestion() {
     $('nextBtn').disabled = true;
     $('nextBtnText').textContent = 'PRÓXIMA';
   }
+}
+
+// ── MÚLTIPLA ESCOLHA ─────────────────────────────────────
+function renderMultipla(q) {
+  const isImageMode = State.currentMode === 'imagem';
+  const originalOpts = [
+    { letter: 'A', text: q.a, img: q.imgA },
+    { letter: 'B', text: q.b, img: q.imgB },
+    { letter: 'C', text: q.c, img: q.imgC },
+    { letter: 'D', text: q.d, img: q.imgD },
+  ].filter(o => o.text || o.img);
+
+  const shuffledOpts = shuffle(originalOpts);
+  const displayLetters = ['A','B','C','D'];
+  const optionMap = {};
+  shuffledOpts.forEach((opt, i) => { if (i < displayLetters.length) optionMap[displayLetters[i]] = opt; });
+
+  const optWrap = $('gameOptions');
+  optWrap.classList.toggle('image-mode', isImageMode);
+
+  displayLetters.forEach(displayLetter => {
+    const mappedOpt = optionMap[displayLetter];
+    if (!mappedOpt) return;
+    const btn = document.createElement('button');
+    btn.className = isImageMode ? 'option-btn image-option' : 'option-btn';
+    btn.dataset.displayLetter  = displayLetter;
+    btn.dataset.originalLetter = mappedOpt.letter;
+    btn.dataset.optionText     = mappedOpt.text || '';
+    if (isImageMode && mappedOpt.img) {
+      btn.innerHTML = `<div class="option-badge">${displayLetter}</div><img class="option-img" src="${mappedOpt.img}" alt="Opção ${displayLetter}"><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>`;
+    } else {
+      btn.innerHTML = `<div class="option-badge">${displayLetter}</div><span class="option-text">${mappedOpt.text}</span><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>`;
+    }
+    btn.onclick = () => handleAnswer(displayLetter, btn, optionMap);
+    optWrap.appendChild(btn);
+  });
+}
+
+// ── VERDADEIRO / FALSO ────────────────────────────────────
+function renderVF(q) {
+  const isImageMode = State.currentMode === 'imagem';
+  if (isImageMode && (q.imgA || q.imgB)) {
+    $('gameOptions').classList.add('image-mode');
+    const vfOpts = [
+      { letter: 'A', text: q.a || 'Verdadeiro', img: q.imgA },
+      { letter: 'B', text: q.b || 'Falso',      img: q.imgB },
+    ];
+    const optionMap = { A: vfOpts[0], B: vfOpts[1] };
+    vfOpts.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.className = 'option-btn image-option';
+      btn.dataset.displayLetter = btn.dataset.originalLetter = opt.letter;
+      btn.dataset.optionText = opt.text;
+      btn.innerHTML = `<div class="option-badge">${opt.letter}</div><img class="option-img" src="${opt.img}" alt="${opt.text}"><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>`;
+      btn.onclick = () => handleAnswer(opt.letter, btn, optionMap);
+      $('gameOptions').appendChild(btn);
+    });
+    return;
+  }
+  $('gameOptions').style.display = 'none';
+  const vfWrap = document.createElement('div');
+  vfWrap.className = 'vf-options';
+  const options = [
+    { letter: 'A', label: 'Verdadeiro', icon: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>' },
+    { letter: 'B', label: 'Falso',      icon: '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/>' },
+  ];
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = `vf-btn vf-${opt.label.toLowerCase()}`;
+    btn.dataset.displayLetter = btn.dataset.originalLetter = opt.letter;
+    btn.dataset.optionText = opt.label;
+    btn.innerHTML = `<svg viewBox="0 0 24 24">${opt.icon}</svg> ${opt.label}`;
+    btn.onclick = () => {
+      vfWrap.querySelectorAll('.vf-btn').forEach(b => b.disabled = true);
+      const isRight = opt.letter === q.answer;
+      if (isRight) {
+        btn.classList.add('correct');
+        State.correct++; State.score += getPointsForMode();
+        $('gameScoreBadge').textContent = formatScore(State.score) + 'v';
+        renderGameStars(); playCorrectSound();
+      } else {
+        btn.classList.add('wrong');
+        vfWrap.querySelectorAll('.vf-btn').forEach(b => { if (b.dataset.displayLetter === q.answer) b.classList.add('correct'); });
+        State.wrong++; playWrongSound();
+      }
+      State.answered = true; stopTimer();
+      $('nextBtn').disabled = false;
+      $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
+      if (State.timerSecs > 0) setTimeout(() => { if (State.answered) advanceQuestion(); }, 1600);
+    };
+    vfWrap.appendChild(btn);
+  });
+  $('gameOptions').insertAdjacentElement('afterend', vfWrap);
+}
+
+// ── LACUNAS ───────────────────────────────────────────────
+function renderLacunas(q) {
+  $('gameOptions').style.display = 'none';
+  const la = $('lacunasArea');
+  la.style.display = 'block';
+  $('lacunasFeedback').className = 'lacunas-feedback';
+  $('lacunasFeedback').textContent = '';
+  $('lacunasInput').value = '';
+  $('lacunasInput').className = 'lacunas-input';
+  $('lacunasInput').disabled = false;
+  $('lacunasCheckBtn').disabled = false;
+
+  const frase = q.lacunaFrase || q.question;
+  const parts = frase.split('___');
+  const lqEl = $('lacunasQuestion');
+  lqEl.innerHTML = '';
+  parts.forEach((part, i) => {
+    lqEl.appendChild(document.createTextNode(part));
+    if (i < parts.length - 1) {
+      const blank = document.createElement('span');
+      blank.className = 'blank'; blank.id = 'lacunaBlank'; blank.textContent = '___';
+      lqEl.appendChild(blank);
+    }
+  });
+  setTimeout(() => $('lacunasInput').focus(), 100);
+  $('lacunasCheckBtn').onclick = () => checkLacunaAnswer(q);
+  $('lacunasInput').onkeydown  = (e) => { if (e.key === 'Enter' && !State.answered) checkLacunaAnswer(q); };
+}
+
+function checkLacunaAnswer(q) {
+  if (State.answered) return;
+  const userAns    = $('lacunasInput').value.trim().toLowerCase();
+  const correctAns = (q.lacunaResposta || q.a || '').trim().toLowerCase();
+  const isRight    = userAns === correctAns || userAns.includes(correctAns) || correctAns.includes(userAns);
+  State.answered = true;
+  $('lacunasInput').disabled = true;
+  $('lacunasCheckBtn').disabled = true;
+  stopTimer();
+  const blank = document.getElementById('lacunaBlank');
+  const fb = $('lacunasFeedback');
+  fb.classList.add('show');
+  if (isRight) {
+    $('lacunasInput').classList.add('correct');
+    if (blank) { blank.textContent = q.lacunaResposta || q.a; blank.classList.add('filled-correct'); }
+    fb.className = 'lacunas-feedback show correct-fb';
+    fb.textContent = '✓ Correcto! ' + (q.lacunaResposta || q.a);
+    State.correct++; State.score += getPointsForMode();
+    $('gameScoreBadge').textContent = formatScore(State.score) + 'v';
+    renderGameStars(); playCorrectSound();
+  } else {
+    $('lacunasInput').classList.add('wrong');
+    if (blank) { blank.textContent = q.lacunaResposta || q.a; blank.classList.add('filled-wrong'); }
+    fb.className = 'lacunas-feedback show wrong-fb';
+    fb.textContent = '✗ Errado! A resposta correcta era: ' + (q.lacunaResposta || q.a);
+    State.wrong++; playWrongSound();
+  }
+  $('nextBtn').disabled = false;
+  $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
+  if (State.timerSecs > 0) setTimeout(() => { if (State.answered) advanceQuestion(); }, 2000);
+}
+
+// ── FLASHCARD ─────────────────────────────────────────────
+function renderFlashcard(q) {
+  $('gameOptions').style.display = 'none';
+  $('nextBtn').disabled = true;
+  const fcArea = $('flashcardArea');
+  fcArea.style.display = 'flex';
+  const fc = $('flashcard');
+  fc.classList.remove('flipped');
+  $('flashcardFrontText').textContent = q.flashFront || q.question;
+  $('flashcardBackText').textContent  = q.flashBack  || q.a;
+  $('flashcardActions').style.display = 'none';
+  const hint = fc.querySelector('.flashcard-tap-hint');
+  if (hint) hint.style.display = '';
+  fc.onclick = () => {
+    if (!fc.classList.contains('flipped')) {
+      fc.classList.add('flipped');
+      if (hint) hint.style.display = 'none';
+      setTimeout(() => { $('flashcardActions').style.display = 'flex'; }, 300);
+    }
+  };
+  $('fcWrongBtn').onclick = () => handleFlashcardResult('wrong');
+  $('fcHardBtn').onclick  = () => handleFlashcardResult('hard');
+  $('fcGoodBtn').onclick  = () => handleFlashcardResult('good');
+}
+
+function handleFlashcardResult(result) {
+  if (State.answered) return;
+  State.answered = true; stopTimer();
+  if (result === 'good') {
+    State.correct++; State.score += getPointsForMode();
+    $('gameScoreBadge').textContent = formatScore(State.score) + 'v';
+    renderGameStars(); playCorrectSound();
+  } else if (result === 'hard') {
+    State.correct++; State.score += Math.floor(getPointsForMode() / 2);
+    $('gameScoreBadge').textContent = formatScore(State.score) + 'v';
+    renderGameStars();
+  } else {
+    State.wrong++; playWrongSound();
+  }
+  $('nextBtn').disabled = false;
+  $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
+  if (State.timerSecs > 0) setTimeout(() => advanceQuestion(), 1400);
 }
 
 // ─── AUDIO FEEDBACK ────────────────────────────────────────
@@ -1630,44 +1772,66 @@ function injectCustomDiscsIntoSetup() {
 }
 
 // ─── CREATE QUIZ: MODE SELECTOR ───────────────────────────
-let createQuizMode = 'multipla';
-let createDest     = 'local'; // 'local' | 'cloud'
+let createQuizMode = 'aprendizado';
+let createAnswerType = 'multipla'; // 'multipla'|'vf'|'lacunas'|'flashcard'
 
 document.querySelectorAll('.create-mode-btn').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('.create-mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     createQuizMode = btn.dataset.mode;
-
-    // Mostrar/ocultar painéis
-    $('textOptionsGrid').style.display    = createQuizMode === 'multipla' ? 'grid'  : 'none';
-    $('vfOptionsGrid').style.display      = createQuizMode === 'vf'       ? 'block' : 'none';
-    $('lacunaOptionsGrid').style.display  = createQuizMode === 'lacuna'   ? 'block' : 'none';
-    $('flashcardOptionsGrid').style.display = createQuizMode === 'flashcard' ? 'block' : 'none';
-    $('imageOptionsGrid').style.display   = createQuizMode === 'imagem'   ? 'block' : 'none';
-
-    // Resposta correcta: só para múltipla e VF (e imagem)
-    const showAnsSelect = ['multipla', 'imagem'].includes(createQuizMode);
-    $('answerSelectWrap').style.display = showAnsSelect ? 'block' : 'none';
-
-    // Atualizar selector de resposta para VF (não usamos createAns para VF)
-    if (createQuizMode === 'multipla' || createQuizMode === 'imagem') {
-      $('createAns').innerHTML = `
-        <option value="">Selecionar resposta correcta...</option>
-        <option value="A">A</option><option value="B">B</option>
-        <option value="C">C</option><option value="D">D</option>`;
-    }
+    const isImage = createQuizMode === 'imagem';
+    $('textOptionsGrid').style.display  = isImage ? 'none' : 'grid';
+    $('imageOptionsGrid').style.display = isImage ? 'block' : 'none';
+    updateCreateFormForAnswerType();
   };
 });
 
-// Destino local/nuvem
-document.querySelectorAll('.create-dest-btn').forEach(btn => {
+// ─── CREATE QUIZ: ANSWER TYPE SELECTOR ───────────────────
+document.querySelectorAll('#createAnswerTypeSelector .answer-type-btn').forEach(btn => {
   btn.onclick = () => {
-    document.querySelectorAll('.create-dest-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#createAnswerTypeSelector .answer-type-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    createDest = btn.dataset.dest;
+    createAnswerType = btn.dataset.atype;
+    updateCreateFormForAnswerType();
   };
 });
+
+function updateCreateFormForAnswerType() {
+  const isImage = createQuizMode === 'imagem';
+  const atype   = createAnswerType;
+  const isFlash = atype === 'flashcard';
+  const isLacun = atype === 'lacunas';
+  const isVF    = atype === 'vf';
+  const isMult  = atype === 'multipla';
+
+  // Esconder/mostrar campos de opções
+  if (!isImage) {
+    $('textOptionsGrid').style.display = (isFlash || isLacun) ? 'none' : 'grid';
+  }
+  $('createLacunasWrap').style.display  = isLacun ? 'block' : 'none';
+  $('createFlashcardWrap').style.display = isFlash ? 'block' : 'none';
+
+  // Para V/F: colocar alternativas fixas
+  if (isVF && !isImage) {
+    $('createA').value = 'Verdadeiro';
+    $('createB').value = 'Falso';
+    $('createC').value = '';
+    $('createD').value = '';
+    $('textOptionsGrid').style.display = 'grid';
+    // desabilitar C e D
+    $('createC').disabled = true;
+    $('createD').disabled = true;
+    $('createC').placeholder = '(não utilizado)';
+    $('createD').placeholder = '(não utilizado)';
+  } else {
+    $('createC').disabled = false;
+    $('createD').disabled = false;
+    $('createC').placeholder = 'Alternativa C';
+    $('createD').placeholder = 'Alternativa D';
+    if (isVF) { /* image mode V/F handled in save */ }
+  }
+}
 
 // ─── IMAGE UPLOAD PREVIEWS ────────────────────────────────
 const imgInputIds = ['A','B','C','D'];
@@ -1700,8 +1864,10 @@ imgInputIds.forEach(letter => {
   };
 });
 
-$('saveQuestionBtn').onclick = async () => {
+$('saveQuestionBtn').onclick = () => {
   let disc = $('createDisc').value.trim();
+
+  // Se selecionou "Outros", usar o campo personalizado
   if (disc === 'Outros') {
     const custom = $('createDiscCustom').value.trim();
     if (!custom) return showToast('Escreva o nome da nova disciplina.');
@@ -1710,102 +1876,183 @@ $('saveQuestionBtn').onclick = async () => {
     injectCustomDiscsIntoSetup();
   }
 
-  const cat = $('createCat').value.trim();
-  const q   = $('createQ').value.trim();
-  if (!q) return showToast('Preencha a pergunta.');
-  if (!disc) return showToast('Selecione a disciplina.');
+  const cat  = $('createCat').value.trim();
+  const q    = $('createQ').value.trim();
+  const isImage = createQuizMode === 'imagem';
 
-  let entry = {
-    id:        'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
-    disc, cat, question: q,
-    qtype:     createQuizMode,
-    diff:      'médio',
-    createdAt: Date.now(),
-    uid:       State.user?.uid || 'anon'
-  };
-
-  // ── Múltipla Escolha ──────────────────────────────────
-  if (createQuizMode === 'multipla') {
-    const a = $('createA').value.trim(), b = $('createB').value.trim();
-    const c = $('createC').value.trim(), d = $('createD').value.trim();
-    const ans = $('createAns').value;
-    if (!a || !b || !c || !d) return showToast('Preencha todas as alternativas.');
-    if (!ans) return showToast('Selecione a resposta correcta.');
-    Object.assign(entry, { a, b, c, d, answer: ans });
-
-  // ── Verdadeiro/Falso ──────────────────────────────────
-  } else if (createQuizMode === 'vf') {
-    // answer is determined at game time — but we store it here using a separate hidden select
-    // We'll add a simple in-page toggle approach
-    const vfAns = $('createVFAnswer') ? $('createVFAnswer').value : '';
-    if (!vfAns) return showToast('Selecione se a afirmação é Verdadeira ou Falsa.');
-    Object.assign(entry, { a: 'Verdadeiro', b: 'Falso', answer: vfAns === 'V' ? 'A' : 'B' });
-
-  // ── Preencher Lacunas ─────────────────────────────────
-  } else if (createQuizMode === 'lacuna') {
-    const lacuna = $('createLacuna').value.trim();
-    if (!lacuna) return showToast('Escreva a resposta da lacuna.');
-    if (!q.includes('___')) return showToast('Use ___ na pergunta para indicar a lacuna.');
-    Object.assign(entry, { answer: lacuna });
-
-  // ── Flashcard ─────────────────────────────────────────
-  } else if (createQuizMode === 'flashcard') {
-    const verso = $('createFlashAns').value.trim();
-    if (!verso) return showToast('Escreva o verso do flashcard (resposta).');
-    Object.assign(entry, { answer: verso });
-
-  // ── Imagem ────────────────────────────────────────────
-  } else if (createQuizMode === 'imagem') {
-    if (!_imgData.A || !_imgData.B || !_imgData.C || !_imgData.D)
-      return showToast('Carregue imagens para todas as alternativas (A, B, C e D).');
-    const ans = $('createAns').value;
-    if (!ans) return showToast('Selecione a resposta correcta.');
-    Object.assign(entry, {
-      a: 'Imagem A', b: 'Imagem B', c: 'Imagem C', d: 'Imagem D',
-      imgA: _imgData.A, imgB: _imgData.B, imgC: _imgData.C, imgD: _imgData.D,
-      answer: ans, mode: 'imagem'
-    });
-  }
-
-  // ── Guardar ───────────────────────────────────────────
-  const saveToCloud = createDest === 'cloud';
-  if (saveToCloud) {
-    if (!navigator.onLine) return showToast('Sem ligação à internet. Não é possível guardar na nuvem.');
-    showLoading('A enviar para a nuvem...');
-    try {
-      const ref = db.ref('questions').push();
-      entry.id = ref.key;
-      await ref.set(entry);
-      hideLoading();
-      showToast(`Pergunta enviada para a nuvem! (${disc})`);
-    } catch(e) {
-      hideLoading();
-      showToast('Erro ao enviar: ' + e.message);
-      return;
-    }
-  } else {
+  // ── FLASHCARD ──
+  if (createAnswerType === 'flashcard') {
+    const front = $('createFlashFront').value.trim();
+    const back  = $('createFlashBack').value.trim();
+    if (!front || !back) return showToast('Preencha a frente e o verso do flashcard.');
     loadLocalDB();
+    const entry = {
+      id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      disc, cat, question: front,
+      a: back, b: '', c: '', d: '',
+      answer: 'A',
+      answerType: 'flashcard',
+      flashFront: front,
+      flashBack: back,
+      diff: 'médio',
+      mode: createQuizMode,
+      createdAt: Date.now(),
+      uid: State.user?.uid || 'anon'
+    };
     State.localDB.push(entry);
     saveLocalDB(State.localDB);
     updateCreateCounter();
-    showToast(`Pergunta guardada localmente! (${disc})`);
+    $('createFlashFront').value = '';
+    $('createFlashBack').value  = '';
+    $('createQ').value = '';
+    showToast(`Flashcard guardado! (${disc})`);
+    return;
   }
 
-  // Limpar campos
-  $('createQ').value  = '';
-  $('createA').value  = ''; $('createB').value = '';
-  $('createC').value  = ''; $('createD').value = '';
-  if ($('createAns')) $('createAns').value = '';
-  if ($('createLacuna')) $('createLacuna').value = '';
-  if ($('createFlashAns')) $('createFlashAns').value = '';
-  if ($('createVFAnswer')) $('createVFAnswer').value = '';
-  imgInputIds.forEach(letter => {
-    _imgData[letter] = null;
-    const preview = $('imgPreview' + letter);
-    if (preview) { preview.classList.remove('has-image'); const img = preview.querySelector('img'); if (img) img.remove(); }
-    const inp = $('imgInput' + letter);
-    if (inp) inp.value = '';
-  });
+  // ── LACUNAS ──
+  if (createAnswerType === 'lacunas') {
+    const frase = $('createLacunaFrase').value.trim();
+    const resp  = $('createLacunaResposta').value.trim();
+    if (!frase || !resp) return showToast('Preencha a frase com lacuna e a resposta.');
+    if (!frase.includes('___')) return showToast('Use ___ (três underscores) para marcar a lacuna na frase.');
+    loadLocalDB();
+    const entry = {
+      id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      disc, cat,
+      question: frase.replace('___', '___'),
+      a: resp, b: '', c: '', d: '',
+      answer: 'A',
+      answerType: 'lacunas',
+      lacunaFrase: frase,
+      lacunaResposta: resp,
+      diff: 'médio',
+      mode: createQuizMode,
+      createdAt: Date.now(),
+      uid: State.user?.uid || 'anon'
+    };
+    State.localDB.push(entry);
+    saveLocalDB(State.localDB);
+    updateCreateCounter();
+    $('createLacunaFrase').value    = '';
+    $('createLacunaResposta').value = '';
+    $('createQ').value = '';
+    showToast(`Pergunta de lacuna guardada! (${disc})`);
+    return;
+  }
+
+  // ── V/F + IMAGEM ──
+  if (createAnswerType === 'vf' && isImage) {
+    if (!q) return showToast('Preencha a pergunta.');
+    if (!_imgData.A || !_imgData.B) return showToast('Carregue imagens para A (Verdadeiro) e B (Falso).');
+    const ans = $('createAns').value;
+    if (!ans || (ans !== 'A' && ans !== 'B')) return showToast('Selecione A (Verdadeiro) ou B (Falso) como resposta correcta.');
+    loadLocalDB();
+    const entry = {
+      id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      disc, cat, question: q,
+      a: 'Verdadeiro', b: 'Falso', c: '', d: '',
+      imgA: _imgData.A, imgB: _imgData.B, imgC: null, imgD: null,
+      answer: ans,
+      answerType: 'vf',
+      diff: 'médio',
+      mode: 'imagem',
+      createdAt: Date.now(),
+      uid: State.user?.uid || 'anon'
+    };
+    State.localDB.push(entry);
+    saveLocalDB(State.localDB);
+    updateCreateCounter();
+    imgInputIds.forEach(letter => {
+      _imgData[letter] = null;
+      const preview = $('imgPreview' + letter);
+      preview.classList.remove('has-image');
+      const img = preview.querySelector('img');
+      if (img) img.remove();
+      $('imgInput' + letter).value = '';
+    });
+    $('createQ').value = '';
+    $('createAns').value = '';
+    showToast(`Pergunta V/F com imagem guardada! (${disc})`);
+    return;
+  }
+
+  if (!q && !isImage) return showToast('Preencha a pergunta.');
+  const ans  = $('createAns').value;
+
+  if (isImage) {
+    if (!q) return showToast('Preencha a pergunta.');
+    if (!ans) return showToast('Selecione a resposta correcta.');
+    if (!_imgData.A || !_imgData.B || !_imgData.C || !_imgData.D) {
+      return showToast('Carregue imagens para todas as alternativas (A, B, C e D).');
+    }
+    loadLocalDB();
+    const entry = {
+      id:         'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      disc, cat, question: q,
+      a: 'Imagem A', b: 'Imagem B', c: 'Imagem C', d: 'Imagem D',
+      imgA: _imgData.A, imgB: _imgData.B, imgC: _imgData.C, imgD: _imgData.D,
+      answer: ans,
+      answerType: createAnswerType !== 'multipla' ? createAnswerType : 'multipla',
+      diff: 'médio',
+      mode: 'imagem',
+      createdAt: Date.now(),
+      uid: State.user?.uid || 'anon'
+    };
+    State.localDB.push(entry);
+    saveLocalDB(State.localDB);
+    updateCreateCounter();
+    imgInputIds.forEach(letter => {
+      _imgData[letter] = null;
+      const preview = $('imgPreview' + letter);
+      preview.classList.remove('has-image');
+      const img = preview.querySelector('img');
+      if (img) img.remove();
+      $('imgInput' + letter).value = '';
+    });
+    $('createQ').value = '';
+    $('createAns').value = '';
+    showToast(`Pergunta de imagem guardada! (${disc})`);
+    return;
+  }
+
+  // ── MÚLTIPLA ESCOLHA ou V/F (texto) ──
+  const a = $('createA').value.trim();
+  const b = $('createB').value.trim();
+  const c = createAnswerType === 'vf' ? 'N/A' : $('createC').value.trim();
+  const d = createAnswerType === 'vf' ? 'N/A' : $('createD').value.trim();
+
+  if (!a || !b) return showToast('Preencha pelo menos as alternativas A e B.');
+  if (createAnswerType !== 'vf' && (!c || !d)) return showToast('Preencha todos os campos da pergunta.');
+  if (!ans) return showToast('Selecione a resposta correcta.');
+
+  loadLocalDB();
+  const entry = {
+    id:        'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    disc, cat, question: q,
+    a, b,
+    c: createAnswerType === 'vf' ? '' : c,
+    d: createAnswerType === 'vf' ? '' : d,
+    answer:    ans,
+    answerType: createAnswerType,
+    diff:      'médio',
+    mode:      createQuizMode,
+    createdAt: Date.now(),
+    uid:       State.user?.uid || 'anon'
+  };
+  State.localDB.push(entry);
+  saveLocalDB(State.localDB);
+  updateCreateCounter();
+
+  $('createQ').value = '';
+  $('createA').value = '';
+  $('createB').value = '';
+  if (createAnswerType !== 'vf') {
+    $('createC').value = '';
+    $('createD').value = '';
+  }
+  $('createAns').value = '';
+
+  showToast(`Pergunta guardada! (${disc})`);
 };
 
 // ─── UPLOAD PARA NUVEM DESACTIVADO ────────────────────────
@@ -2138,8 +2385,8 @@ $('btnEnviarComprovativo').onclick = () => {
 
 $('btnComprarPacote').onclick = () => { if (pacoteAtual) abrirPagamento(pacoteAtual); };
 
-$('lojaBackBtn').onclick   = () => showScreen('screen-home');
-$('pacoteBackBtn').onclick = () => showScreen('screen-loja');
+$('lojaBackBtn').onclick   = () => showScreen('screen-mainmenu');
+$('pacoteBackBtn').onclick = () => abrirLoja();
 $('pagBackBtn').onclick    = () => showScreen('screen-pacote');
 $('btnLoja').onclick       = () => abrirLoja();
 
@@ -2177,231 +2424,6 @@ function marcarNotifVista(id) {
 }
 
 setTimeout(() => verificarNotifNovoPacote(), 3000);
-
-// ══════════════════════════════════════════════════════════
-// JOGO: VERDADEIRO / FALSO
-// ══════════════════════════════════════════════════════════
-function startVFGame() {
-  State.qIndex = 0; State.score = 0; State.correct = 0; State.wrong = 0;
-  showScreen('screen-game-vf');
-  renderVFQuestion();
-}
-
-function renderVFQuestion() {
-  const q = State.questions[State.qIndex];
-  if (!q) { endGame(); return; }
-  State.answered = false;
-
-  const pct = (State.qIndex / State.questions.length) * 100;
-  $('vfProgressFill').style.width   = Math.max(2, pct) + '%';
-  $('vfProgressLabel').textContent  = (State.qIndex + 1) + ' / ' + State.questions.length;
-  $('vfScoreBadge').textContent     = State.correct + ' ✓';
-  $('vfQuestionNum').textContent    = 'Questão ' + (State.qIndex + 1);
-  $('vfQuestionText').textContent   = q.question;
-
-  const trueBtn  = $('vfTrueBtn');
-  const falseBtn = $('vfFalseBtn');
-  trueBtn.disabled  = false;
-  falseBtn.disabled = false;
-  trueBtn.className  = 'vf-game-btn vf-true-btn';
-  falseBtn.className = 'vf-game-btn vf-false-btn';
-  $('vfNextBtn').disabled = true;
-  $('vfNextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
-}
-
-function handleVFAnswer(chosen) { // chosen: 'V' or 'F'
-  if (State.answered) return;
-  State.answered = true;
-
-  const q = State.questions[State.qIndex];
-  // Resposta correcta: q.answer = 'A' significa Verdadeiro, 'B' significa Falso
-  const correctIsTrue = q.answer === 'A' || q.answer === 'V' || String(q.answer).toLowerCase() === 'verdadeiro';
-  const isRight = (chosen === 'V') === correctIsTrue;
-
-  if (isRight) { State.correct++; State.score += 5; playCorrectSound(); }
-  else         { State.wrong++;   playWrongSound(); }
-
-  $('vfScoreBadge').textContent = State.correct + ' ✓';
-  $('vfTrueBtn').disabled  = true;
-  $('vfFalseBtn').disabled = true;
-
-  if (chosen === 'V') {
-    $('vfTrueBtn').classList.add(isRight ? 'vf-correct' : 'vf-wrong');
-    if (!isRight) $('vfFalseBtn').classList.add('vf-correct');
-  } else {
-    $('vfFalseBtn').classList.add(isRight ? 'vf-correct' : 'vf-wrong');
-    if (!isRight) $('vfTrueBtn').classList.add('vf-correct');
-  }
-  $('vfNextBtn').disabled = false;
-}
-
-$('vfTrueBtn').onclick  = () => handleVFAnswer('V');
-$('vfFalseBtn').onclick = () => handleVFAnswer('F');
-$('vfNextBtn').onclick  = () => {
-  if (!State.answered) { showToast('Escolha Verdadeiro ou Falso.'); return; }
-  State.qIndex++;
-  if (State.qIndex >= State.questions.length) endGame();
-  else renderVFQuestion();
-};
-$('gameVFExitBtn').onclick = () => {
-  showModal({
-    title: 'Abandonar Jogo', msg: 'Quer mesmo sair?',
-    btns: [
-      { label: 'CONTINUAR', cls: 'btn-primary' },
-      { label: 'SAIR', cls: 'btn-danger', action: () => { stopTimer(); showScreen('screen-mainmenu'); } }
-    ]
-  });
-};
-
-// ══════════════════════════════════════════════════════════
-// JOGO: PREENCHER LACUNAS
-// ══════════════════════════════════════════════════════════
-function startLacunaGame() {
-  State.qIndex = 0; State.score = 0; State.correct = 0; State.wrong = 0;
-  showScreen('screen-game-lacuna');
-  renderLacunaQuestion();
-}
-
-function renderLacunaQuestion() {
-  const q = State.questions[State.qIndex];
-  if (!q) { endGame(); return; }
-  State.answered = false;
-
-  const pct = (State.qIndex / State.questions.length) * 100;
-  $('lacunaProgressFill').style.width  = Math.max(2, pct) + '%';
-  $('lacunaProgressLabel').textContent = (State.qIndex + 1) + ' / ' + State.questions.length;
-  $('lacunaScoreBadge').textContent    = State.correct + ' ✓';
-  $('lacunaQuestionNum').textContent   = 'Questão ' + (State.qIndex + 1);
-  $('lacunaQuestionText').textContent  = q.question;
-  $('lacunaInput').value = '';
-  $('lacunaInput').disabled = false;
-  $('lacunaFeedback').textContent = '';
-  $('lacunaFeedback').className = 'lacuna-feedback';
-  $('lacunaSubmitBtn').disabled = false;
-  $('lacunaNextBtn').disabled = true;
-  $('lacunaNextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
-  setTimeout(() => $('lacunaInput').focus(), 200);
-}
-
-function handleLacunaSubmit() {
-  if (State.answered) return;
-  const q = State.questions[State.qIndex];
-  const userAns   = $('lacunaInput').value.trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
-  const correctAns = String(q.answer).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
-  const isRight = userAns === correctAns;
-
-  State.answered = true;
-  $('lacunaInput').disabled   = true;
-  $('lacunaSubmitBtn').disabled = true;
-
-  const fb = $('lacunaFeedback');
-  if (isRight) {
-    State.correct++; State.score += 5;
-    fb.textContent  = '✔ Correcto!';
-    fb.className    = 'lacuna-feedback lacuna-correct';
-    playCorrectSound();
-  } else {
-    State.wrong++;
-    fb.textContent  = `✘ Errado. Resposta correcta: "${q.answer}"`;
-    fb.className    = 'lacuna-feedback lacuna-wrong';
-    playWrongSound();
-  }
-  $('lacunaScoreBadge').textContent = State.correct + ' ✓';
-  $('lacunaNextBtn').disabled = false;
-}
-
-$('lacunaSubmitBtn').onclick = handleLacunaSubmit;
-$('lacunaInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleLacunaSubmit(); });
-$('lacunaNextBtn').onclick = () => {
-  if (!State.answered) { showToast('Confirme a resposta primeiro.'); return; }
-  State.qIndex++;
-  if (State.qIndex >= State.questions.length) endGame();
-  else renderLacunaQuestion();
-};
-$('gameLacunaExitBtn').onclick = () => {
-  showModal({
-    title: 'Abandonar Jogo', msg: 'Quer mesmo sair?',
-    btns: [
-      { label: 'CONTINUAR', cls: 'btn-primary' },
-      { label: 'SAIR', cls: 'btn-danger', action: () => { stopTimer(); showScreen('screen-mainmenu'); } }
-    ]
-  });
-};
-
-// ══════════════════════════════════════════════════════════
-// JOGO: FLASHCARD (Anki estilo)
-// ══════════════════════════════════════════════════════════
-let flashReviewQueue = []; // cartas para rever (não sabia / quase)
-
-function startFlashGame() {
-  State.qIndex = 0; State.score = 0; State.correct = 0; State.wrong = 0;
-  flashReviewQueue = [];
-  showScreen('screen-game-flash');
-  renderFlashCard();
-}
-
-function renderFlashCard() {
-  const q = State.questions[State.qIndex];
-  if (!q) {
-    // Se há cartas para rever, adicionar no final
-    if (flashReviewQueue.length > 0) {
-      State.questions = [...State.questions, ...flashReviewQueue];
-      flashReviewQueue = [];
-    }
-    endGame(); return;
-  }
-
-  const pct = (State.qIndex / State.questions.length) * 100;
-  $('flashProgressFill').style.width  = Math.max(2, pct) + '%';
-  $('flashProgressLabel').textContent = (State.qIndex + 1) + ' / ' + State.questions.length;
-  $('flashScoreBadge').textContent    = State.correct + ' ✓';
-
-  $('flashFrontText').textContent = q.question;
-  $('flashBackText').textContent  = q.answer || '';
-
-  const card = $('flashCard');
-  card.classList.remove('flipped');
-  $('flashVerdictWrap').style.display = 'none';
-}
-
-$('flashCard').onclick = () => {
-  const card = $('flashCard');
-  if (!card.classList.contains('flipped')) {
-    card.classList.add('flipped');
-    $('flashVerdictWrap').style.display = 'flex';
-  }
-};
-
-function handleFlashVerdict(verdict) { // 'no' | 'almost' | 'yes'
-  const q = State.questions[State.qIndex];
-  if (verdict === 'yes') {
-    State.correct++; State.score += 5; playCorrectSound();
-  } else if (verdict === 'almost') {
-    State.wrong++;
-    flashReviewQueue.push({...q, id: q.id + '_rev' + Date.now()});
-    playWrongSound();
-  } else {
-    State.wrong++;
-    flashReviewQueue.push({...q, id: q.id + '_rev' + Date.now()});
-    playWrongSound();
-  }
-  $('flashScoreBadge').textContent = State.correct + ' ✓';
-  State.qIndex++;
-  renderFlashCard();
-}
-
-$('flashYesBtn').onclick    = () => handleFlashVerdict('yes');
-$('flashAlmostBtn').onclick = () => handleFlashVerdict('almost');
-$('flashNoBtn').onclick     = () => handleFlashVerdict('no');
-$('gameFlashExitBtn').onclick = () => {
-  showModal({
-    title: 'Abandonar Jogo', msg: 'Quer mesmo sair?',
-    btns: [
-      { label: 'CONTINUAR', cls: 'btn-primary' },
-      { label: 'SAIR', cls: 'btn-danger', action: () => { stopTimer(); showScreen('screen-mainmenu'); } }
-    ]
-  });
-};
 
 // ─── INIT ─────────────────────────────────────────────────
 (function init() {
