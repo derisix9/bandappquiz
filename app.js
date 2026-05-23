@@ -1046,13 +1046,6 @@ document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(b
 });
 
 // ─── GAME SETUP: DB SOURCE SELECTOR ────────────────────────
-document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    State.dbSource = btn.dataset.source;
-  };
-});
 
 $('startGameBtn').onclick = async () => {
   State.currentDisc = $('setupDisc').value;
