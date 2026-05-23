@@ -1134,8 +1134,17 @@ select.field-input       { cursor: pointer; }
 .timer-ring-num.danger  { color: var(--red); }
 
 /* Question Card */
+/* Game content scroll area */
+.game-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px 14px 8px;
+}
+
 .game-question-card {
-  margin: 12px 14px 12px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1158,7 +1167,7 @@ select.field-input       { cursor: pointer; }
 .type-flashcard     { background: rgba(168, 85, 247, 0.12); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.2); }
 
 /* Multiple Choice Options */
-.game-options { padding: 0 14px; display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; }
+.game-options { display: flex; flex-direction: column; gap: 10px; }
 
 .option-btn {
   display: flex;
@@ -1222,7 +1231,7 @@ select.field-input       { cursor: pointer; }
 }
 
 /* Image Mode Options Grid */
-.game-options.image-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 14px; }
+.game-options.image-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
 .option-btn.image-option            { flex-direction: column; align-items: stretch; padding: 0; overflow: hidden; height: auto; gap: 0; position: relative; }
 .option-btn.image-option .option-badge { width: 100%; height: 32px; border-radius: 0; font-size: 0.9rem; }
@@ -1300,8 +1309,6 @@ select.field-input       { cursor: pointer; }
    ══════════════════════════════════════════════════════════ */
 
 .lacunas-area {
-  padding: 12px 16px 0;
-  margin-top: 4px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1368,8 +1375,6 @@ select.field-input       { cursor: pointer; }
    ══════════════════════════════════════════════════════════ */
 
 .flashcard-area {
-  padding: 12px 16px 0;
-  margin-top: 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
