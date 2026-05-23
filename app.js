@@ -2176,7 +2176,7 @@ function abrirRevisao(entry) {
     // Imagem de pergunta (multipla2 ou questionImg)
     let imgHtml = '';
     if (h.questionImg) {
-      imgHtml = `<img class="rev-question-img" src="${escHtml(h.questionImg)}" alt="imagem">`;
+      imgHtml = `<img class="rev-question-img" src="${h.questionImg}" alt="imagem">`;
     }
 
     // Imagens das opções (modo imagem multipla1 ou VF com imagens)
@@ -2194,12 +2194,12 @@ function abrirRevisao(entry) {
           <div class="rev-img-answers">
             <div class="rev-img-col rev-img-wrong">
               <span class="rev-img-label">A tua resposta</span>
-              <img class="rev-opt-img" src="${escHtml(userImgSrc)}" alt="${userLbl}">
+              <img class="rev-opt-img" src="${userImgSrc}" alt="${userLbl}">
               <span class="rev-img-caption wrong-text">${userLbl}</span>
             </div>
             <div class="rev-img-col rev-img-correct">
               <span class="rev-img-label">Resposta certa</span>
-              <img class="rev-opt-img" src="${escHtml(corrImgSrc)}" alt="${corrLbl}">
+              <img class="rev-opt-img" src="${corrImgSrc}" alt="${corrLbl}">
               <span class="rev-img-caption correct-text">${corrLbl}</span>
             </div>
           </div>`;
@@ -2208,38 +2208,41 @@ function abrirRevisao(entry) {
           <div class="rev-img-answers">
             <div class="rev-img-col rev-img-correct">
               <span class="rev-img-label">Resposta certa</span>
-              <img class="rev-opt-img" src="${escHtml(corrImgSrc)}" alt="${corrLbl}">
+              <img class="rev-opt-img" src="${corrImgSrc}" alt="${corrLbl}">
               <span class="rev-img-caption correct-text">${corrLbl}</span>
             </div>
           </div>`;
       }
     }
 
-    card.innerHTML = `
-      <div class="rev-card-header">
-        <span class="rev-card-num">Q${i + 1}</span>
-        <span class="rev-card-type">${escHtml(typeLabel)}</span>
-        <span class="rev-card-result ${h.isRight ? 'rev-result-ok' : 'rev-result-fail'}">
-          ${h.isRight
-            ? '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Certo'
-            : '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg> Errado'}
-        </span>
-      </div>
-      ${imgHtml}
-      <div class="rev-card-question">${qText}</div>
-      ${hasOptImgs ? ansImgHtml : `
-      <div class="rev-card-answers">
-        ${!h.isRight ? `<div class="rev-answer rev-answer-user">
-          <span class="rev-answer-label">A tua resposta</span>
-          <span class="rev-answer-text wrong-text">${userAns}</span>
-        </div>` : ''}
-        <div class="rev-answer rev-answer-correct">
-          <span class="rev-answer-label">${h.isRight ? 'Resposta' : 'Resposta certa'}</span>
-          <span class="rev-answer-text correct-text">${corrAns}</span>
-        </div>
-      </div>`}
-      ${h.disc || h.cat ? `<div class="rev-card-tags">${h.disc ? `<span class="rev-tag">${escHtml(h.disc)}</span>` : ''}${h.cat ? `<span class="rev-tag">${escHtml(h.cat)}</span>` : ''}</div>` : ''}
-    `;
+    // Bloco de respostas: imagens (modo imagem) ou texto
+    let answersBlock;
+    if (hasOptImgs) {
+      answersBlock = ansImgHtml;
+    } else {
+      const userAnsBlock = !h.isRight
+        ? '<div class="rev-answer rev-answer-user"><span class="rev-answer-label">A tua resposta</span><span class="rev-answer-text wrong-text">' + userAns + '</span></div>'
+        : '';
+      const corrLabelText = h.isRight ? 'Resposta' : 'Resposta certa';
+      answersBlock = '<div class="rev-card-answers">' + userAnsBlock + '<div class="rev-answer rev-answer-correct"><span class="rev-answer-label">' + corrLabelText + '</span><span class="rev-answer-text correct-text">' + corrAns + '</span></div></div>';
+    }
+    const tagsBlock = (h.disc || h.cat)
+      ? '<div class="rev-card-tags">' + (h.disc ? '<span class="rev-tag">' + escHtml(h.disc) + '</span>' : '') + (h.cat ? '<span class="rev-tag">' + escHtml(h.cat) + '</span>' : '') + '</div>'
+      : '';
+    const resultIcon = h.isRight
+      ? '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Certo'
+      : '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg> Errado';
+
+    card.innerHTML =
+      '<div class="rev-card-header">' +
+        '<span class="rev-card-num">Q' + (i + 1) + '</span>' +
+        '<span class="rev-card-type">' + escHtml(typeLabel) + '</span>' +
+        '<span class="rev-card-result ' + (h.isRight ? 'rev-result-ok' : 'rev-result-fail') + '">' + resultIcon + '</span>' +
+      '</div>' +
+      imgHtml +
+      '<div class="rev-card-question">' + qText + '</div>' +
+      answersBlock +
+      tagsBlock;
     list.appendChild(card);
   });
 
