@@ -977,8 +977,13 @@ document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(btn => {
         showToast('A carregar disciplinas da nuvem...');
         try {
           const snap = await db.ref('questions').once('value');
-          _setupCloudCache = [];
-          snap.forEach(ch => { const q = ch.val(); if (q) _setupCloudCache.push(q); });
+          const data = snap.val();
+          if (!data) {
+            showToast('Sem perguntas na nuvem.');
+            populateSetupDiscs(null);
+            return;
+          }
+          _setupCloudCache = Object.values(data);
         } catch(e) {
           showToast('Erro ao carregar da nuvem.');
           _setupCloudCache = null;
@@ -2239,7 +2244,22 @@ function updateCreateFormForAnswerType() {
   $('createLacunasWrap').style.display   = isLacun ? 'block' : 'none';
   $('createFlashcardWrap').style.display = isFlash ? 'block' : 'none';
 
-  // V/F: só A e B, esconder C e D por completo
+  // Resposta correcta: ocultar em flashcard e lacunas; mostrar só A/B em V/F
+  const ansWrap = $('createAnsWrap');
+  if (ansWrap) {
+    ansWrap.style.display = hideQAndOptions ? 'none' : 'block';
+    if (!hideQAndOptions) {
+      const sel = $('createAns');
+      // Mostrar/ocultar opções C e D consoante o tipo
+      [...sel.options].forEach(o => {
+        if (o.value === 'C' || o.value === 'D') o.style.display = isVF ? 'none' : '';
+      });
+      // Se estava seleccionado C ou D e mudou para V/F, resetar
+      if (isVF && (sel.value === 'C' || sel.value === 'D')) sel.value = '';
+    }
+  }
+
+  // V/F: só A e B visíveis; C e D ocultos
   if ($('createCWrap')) $('createCWrap').style.display = isVF ? 'none' : '';
   if ($('createDWrap')) $('createDWrap').style.display = isVF ? 'none' : '';
 
@@ -2251,7 +2271,6 @@ function updateCreateFormForAnswerType() {
     $('createC').disabled = false;
     $('createD').disabled = false;
   } else if (!isFlash && !isLacun) {
-    $('createA').value = $('createA').value; // preserve
     $('createC').disabled = false;
     $('createD').disabled = false;
     $('createC').placeholder = 'Alternativa C';
