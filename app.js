@@ -919,32 +919,17 @@ function updateCategoryOptions(disc, cloudQuestions) {
   });
 }
 
-// Populate discipline dropdown for game setup based on active db source
-async function populateSetupDiscs(cloudQuestions) {
-  const sel = $('setupDisc');
-  // Save current selection
-  const prev = sel.value;
-  sel.innerHTML = '<option value="all">Todas as Disciplinas</option>';
-
-  let discs = [];
-  if (State.dbSource === 'cloud' && cloudQuestions) {
-    discs = [...new Set(cloudQuestions.map(q => q.disc).filter(Boolean))].sort();
+// Populate discipline dropdown for game setup — local only (called on screen open)
+function populateSetupDiscs(cloudQuestions) {
+  if (cloudQuestions) {
+    const discs = [...new Set(cloudQuestions.map(q => q.disc).filter(Boolean))].sort();
+    _fillSetupDiscs(discs, cloudQuestions);
   } else {
-    // Local: from localDB + custom discs
     const fromDB = [...new Set(State.localDB.map(q => q.disc).filter(Boolean))].sort();
     const custom  = loadCustomDiscs();
-    discs = [...new Set([...fromDB, ...custom])].sort();
+    const discs   = [...new Set([...fromDB, ...custom])].sort();
+    _fillSetupDiscs(discs, null);
   }
-
-  discs.forEach(d => {
-    const o = document.createElement('option');
-    o.value = d; o.textContent = d;
-    sel.appendChild(o);
-  });
-
-  // Restore selection if still valid
-  if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
-  updateCategoryOptions(sel.value, cloudQuestions);
 }
 
 // ─── GAME SETUP ───────────────────────────────────────────
@@ -952,52 +937,83 @@ $('setupBackBtn').onclick = () => showScreen('screen-modeselect');
 
 $('setupDisc').onchange = () => {
   loadLocalDB();
-  const cloudQ = (State.dbSource === 'cloud') ? _setupCloudCache : null;
-  updateCategoryOptions($('setupDisc').value, cloudQ);
+  _fillSetupCats($('setupDisc').value, (State.dbSource === 'cloud') ? _setupCloudCache : null);
   State.currentCat = 'all';
 };
 
 document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(btn => {
   btn.onclick = async () => {
+    const source = btn.dataset.source;
+
+    // Marcar activo
     document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    State.dbSource = btn.dataset.source;
+    State.dbSource = source;
 
-    if (State.dbSource === 'cloud') {
-      if (!navigator.onLine) {
-        showToast('Sem conexão à internet para carregar disciplinas da nuvem.');
-        State.dbSource = 'local';
-        document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(b => {
-          b.classList.toggle('active', b.dataset.source === 'local');
-        });
-        populateSetupDiscs(null);
-        return;
-      }
-      if (!_setupCloudCache) {
-        showToast('A carregar disciplinas da nuvem...');
-        try {
-          const snap = await db.ref('questions').once('value');
-          const data = snap.val();
-          if (!data) {
-            showToast('Sem perguntas na nuvem.');
-            populateSetupDiscs(null);
-            return;
-          }
-          _setupCloudCache = Object.values(data);
-        } catch(e) {
-          showToast('Erro ao carregar da nuvem.');
-          _setupCloudCache = null;
-          populateSetupDiscs(null);
-          return;
-        }
-      }
-      populateSetupDiscs(_setupCloudCache);
-    } else {
+    if (source === 'local') {
       _setupCloudCache = null;
-      populateSetupDiscs(null);
+      // Popular com dados locais
+      const fromDB = [...new Set(State.localDB.map(q => q.disc).filter(Boolean))].sort();
+      const custom  = loadCustomDiscs();
+      const discs   = [...new Set([...fromDB, ...custom])].sort();
+      _fillSetupDiscs(discs, null);
+      return;
+    }
+
+    // === NUVEM ===
+    if (!navigator.onLine) {
+      showToast('Sem conexão à internet.');
+      // Reverter para local
+      State.dbSource = 'local';
+      document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.source === 'local');
+      });
+      return;
+    }
+
+    showToast('A carregar da nuvem...');
+    try {
+      const snap = await db.ref('questions').once('value');
+      const data = snap.val();
+      if (!data) { showToast('Sem perguntas na nuvem.'); return; }
+      _setupCloudCache = Object.values(data);
+      const discs = [...new Set(_setupCloudCache.map(q => q.disc).filter(Boolean))].sort();
+      _fillSetupDiscs(discs, _setupCloudCache);
+      showToast(`Nuvem: ${discs.length} disciplinas carregadas.`);
+    } catch(e) {
+      showToast('Erro ao carregar da nuvem: ' + e.message);
     }
   };
 });
+
+// Preenche setupDisc + setupCat com as disciplinas recebidas
+// cloudPool: array de perguntas da nuvem (ou null para local)
+function _fillSetupDiscs(discs, cloudPool) {
+  const sel = $('setupDisc');
+  sel.innerHTML = '<option value="all">Todas as Disciplinas</option>';
+  discs.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    sel.appendChild(o);
+  });
+  sel.value = 'all';
+  _fillSetupCats('all', cloudPool);
+}
+
+// Preenche setupCat com as categorias da disciplina seleccionada
+function _fillSetupCats(disc, cloudPool) {
+  const catSel = $('setupCat');
+  catSel.innerHTML = '<option value="all">Todas as Categorias</option>';
+  const pool = cloudPool || State.localDB;
+  const filtered = disc === 'all' ? pool : pool.filter(q => q.disc === disc);
+  const cats = [...new Set(filtered.map(q => q.cat).filter(Boolean))].sort();
+  cats.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    catSel.appendChild(o);
+  });
+  catSel.value = 'all';
+}
 
 document.querySelectorAll('.timer-opt[data-seconds]').forEach(opt => {
   opt.onclick = () => {
