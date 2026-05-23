@@ -2549,6 +2549,8 @@ if (_qImgInput) {
     reader.readAsDataURL(file);
   };
 }
+
+$('saveQuestionBtn').onclick = () => {
   let disc = $('createDisc').value.trim();
 
   // Se selecionou "Outros", usar o campo personalizado
