@@ -183,6 +183,24 @@ const LS = {
   del(k)    { localStorage.removeItem(k); }
 };
 
+// ─── DISCIPLINAS PERSONALIZADAS (localStorage) ─────────────
+const LS_CUSTOM_DISCS = 'eq_custom_discs';
+
+function loadCustomDiscs() {
+  return LS.get(LS_CUSTOM_DISCS) || [];
+}
+
+function saveCustomDisc(name) {
+  const discs = loadCustomDiscs();
+  if (!discs.includes(name)) {
+    discs.push(name);
+    LS.set(LS_CUSTOM_DISCS, discs);
+  }
+}
+
+// Cache de perguntas da nuvem para o setup do jogo
+let _setupCloudCache = null;
+
 function loadLocalDB() {
   State.localDB = LS.get('eq_questions') || [];
 }
@@ -847,17 +865,13 @@ document.querySelectorAll('.mode-card').forEach(card => {
 
     // Reset category
     State.currentCat = 'all';
-    _setupCloudCache = null;  // limpar cache da nuvem ao abrir setup
-    populateSetupDiscs(null); // popula disciplinas locais + custom
-
-    // Flashcard só disponível no modo Aprendizado
-    updateSetupFlashcardVisibility();
-
     // Reset fonte de dados para Local
     State.dbSource = 'local';
     document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.source === 'local');
     });
+    _setupCloudCache = null;  // limpar cache da nuvem ao abrir setup
+    populateSetupDiscs(null); // popula disciplinas locais + custom
 
     showScreen('screen-gamesetup');
   };
@@ -941,9 +955,6 @@ $('setupDisc').onchange = () => {
   updateCategoryOptions($('setupDisc').value);
   State.currentCat = 'all';
 };
-
-// Store cloud questions for reuse when switching source
-let _setupCloudCache = null;
 
 document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(btn => {
   btn.onclick = async () => {
@@ -2138,21 +2149,6 @@ $('createCat').onchange = () => {
   if ($('createCat').value !== '__new__') $('createCatNew').value = '';
 };
 
-// ─── DISCIPLINAS PERSONALIZADAS (localStorage) ─────────────
-const LS_CUSTOM_DISCS = 'eq_custom_discs';
-
-function loadCustomDiscs() {
-  return LS.get(LS_CUSTOM_DISCS) || [];
-}
-
-function saveCustomDisc(name) {
-  const discs = loadCustomDiscs();
-  if (!discs.includes(name)) {
-    discs.push(name);
-    LS.set(LS_CUSTOM_DISCS, discs);
-  }
-}
-
 // Injectar disciplinas personalizadas no selector do jogo
 function injectCustomDiscsIntoSetup() {
   const sel = $('setupDisc');
@@ -2306,6 +2302,7 @@ $('saveQuestionBtn').onclick = () => {
   let cat = $('createCat').value;
   if (cat === '__new__') {
     cat = ($('createCatNew') ? $('createCatNew').value.trim() : '');
+    if (!cat) return showToast('Escreva o nome da nova categoria.');
   } else {
     cat = cat.trim();
   }
