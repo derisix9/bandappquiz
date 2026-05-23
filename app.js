@@ -879,21 +879,53 @@ document.querySelectorAll('.mode-card').forEach(card => {
 
 function updateSetupFlashcardVisibility() {
   const isAprendizado = State.currentMode === 'aprendizado';
-  const fcBtn = document.querySelector('#setupAnswerTypeSelector .answer-type-btn[data-atype="flashcard"]');
-  if (!fcBtn) return;
-  if (isAprendizado) {
-    fcBtn.style.display = '';
-    fcBtn.disabled = false;
-    fcBtn.title = '';
-  } else {
-    fcBtn.style.display = 'none';
-    // If flashcard was selected, reset to 'todos'
-    if (State.currentAnswerType === 'flashcard') {
-      State.currentAnswerType = 'todos';
+  const isImagem      = State.currentMode === 'imagem';
+
+  // Controlar visibilidade de cada botão
+  const setupBtns = {
+    todos:      document.querySelector('#setupAnswerTypeSelector .answer-type-btn[data-atype="todos"]'),
+    multipla:   document.querySelector('#setupAnswerTypeSelector .answer-type-btn[data-atype="multipla"]'),
+    multipla2:  $('setupMultipla2Btn'),
+    vf:         $('setupVFBtn'),
+    lacunas:    $('setupLacunasBtn'),
+    flashcard:  $('setupFlashcardBtn'),
+  };
+
+  if (isImagem) {
+    // Modo imagem: apenas multipla1 e multipla2
+    if (setupBtns.todos)     setupBtns.todos.style.display     = 'none';
+    if (setupBtns.multipla2) setupBtns.multipla2.style.display = '';
+    if (setupBtns.vf)        setupBtns.vf.style.display        = 'none';
+    if (setupBtns.lacunas)   setupBtns.lacunas.style.display   = 'none';
+    if (setupBtns.flashcard) setupBtns.flashcard.style.display = 'none';
+    // Renomear multipla
+    const m1span = setupBtns.multipla?.querySelector('span');
+    if (m1span) m1span.textContent = 'Múltipla - Opção 1';
+    // Resetar para multipla se estava em tipo inválido
+    if (!['multipla','multipla2'].includes(State.currentAnswerType)) {
+      State.currentAnswerType = 'multipla';
       document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.atype === 'todos');
+        b.classList.toggle('active', b.dataset.atype === 'multipla');
       });
     }
+  } else {
+    // Modo normal: mostrar todos excepto multipla2
+    if (setupBtns.todos)     setupBtns.todos.style.display     = '';
+    if (setupBtns.multipla2) setupBtns.multipla2.style.display = 'none';
+    if (setupBtns.vf)        setupBtns.vf.style.display        = '';
+    if (setupBtns.lacunas)   setupBtns.lacunas.style.display   = '';
+    // Flashcard só em aprendizado
+    if (setupBtns.flashcard) {
+      setupBtns.flashcard.style.display = isAprendizado ? '' : 'none';
+      if (!isAprendizado && State.currentAnswerType === 'flashcard') {
+        State.currentAnswerType = 'todos';
+        document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.atype === 'todos');
+        });
+      }
+    }
+    const m1span = setupBtns.multipla?.querySelector('span');
+    if (m1span) m1span.textContent = 'Múltipla Escolha';
   }
 }
 
@@ -1274,6 +1306,8 @@ function renderQuestion() {
     renderLacunas(q);
   } else if (atype === 'vf') {
     renderVF(q);
+  } else if (atype === 'multipla2') {
+    renderMultipla2(q);
   } else {
     renderMultipla(q);
   }
@@ -1321,6 +1355,39 @@ function renderMultipla(q) {
     } else {
       btn.innerHTML = `<div class="option-badge">${displayLetter}</div><span class="option-text">${mappedOpt.text}</span><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>`;
     }
+    btn.onclick = () => handleAnswer(displayLetter, btn, optionMap);
+    optWrap.appendChild(btn);
+  });
+}
+
+// ── MÚLTIPLA OPÇÃO 2 (imagem no topo + respostas texto) ──
+function renderMultipla2(q) {
+  // A imagem da pergunta já é mostrada pelo questionImageWrap no renderQuestion
+  // Aqui renderizamos as opções como texto normal (igual a múltipla)
+  const originalOpts = [
+    { letter: 'A', text: q.a },
+    { letter: 'B', text: q.b },
+    { letter: 'C', text: q.c },
+    { letter: 'D', text: q.d },
+  ].filter(o => o.text && o.text.trim());
+
+  const shuffledOpts = shuffle(originalOpts);
+  const displayLetters = ['A','B','C','D'];
+  const optionMap = {};
+  shuffledOpts.forEach((opt, i) => { if (i < displayLetters.length) optionMap[displayLetters[i]] = opt; });
+
+  const optWrap = $('gameOptions');
+  optWrap.classList.remove('image-mode');
+
+  displayLetters.forEach(displayLetter => {
+    const mappedOpt = optionMap[displayLetter];
+    if (!mappedOpt) return;
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.dataset.displayLetter  = displayLetter;
+    btn.dataset.originalLetter = mappedOpt.letter;
+    btn.dataset.optionText     = mappedOpt.text;
+    btn.innerHTML = `<div class="option-badge">${displayLetter}</div><span class="option-text">${mappedOpt.text}</span><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
     btn.onclick = () => handleAnswer(displayLetter, btn, optionMap);
     optWrap.appendChild(btn);
   });
@@ -2250,10 +2317,33 @@ document.querySelectorAll('.create-mode-btn').forEach(btn => {
     const isImage = createQuizMode === 'imagem';
     $('textOptionsGrid').style.display  = isImage ? 'none' : 'grid';
     $('imageOptionsGrid').style.display = isImage ? 'block' : 'none';
+    // Mostrar/ocultar tipos consoante modo
+    _updateCreateAnswerTypeBtns();
     updateCreateFormForAnswerType();
     updateCreateFlashcardVisibility();
   };
 });
+
+// Controla visibilidade dos botões de tipo no criar quiz
+function _updateCreateAnswerTypeBtns() {
+  const isImage = createQuizMode === 'imagem';
+  // Multipla2: só aparece em modo imagem
+  const m2Btn = $('createMultipla2Btn');
+  if (m2Btn) m2Btn.style.display = isImage ? '' : 'none';
+  // VF, Lacunas, Flashcard: ocultos em modo imagem
+  const hide = ['createVFBtn','createLacunasBtn','createFlashcardBtn'];
+  hide.forEach(id => { const el = $(id); if (el) el.style.display = isImage ? 'none' : ''; });
+  // Se estava num tipo inválido para imagem, voltar para multipla
+  if (isImage && !['multipla','multipla2'].includes(createAnswerType)) {
+    createAnswerType = 'multipla';
+    document.querySelectorAll('#createAnswerTypeSelector .answer-type-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.atype === 'multipla');
+    });
+  }
+  // Renomear o btn multipla consoante modo
+  const m1Btn = document.querySelector('#createAnswerTypeSelector .answer-type-btn[data-atype="multipla"] span');
+  if (m1Btn) m1Btn.textContent = isImage ? 'Múltipla - Opção 1' : 'Múltipla Escolha';
+}
 
 function updateCreateFlashcardVisibility() {
   const isAprendizado = createQuizMode === 'aprendizado';
@@ -2288,48 +2378,55 @@ document.querySelectorAll('#createAnswerTypeSelector .answer-type-btn').forEach(
 function updateCreateFormForAnswerType() {
   const isImage = createQuizMode === 'imagem';
   const atype   = createAnswerType;
-  const isFlash = atype === 'flashcard';
-  const isLacun = atype === 'lacunas';
-  const isVF    = atype === 'vf';
+  const isFlash  = atype === 'flashcard';
+  const isLacun  = atype === 'lacunas';
+  const isVF     = atype === 'vf';
+  const isM2     = atype === 'multipla2'; // imagem no topo + 4 opções texto
 
   // Pergunta + grelha de opções: ocultar em flashcard e lacunas
   const hideQAndOptions = isFlash || isLacun;
-  if ($('createQWrap'))       $('createQWrap').style.display       = hideQAndOptions ? 'none' : 'block';
-  if (!isImage) {
-    $('textOptionsGrid').style.display = hideQAndOptions ? 'none' : 'grid';
+  if ($('createQWrap'))     $('createQWrap').style.display     = hideQAndOptions ? 'none' : 'block';
+
+  // Modo multipla2: mostrar campo de upload da imagem-pergunta (questionImg) + opções texto
+  const qImgWrap = $('createQuestionImgWrap');
+  if (qImgWrap) qImgWrap.style.display = isM2 ? 'block' : 'none';
+
+  // Grelha de opções: texto em multipla/vf/multipla2, imagens em modo imagem opção1
+  if (!isImage || isM2) {
+    if ($('textOptionsGrid')) $('textOptionsGrid').style.display = hideQAndOptions ? 'none' : 'grid';
+    if ($('imageOptionsGrid')) $('imageOptionsGrid').style.display = 'none';
+  } else {
+    if ($('textOptionsGrid')) $('textOptionsGrid').style.display = hideQAndOptions ? 'none' : 'none';
+    if ($('imageOptionsGrid')) $('imageOptionsGrid').style.display = hideQAndOptions ? 'none' : 'block';
   }
 
   // Campos especiais
   $('createLacunasWrap').style.display   = isLacun ? 'block' : 'none';
   $('createFlashcardWrap').style.display = isFlash ? 'block' : 'none';
 
-  // Resposta correcta: ocultar em flashcard e lacunas; mostrar só A/B em V/F
+  // Resposta correcta: ocultar em flash/lacunas
   const ansWrap = $('createAnsWrap');
   if (ansWrap) {
     ansWrap.style.display = hideQAndOptions ? 'none' : 'block';
     if (!hideQAndOptions) {
       const sel = $('createAns');
-      // Mostrar/ocultar opções C e D consoante o tipo
       [...sel.options].forEach(o => {
         if (o.value === 'C' || o.value === 'D') o.style.display = isVF ? 'none' : '';
       });
-      // Se estava seleccionado C ou D e mudou para V/F, resetar
       if (isVF && (sel.value === 'C' || sel.value === 'D')) sel.value = '';
     }
   }
 
-  // V/F: só A e B visíveis; C e D ocultos
-  if ($('createCWrap')) $('createCWrap').style.display = isVF ? 'none' : '';
-  if ($('createDWrap')) $('createDWrap').style.display = isVF ? 'none' : '';
+  // C e D: ocultar em VF e multipla2
+  if ($('createCWrap')) $('createCWrap').style.display = (isVF || isM2) ? 'none' : '';
+  if ($('createDWrap')) $('createDWrap').style.display = (isVF || isM2) ? 'none' : '';
 
   if (isVF && !isImage) {
     $('createA').value = 'Verdadeiro';
     $('createB').value = 'Falso';
     $('createC').value = '';
     $('createD').value = '';
-    $('createC').disabled = false;
-    $('createD').disabled = false;
-  } else if (!isFlash && !isLacun) {
+  } else if (!isFlash && !isLacun && !isM2) {
     $('createC').disabled = false;
     $('createD').disabled = false;
     $('createC').placeholder = 'Alternativa C';
@@ -2339,7 +2436,7 @@ function updateCreateFormForAnswerType() {
 
 // ─── IMAGE UPLOAD PREVIEWS ────────────────────────────────
 const imgInputIds = ['A','B','C','D'];
-const _imgData = { A: null, B: null, C: null, D: null };
+const _imgData = { A: null, B: null, C: null, D: null, Question: null };
 
 imgInputIds.forEach(letter => {
   const input   = $('imgInput' + letter);
@@ -2368,7 +2465,28 @@ imgInputIds.forEach(letter => {
   };
 });
 
-$('saveQuestionBtn').onclick = () => {
+// Handler para a imagem da pergunta (Multipla Opção 2)
+const _qImgInput = $('imgInputQuestion');
+if (_qImgInput) {
+  _qImgInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { showToast('Imagem muito grande. Máx 2MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      _imgData.Question = ev.target.result;
+      const preview = $('imgPreviewQuestion');
+      const oldImg = preview.querySelector('img');
+      if (oldImg) oldImg.remove();
+      const img = document.createElement('img');
+      img.src = ev.target.result;
+      img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;';
+      preview.classList.add('has-image');
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  };
+}
   let disc = $('createDisc').value.trim();
 
   // Se selecionou "Outros", usar o campo personalizado
@@ -2490,6 +2608,47 @@ $('saveQuestionBtn').onclick = () => {
 
   if (!q && !isImage) return showToast('Preencha a pergunta.');
   const ans  = $('createAns').value;
+
+  // ── MÚLTIPLA OPÇÃO 2 (imagem no topo + 4 respostas texto) ──
+  if (createAnswerType === 'multipla2') {
+    if (!q) return showToast('Preencha a pergunta.');
+    if (!_imgData.Question) return showToast('Carregue a imagem da pergunta.');
+    const a2 = $('createA').value.trim();
+    const b2 = $('createB').value.trim();
+    if (!a2 || !b2) return showToast('Preencha pelo menos as alternativas A e B.');
+    if (!ans) return showToast('Selecione a resposta correcta.');
+    loadLocalDB();
+    const entry = {
+      id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      disc, cat, question: q,
+      questionImg: _imgData.Question,
+      a: a2, b: b2,
+      c: $('createC').value.trim() || '',
+      d: $('createD').value.trim() || '',
+      answer: ans,
+      answerType: 'multipla2',
+      diff: 'médio',
+      mode: 'imagem',
+      createdAt: Date.now(),
+      uid: State.user?.uid || 'anon'
+    };
+    State.localDB.push(entry);
+    saveLocalDB(State.localDB);
+    updateCreateCounter();
+    // Limpar campos
+    _imgData.Question = null;
+    const qPrev = $('imgPreviewQuestion');
+    qPrev.classList.remove('has-image');
+    const qImg = qPrev.querySelector('img');
+    if (qImg) qImg.remove();
+    $('imgInputQuestion').value = '';
+    $('createQ').value = '';
+    $('createA').value = '';
+    $('createB').value = '';
+    $('createAns').value = '';
+    showToast(`Pergunta Opção 2 guardada! (${disc})`);
+    return;
+  }
 
   if (isImage) {
     if (!q) return showToast('Preencha a pergunta.');

@@ -577,15 +577,19 @@
         <svg viewBox="0 0 24 24"><path d="M18 7l-1.41-1.41-6.34 6.34-2.83-2.83L6 10.5l4.24 4.24L18 7zm-1-5H7c-1.11 0-2 .9-2 2v16c0 1.1.89 2 2 2h10c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 18H7V4h10v16z"/></svg>
         <span>Múltipla Escolha</span>
       </button>
-      <button class="answer-type-btn" data-atype="vf">
+      <button class="answer-type-btn" data-atype="multipla2" id="setupMultipla2Btn" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM9 8H7v2h2V8zm0 4H7v2h2v-2zm0 4H7v2h2v-2zm8-8h-6v2h6V8zm0 4h-6v2h6v-2zm0 4h-6v2h6v-2z"/></svg>
+        <span>Múltipla - Opção 2</span>
+      </button>
+      <button class="answer-type-btn" data-atype="vf" id="setupVFBtn">
         <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
         <span>Verdadeiro/Falso</span>
       </button>
-      <button class="answer-type-btn" data-atype="lacunas">
+      <button class="answer-type-btn" data-atype="lacunas" id="setupLacunasBtn">
         <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
         <span>Preencher Lacunas</span>
       </button>
-      <button class="answer-type-btn" data-atype="flashcard">
+      <button class="answer-type-btn" data-atype="flashcard" id="setupFlashcardBtn">
         <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.51 15.5 0 12.36 0c-1.9 0-3.56.98-4.56 2.44L6.5 4.5 4.18 2.18A2.5 2.5 0 000 4v16a2 2 0 002 2h16l4-4V8a2 2 0 00-2-2zm-9 11l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg>
         <span>Flashcard</span>
       </button>
@@ -843,17 +847,21 @@
     <div class="answer-type-selector" id="createAnswerTypeSelector">
       <button class="answer-type-btn active" data-atype="multipla">
         <svg viewBox="0 0 24 24"><path d="M18 7l-1.41-1.41-6.34 6.34-2.83-2.83L6 10.5l4.24 4.24L18 7zm-1-5H7c-1.11 0-2 .9-2 2v16c0 1.1.89 2 2 2h10c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 18H7V4h10v16z"/></svg>
-        <span>Múltipla Escolha</span>
+        <span>Múltipla - Opção 1</span>
       </button>
-      <button class="answer-type-btn" data-atype="vf">
+      <button class="answer-type-btn" data-atype="multipla2" id="createMultipla2Btn" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM9 8H7v2h2V8zm0 4H7v2h2v-2zm0 4H7v2h2v-2zm8-8h-6v2h6V8zm0 4h-6v2h6v-2zm0 4h-6v2h6v-2z"/></svg>
+        <span>Múltipla - Opção 2</span>
+      </button>
+      <button class="answer-type-btn" data-atype="vf" id="createVFBtn">
         <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
         <span>Verdadeiro/Falso</span>
       </button>
-      <button class="answer-type-btn" data-atype="lacunas">
+      <button class="answer-type-btn" data-atype="lacunas" id="createLacunasBtn">
         <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
         <span>Preencher Lacunas</span>
       </button>
-      <button class="answer-type-btn" data-atype="flashcard">
+      <button class="answer-type-btn" data-atype="flashcard" id="createFlashcardBtn">
         <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.51 15.5 0 12.36 0c-1.9 0-3.56.98-4.56 2.44L6.5 4.5 4.18 2.18A2.5 2.5 0 000 4v16a2 2 0 002 2h16l4-4V8a2 2 0 00-2-2zm-9 11l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg>
         <span>Flashcard (Anki)</span>
       </button>
@@ -899,6 +907,18 @@
     </select>
     <div id="createCatNewWrap" style="display:none">
       <input type="text" class="field-input mb-sm" id="createCatNew" placeholder="Ex: Planeta Terra, Células...">
+    </div>
+
+    <!-- Imagem da pergunta (só Multipla Opção 2) -->
+    <div id="createQuestionImgWrap" style="display:none">
+      <label class="field-label">Imagem da Pergunta</label>
+      <label class="image-opt-upload" for="imgInputQuestion" style="display:block;margin-bottom:8px">
+        <input type="file" id="imgInputQuestion" accept="image/*" style="display:none">
+        <div class="image-opt-preview" id="imgPreviewQuestion" style="height:160px;width:100%;border-radius:12px">
+          <svg viewBox="0 0 24 24"><path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/></svg>
+          <span>Toque para carregar imagem</span>
+        </div>
+      </label>
     </div>
 
     <div id="createQWrap">
