@@ -1322,7 +1322,7 @@ function renderLacunas(q) {
 function checkLacunaAnswer(q) {
   if (State.answered) return;
   const userAns    = $('lacunasInput').value.trim().toLowerCase();
-  const correctAns = (q.lacunaResposta || q.a || '').trim().toLowerCase();
+  const correctAns = (q.lacunaResposta || q.lacunaAnswer || q.a || '').trim().toLowerCase();
   const isRight    = userAns === correctAns || userAns.includes(correctAns) || correctAns.includes(userAns);
   State.answered = true;
   $('lacunasInput').disabled = true;
@@ -1333,24 +1333,24 @@ function checkLacunaAnswer(q) {
   fb.classList.add('show');
   if (isRight) {
     $('lacunasInput').classList.add('correct');
-    if (blank) { blank.textContent = q.lacunaResposta || q.a; blank.classList.add('filled-correct'); }
+    if (blank) { blank.textContent = q.lacunaResposta || q.lacunaAnswer || q.a; blank.classList.add('filled-correct'); }
     fb.className = 'lacunas-feedback show correct-fb';
-    fb.textContent = '✓ Correcto! ' + (q.lacunaResposta || q.a);
+    fb.textContent = '✓ Correcto! ' + (q.lacunaResposta || q.lacunaAnswer || q.a);
     State.correct++; State.score += getPointsForMode();
     $('gameScoreBadge').textContent = formatScore(State.score) + 'v';
     renderGameStars(); playCorrectSound();
   } else {
     $('lacunasInput').classList.add('wrong');
-    if (blank) { blank.textContent = q.lacunaResposta || q.a; blank.classList.add('filled-wrong'); }
+    if (blank) { blank.textContent = q.lacunaResposta || q.lacunaAnswer || q.a; blank.classList.add('filled-wrong'); }
     fb.className = 'lacunas-feedback show wrong-fb';
-    fb.textContent = '✗ Errado! A resposta correcta era: ' + (q.lacunaResposta || q.a);
+    fb.textContent = '✗ Errado! A resposta correcta era: ' + (q.lacunaResposta || q.lacunaAnswer || q.a);
     State.wrong++; playWrongSound();
   }
   // Registar no histórico
   State.roundHistory.push({
     qIndex: State.qIndex, question: q.lacunaFrase || q.question || '',
     answerType: 'lacunas',
-    correctAnswer: q.lacunaResposta || q.a || '',
+    correctAnswer: q.lacunaResposta || q.lacunaAnswer || q.a || '',
     userAnswer: $('lacunasInput').value.trim(),
     isRight: isRight,
     disc: q.disc || '', cat: q.cat || '', questionImg: null,
