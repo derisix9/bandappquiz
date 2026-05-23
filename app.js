@@ -936,6 +936,7 @@ function populateSetupDiscs(cloudQuestions) {
 $('setupBackBtn').onclick = () => showScreen('screen-modeselect');
 
 $('setupDisc').onchange = () => {
+  if (_fillingSetup) return;
   loadLocalDB();
   _fillSetupCats($('setupDisc').value, (State.dbSource === 'cloud') ? _setupCloudCache : null);
   State.currentCat = 'all';
@@ -988,7 +989,10 @@ document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(btn => {
 
 // Preenche setupDisc + setupCat com as disciplinas recebidas
 // cloudPool: array de perguntas da nuvem (ou null para local)
+let _fillingSetup = false; // flag para suprimir onchange durante preenchimento
+
 function _fillSetupDiscs(discs, cloudPool) {
+  _fillingSetup = true;
   const sel = $('setupDisc');
   sel.innerHTML = '<option value="all">Todas as Disciplinas</option>';
   discs.forEach(d => {
@@ -997,6 +1001,7 @@ function _fillSetupDiscs(discs, cloudPool) {
     sel.appendChild(o);
   });
   sel.value = 'all';
+  _fillingSetup = false;
   _fillSetupCats('all', cloudPool);
 }
 
