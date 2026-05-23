@@ -1721,11 +1721,58 @@ function stopTimer() {
 }
 
 function timeUp() {
+  if (State.answered) return;
   State.answered = true;
   State.wrong++;
   const q = State.questions[State.qIndex];
+
+  playWrongSound();
+
+  // ── LACUNAS ──────────────────────────────────────────────
+  if (q.answerType === 'lacunas') {
+    $('lacunasInput').disabled = true;
+    $('lacunasCheckBtn').disabled = true;
+    $('lacunasInput').classList.add('wrong');
+    const blank = document.getElementById('lacunaBlank');
+    const correctAns = q.lacunaResposta || q.lacunaAnswer || q.a || '';
+    if (blank) { blank.textContent = correctAns; blank.classList.add('filled-wrong'); }
+    const fb = $('lacunasFeedback');
+    fb.className = 'lacunas-feedback show wrong-fb';
+    fb.textContent = '✗ Tempo esgotado! A resposta correcta era: ' + correctAns;
+    State.roundHistory.push({
+      qIndex: State.qIndex, question: q.lacunaFrase || q.question || '',
+      answerType: 'lacunas', correctAnswer: correctAns,
+      userAnswer: '(tempo esgotado)', isRight: false,
+      disc: q.disc || '', cat: q.cat || '', questionImg: null,
+    });
+    setTimeout(() => advanceQuestion(), 2500);
+    return;
+  }
+
+  // ── FLASHCARD ────────────────────────────────────────────
+  if (q.answerType === 'flashcard') {
+    const fc = $('flashcard');
+    if (!fc.classList.contains('flipped')) fc.classList.add('flipped');
+    const hint = fc.querySelector('.flashcard-tap-hint');
+    if (hint) hint.style.display = 'none';
+    setTimeout(() => { $('flashcardActions').style.display = 'flex'; }, 300);
+    showToast('Tempo esgotado! Vê a resposta e avalia.');
+    State.roundHistory.push({
+      qIndex: State.qIndex,
+      question: q.flashFront || q.question || '',
+      answerType: 'flashcard',
+      correctAnswer: q.flashBack || q.a || '',
+      userAnswer: '(tempo esgotado)', isRight: false,
+      disc: q.disc || '', cat: q.cat || '', questionImg: null,
+    });
+    // Forçar avanço após 4s se o utilizador não clicar
+    setTimeout(() => { if (State.answered && State.qIndex === State.questions.indexOf(q)) advanceQuestion(); }, 4000);
+    return;
+  }
+
+  // ── MÚLTIPLA / V/F ───────────────────────────────────────
   const correctOriginalLetter = q.answer;
-  const correctOriginalText   = q[correctOriginalLetter.toLowerCase()];
+  const correctOriginalText   = q[correctOriginalLetter?.toLowerCase()] || '';
 
   $('gameOptions').querySelectorAll('.option-btn').forEach(btn => {
     btn.disabled = true;
@@ -1737,10 +1784,8 @@ function timeUp() {
     if (isCorrectBtn) btn.classList.add('correct');
   });
 
-  playWrongSound();
   showToast('Tempo esgotado! A resposta correcta era ' + correctOriginalLetter + '.');
 
-  // Registar no histórico como sem resposta
   State.roundHistory.push({
     qIndex: State.qIndex,
     question: q.question || '',
