@@ -1449,6 +1449,11 @@ function renderVF(q) {
         userAnswer: opt.label,
         isRight: isRight,
         disc: q.disc || '', cat: q.cat || '', questionImg: q.questionImg || null,
+        imgA: q.imgA || null, imgB: q.imgB || null, imgC: null, imgD: null,
+        correctImg: q['img' + q.answer] || null,
+        userImg: opt.letter === 'A' ? q.imgA : q.imgB || null,
+        correctLetter: q.answer || null,
+        userLetter: opt.letter || null,
       });
       State.answered = true; stopTimer();
       $('nextBtn').disabled = false;
@@ -1696,6 +1701,8 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
   }
 
   // Registar no histórico da rodada
+  // Para modo imagem (multipla1): guardar imgs das opções para revisão
+  const _selectedImg = selectedOpt ? (q['img' + selectedOpt.letter] || null) : null;
   State.roundHistory.push({
     qIndex:        State.qIndex,
     question:      q.question || '',
@@ -1706,6 +1713,15 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
     disc:          q.disc || '',
     cat:           q.cat  || '',
     questionImg:   q.questionImg || null,
+    // Imagens das opções (modo imagem multipla1)
+    imgA: q.imgA || null,
+    imgB: q.imgB || null,
+    imgC: q.imgC || null,
+    imgD: q.imgD || null,
+    correctImg:    correctOriginalImg || null,
+    userImg:       _selectedImg,
+    correctLetter: correctOriginalLetter || null,
+    userLetter:    selectedOriginalLetter || null,
   });
 
   // Habilitar PRÓXIMA
@@ -1861,6 +1877,11 @@ function timeUp() {
     userAnswer: '(sem resposta — tempo esgotado)',
     isRight: false,
     disc: q.disc || '', cat: q.cat || '', questionImg: q.questionImg || null,
+    imgA: q.imgA || null, imgB: q.imgB || null, imgC: q.imgC || null, imgD: q.imgD || null,
+    correctImg: q['img' + correctOriginalLetter] || null,
+    userImg: null,
+    correctLetter: correctOriginalLetter || null,
+    userLetter: null,
   });
 
   setTimeout(() => advanceQuestion(), 2000);
@@ -2145,16 +2166,53 @@ function abrirRevisao(entry) {
     const card = document.createElement('div');
     card.className = 'rev-card ' + (h.isRight ? 'rev-card-correct' : 'rev-card-wrong');
 
-    const typeLabelMap = { multipla: 'Múltipla Escolha', vf: 'Verdadeiro/Falso', lacunas: 'Lacuna', flashcard: 'Flashcard' };
+    const typeLabelMap = { multipla: 'Múltipla Escolha', multipla2: 'Múltipla - Opção 2', vf: 'Verdadeiro/Falso', lacunas: 'Lacuna', flashcard: 'Flashcard' };
     const typeLabel = typeLabelMap[h.answerType] || h.answerType;
 
     const qText = escHtml(h.question || '');
     const userAns = escHtml(h.userAnswer || '—');
     const corrAns = escHtml(h.correctAnswer || '—');
 
+    // Imagem de pergunta (multipla2 ou questionImg)
     let imgHtml = '';
     if (h.questionImg) {
       imgHtml = `<img class="rev-question-img" src="${escHtml(h.questionImg)}" alt="imagem">`;
+    }
+
+    // Imagens das opções (modo imagem multipla1 ou VF com imagens)
+    const hasOptImgs = h.imgA || h.imgB || h.imgC || h.imgD;
+    let ansImgHtml = '';
+    if (hasOptImgs) {
+      // Mostrar imagem da resposta correcta e (se errado) a do utilizador
+      const corrImgSrc = h.correctImg || '';
+      const userImgSrc = h.userImg || '';
+      const corrLbl    = escHtml(h.correctAnswer || h.correctLetter || '—');
+      const userLbl    = escHtml(h.userAnswer || h.userLetter || '—');
+
+      if (!h.isRight && userImgSrc) {
+        ansImgHtml = `
+          <div class="rev-img-answers">
+            <div class="rev-img-col rev-img-wrong">
+              <span class="rev-img-label">A tua resposta</span>
+              <img class="rev-opt-img" src="${escHtml(userImgSrc)}" alt="${userLbl}">
+              <span class="rev-img-caption wrong-text">${userLbl}</span>
+            </div>
+            <div class="rev-img-col rev-img-correct">
+              <span class="rev-img-label">Resposta certa</span>
+              <img class="rev-opt-img" src="${escHtml(corrImgSrc)}" alt="${corrLbl}">
+              <span class="rev-img-caption correct-text">${corrLbl}</span>
+            </div>
+          </div>`;
+      } else if (corrImgSrc) {
+        ansImgHtml = `
+          <div class="rev-img-answers">
+            <div class="rev-img-col rev-img-correct">
+              <span class="rev-img-label">Resposta certa</span>
+              <img class="rev-opt-img" src="${escHtml(corrImgSrc)}" alt="${corrLbl}">
+              <span class="rev-img-caption correct-text">${corrLbl}</span>
+            </div>
+          </div>`;
+      }
     }
 
     card.innerHTML = `
@@ -2169,6 +2227,7 @@ function abrirRevisao(entry) {
       </div>
       ${imgHtml}
       <div class="rev-card-question">${qText}</div>
+      ${hasOptImgs ? ansImgHtml : `
       <div class="rev-card-answers">
         ${!h.isRight ? `<div class="rev-answer rev-answer-user">
           <span class="rev-answer-label">A tua resposta</span>
@@ -2178,7 +2237,7 @@ function abrirRevisao(entry) {
           <span class="rev-answer-label">${h.isRight ? 'Resposta' : 'Resposta certa'}</span>
           <span class="rev-answer-text correct-text">${corrAns}</span>
         </div>
-      </div>
+      </div>`}
       ${h.disc || h.cat ? `<div class="rev-card-tags">${h.disc ? `<span class="rev-tag">${escHtml(h.disc)}</span>` : ''}${h.cat ? `<span class="rev-tag">${escHtml(h.cat)}</span>` : ''}</div>` : ''}
     `;
     list.appendChild(card);
