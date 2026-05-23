@@ -874,6 +874,7 @@ document.querySelectorAll('.mode-card').forEach(card => {
     populateSetupDiscs(null); // popula disciplinas locais + custom
 
     showScreen('screen-gamesetup');
+    updateSetupFlashcardVisibility();
   };
 });
 
@@ -2479,9 +2480,9 @@ function updateCreateFormForAnswerType() {
     }
   }
 
-  // C e D: ocultar em VF e multipla2
-  if ($('createCWrap')) $('createCWrap').style.display = (isVF || isM2) ? 'none' : '';
-  if ($('createDWrap')) $('createDWrap').style.display = (isVF || isM2) ? 'none' : '';
+  // C e D: ocultar apenas em VF (multipla2 tem 4 opções de texto)
+  if ($('createCWrap')) $('createCWrap').style.display = isVF ? 'none' : '';
+  if ($('createDWrap')) $('createDWrap').style.display = isVF ? 'none' : '';
 
   if (isVF && !isImage) {
     $('createA').value = 'Verdadeiro';
