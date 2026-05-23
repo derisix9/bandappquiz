@@ -538,14 +538,6 @@
     <label class="field-label">Disciplina</label>
     <select id="setupDisc" class="field-input mb-md">
       <option value="all">Todas as Disciplinas</option>
-      <option value="Geografia">Geografia</option>
-      <option value="História">História</option>
-      <option value="Física">Física</option>
-      <option value="Química">Química</option>
-      <option value="Biologia">Biologia</option>
-      <option value="Matemática">Matemática</option>
-      <option value="Línguas">Línguas</option>
-      <option value="Outros">Outros</option>
     </select>
 
     <label class="field-label">Categoria</label>
@@ -900,7 +892,12 @@
     </div>
 
     <label class="field-label">Categoria / Tema</label>
-    <input type="text" class="field-input mb-sm" id="createCat" placeholder="Ex: Planeta Terra, Células...">
+    <select class="field-input mb-sm" id="createCat">
+      <option value="">Seleccionar categoria...</option>
+    </select>
+    <div id="createCatNewWrap" style="display:none">
+      <input type="text" class="field-input mb-sm" id="createCatNew" placeholder="Ex: Planeta Terra, Células...">
+    </div>
 
     <label class="field-label">Pergunta</label>
     <textarea class="field-input mb-sm" id="createQ" rows="3" placeholder="Escreva a sua pergunta aqui..."></textarea>

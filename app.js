@@ -791,7 +791,12 @@ $('forgotPassBtn').onclick = () => {
 // ─── MAIN MENU NAVIGATION ────────────────────────────────
 $('btnJogar').onclick   = () => showScreen('screen-modeselect');
 $('btnRanking').onclick = () => { loadRankingScreen('all'); showScreen('screen-ranking'); };
-$('btnCriar').onclick   = () => { loadLocalDB(); updateCreateCounter(); showScreen('screen-create'); };
+$('btnCriar').onclick = () => {
+  loadLocalDB();
+  updateCreateCounter();
+  populateCreateDisc();
+  showScreen('screen-create');
+};
 $('btnSync').onclick    = () => { loadSyncScreen(); showScreen('screen-sync'); };
 $('btnSobre').onclick   = () => showScreen('screen-sobre');
 $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
@@ -842,8 +847,8 @@ document.querySelectorAll('.mode-card').forEach(card => {
 
     // Reset category
     State.currentCat = 'all';
-    injectCustomDiscsIntoSetup();   // Adicionar disciplinas personalizadas ao selector
-    updateCategoryOptions('all');
+    _setupCloudCache = null;  // limpar cache da nuvem ao abrir setup
+    populateSetupDiscs(null); // popula disciplinas locais + custom
 
     // Flashcard só disponível no modo Aprendizado
     updateSetupFlashcardVisibility();
@@ -885,13 +890,12 @@ function setTimerDefault(secs) {
   State.timerSecs = secs;
 }
 
-// Populate category dropdown based on selected discipline
-function updateCategoryOptions(disc) {
+// Populate category dropdown based on selected discipline + active db source
+function updateCategoryOptions(disc, cloudQuestions) {
   const catSel = $('setupCat');
   catSel.innerHTML = '<option value="all">Todas as Categorias</option>';
 
-  // Gather categories from local DB
-  let pool = State.localDB;
+  let pool = (State.dbSource === 'cloud' && cloudQuestions) ? cloudQuestions : State.localDB;
   if (disc !== 'all') pool = pool.filter(q => q.disc === disc);
   const cats = [...new Set(pool.map(q => q.cat).filter(Boolean))].sort();
   cats.forEach(c => {
@@ -899,6 +903,34 @@ function updateCategoryOptions(disc) {
     o.value = c; o.textContent = c;
     catSel.appendChild(o);
   });
+}
+
+// Populate discipline dropdown for game setup based on active db source
+async function populateSetupDiscs(cloudQuestions) {
+  const sel = $('setupDisc');
+  // Save current selection
+  const prev = sel.value;
+  sel.innerHTML = '<option value="all">Todas as Disciplinas</option>';
+
+  let discs = [];
+  if (State.dbSource === 'cloud' && cloudQuestions) {
+    discs = [...new Set(cloudQuestions.map(q => q.disc).filter(Boolean))].sort();
+  } else {
+    // Local: from localDB + custom discs
+    const fromDB = [...new Set(State.localDB.map(q => q.disc).filter(Boolean))].sort();
+    const custom  = loadCustomDiscs();
+    discs = [...new Set([...fromDB, ...custom])].sort();
+  }
+
+  discs.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    sel.appendChild(o);
+  });
+
+  // Restore selection if still valid
+  if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  updateCategoryOptions(sel.value);
 }
 
 // ─── GAME SETUP ───────────────────────────────────────────
@@ -909,6 +941,44 @@ $('setupDisc').onchange = () => {
   updateCategoryOptions($('setupDisc').value);
   State.currentCat = 'all';
 };
+
+// Store cloud questions for reuse when switching source
+let _setupCloudCache = null;
+
+document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(btn => {
+  btn.onclick = async () => {
+    document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    State.dbSource = btn.dataset.source;
+
+    if (State.dbSource === 'cloud') {
+      if (!navigator.onLine) {
+        showToast('Sem conexão à internet para carregar disciplinas da nuvem.');
+        State.dbSource = 'local';
+        document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.source === 'local');
+        });
+        populateSetupDiscs(null);
+        return;
+      }
+      if (!_setupCloudCache) {
+        showToast('A carregar disciplinas da nuvem...');
+        try {
+          const snap = await firebase.database().ref('questions').once('value');
+          _setupCloudCache = [];
+          snap.forEach(ch => { const q = ch.val(); if (q) _setupCloudCache.push(q); });
+        } catch(e) {
+          showToast('Erro ao carregar da nuvem.');
+          _setupCloudCache = null;
+        }
+      }
+      populateSetupDiscs(_setupCloudCache);
+    } else {
+      _setupCloudCache = null;
+      populateSetupDiscs(null);
+    }
+  };
+});
 
 document.querySelectorAll('.timer-opt[data-seconds]').forEach(opt => {
   opt.onclick = () => {
@@ -1983,11 +2053,89 @@ function updateCreateCounter() {
   $('createCounter').textContent = State.localDB.length + ' perguntas guardadas localmente';
 }
 
+// Popula o select de disciplina na criação de quiz com localDB + custom + "Outro"
+function populateCreateDisc() {
+  const sel = $('createDisc');
+  const prev = sel.value;
+
+  // Base disciplines from localDB
+  const fromDB = [...new Set(State.localDB.map(q => q.disc).filter(Boolean))].sort();
+  const custom  = loadCustomDiscs();
+  const allDiscs = [...new Set([...fromDB, ...custom])].sort();
+
+  sel.innerHTML = '';
+  allDiscs.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    sel.appendChild(o);
+  });
+
+  // Separador + "Outro"
+  if (allDiscs.length > 0) {
+    const sep = document.createElement('option');
+    sep.disabled = true; sep.textContent = '──────────────';
+    sel.appendChild(sep);
+  }
+  const outroOpt = document.createElement('option');
+  outroOpt.value = 'Outros'; outroOpt.textContent = '➕ Outros (nova disciplina)';
+  sel.appendChild(outroOpt);
+
+  // Restore or default to first
+  if (prev && [...sel.options].some(o => o.value === prev)) {
+    sel.value = prev;
+  } else {
+    sel.selectedIndex = 0;
+  }
+
+  // Update cat based on current disc
+  const isOther = sel.value === 'Outros';
+  $('customDiscWrap').style.display = isOther ? 'block' : 'none';
+  populateCreateCat(isOther ? null : sel.value);
+}
+
 // Mostrar/ocultar campo de disciplina personalizada
 $('createDisc').onchange = () => {
-  const isOther = $('createDisc').value === 'Outros';
+  const val = $('createDisc').value;
+  const isOther = val === 'Outros';
   $('customDiscWrap').style.display = isOther ? 'block' : 'none';
   if (!isOther) $('createDiscCustom').value = '';
+  populateCreateCat(isOther ? null : val);
+};
+
+// Popula o select de categoria na criação de quiz
+function populateCreateCat(disc) {
+  const sel = $('createCat');
+  sel.innerHTML = '';
+
+  // Categorias existentes no localDB para esta disciplina
+  let pool = State.localDB;
+  if (disc) pool = pool.filter(q => q.disc === disc);
+  const cats = [...new Set(pool.map(q => q.cat).filter(Boolean))].sort();
+
+  cats.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    sel.appendChild(o);
+  });
+
+  // Separador + opção nova categoria
+  if (cats.length > 0) {
+    const sep = document.createElement('option');
+    sep.disabled = true; sep.textContent = '──────────────';
+    sel.appendChild(sep);
+  }
+  const newOpt = document.createElement('option');
+  newOpt.value = '__new__'; newOpt.textContent = '➕ Nova Categoria';
+  sel.appendChild(newOpt);
+
+  // Seleccionar "Nova Categoria" por defeito se não há categorias
+  sel.value = cats.length === 0 ? '__new__' : cats[0];
+  $('createCatNewWrap').style.display = sel.value === '__new__' ? 'block' : 'none';
+}
+
+$('createCat').onchange = () => {
+  $('createCatNewWrap').style.display = $('createCat').value === '__new__' ? 'block' : 'none';
+  if ($('createCat').value !== '__new__') $('createCatNew').value = '';
 };
 
 // ─── DISCIPLINAS PERSONALIZADAS (localStorage) ─────────────
@@ -2151,9 +2299,16 @@ $('saveQuestionBtn').onclick = () => {
     disc = custom;
     saveCustomDisc(disc);
     injectCustomDiscsIntoSetup();
+    populateCreateDisc(); // refresh createDisc com a nova disciplina
   }
 
-  const cat  = $('createCat').value.trim();
+  // Ler categoria: se "__new__" usar o input de nova categoria
+  let cat = $('createCat').value;
+  if (cat === '__new__') {
+    cat = ($('createCatNew') ? $('createCatNew').value.trim() : '');
+  } else {
+    cat = cat.trim();
+  }
   const q    = $('createQ').value.trim();
   const isImage = createQuizMode === 'imagem';
 
