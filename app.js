@@ -944,7 +944,7 @@ async function populateSetupDiscs(cloudQuestions) {
 
   // Restore selection if still valid
   if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
-  updateCategoryOptions(sel.value);
+  updateCategoryOptions(sel.value, cloudQuestions);
 }
 
 // ─── GAME SETUP ───────────────────────────────────────────
@@ -952,7 +952,8 @@ $('setupBackBtn').onclick = () => showScreen('screen-modeselect');
 
 $('setupDisc').onchange = () => {
   loadLocalDB();
-  updateCategoryOptions($('setupDisc').value);
+  const cloudQ = (State.dbSource === 'cloud') ? _setupCloudCache : null;
+  updateCategoryOptions($('setupDisc').value, cloudQ);
   State.currentCat = 'all';
 };
 
@@ -975,12 +976,14 @@ document.querySelectorAll('#dbSourceSelector .db-source-btn').forEach(btn => {
       if (!_setupCloudCache) {
         showToast('A carregar disciplinas da nuvem...');
         try {
-          const snap = await firebase.database().ref('questions').once('value');
+          const snap = await db.ref('questions').once('value');
           _setupCloudCache = [];
           snap.forEach(ch => { const q = ch.val(); if (q) _setupCloudCache.push(q); });
         } catch(e) {
           showToast('Erro ao carregar da nuvem.');
           _setupCloudCache = null;
+          populateSetupDiscs(null);
+          return;
         }
       }
       populateSetupDiscs(_setupCloudCache);
@@ -2224,33 +2227,35 @@ function updateCreateFormForAnswerType() {
   const isFlash = atype === 'flashcard';
   const isLacun = atype === 'lacunas';
   const isVF    = atype === 'vf';
-  const isMult  = atype === 'multipla';
 
-  // Esconder/mostrar campos de opções
+  // Pergunta + grelha de opções: ocultar em flashcard e lacunas
+  const hideQAndOptions = isFlash || isLacun;
+  if ($('createQWrap'))       $('createQWrap').style.display       = hideQAndOptions ? 'none' : 'block';
   if (!isImage) {
-    $('textOptionsGrid').style.display = (isFlash || isLacun) ? 'none' : 'grid';
+    $('textOptionsGrid').style.display = hideQAndOptions ? 'none' : 'grid';
   }
-  $('createLacunasWrap').style.display  = isLacun ? 'block' : 'none';
+
+  // Campos especiais
+  $('createLacunasWrap').style.display   = isLacun ? 'block' : 'none';
   $('createFlashcardWrap').style.display = isFlash ? 'block' : 'none';
 
-  // Para V/F: colocar alternativas fixas
+  // V/F: só A e B, esconder C e D por completo
+  if ($('createCWrap')) $('createCWrap').style.display = isVF ? 'none' : '';
+  if ($('createDWrap')) $('createDWrap').style.display = isVF ? 'none' : '';
+
   if (isVF && !isImage) {
     $('createA').value = 'Verdadeiro';
     $('createB').value = 'Falso';
     $('createC').value = '';
     $('createD').value = '';
-    $('textOptionsGrid').style.display = 'grid';
-    // desabilitar C e D
-    $('createC').disabled = true;
-    $('createD').disabled = true;
-    $('createC').placeholder = '(não utilizado)';
-    $('createD').placeholder = '(não utilizado)';
-  } else {
+    $('createC').disabled = false;
+    $('createD').disabled = false;
+  } else if (!isFlash && !isLacun) {
+    $('createA').value = $('createA').value; // preserve
     $('createC').disabled = false;
     $('createD').disabled = false;
     $('createC').placeholder = 'Alternativa C';
     $('createD').placeholder = 'Alternativa D';
-    if (isVF) { /* image mode V/F handled in save */ }
   }
 }
 
