@@ -1088,7 +1088,7 @@ select.field-input       { cursor: pointer; }
    15. SCREEN: GAME PLAY
    ══════════════════════════════════════════════════════════ */
 
-#screen-game        { background: var(--bg); display: none; flex-direction: column; }
+#screen-game        { background: var(--bg); display: none; flex-direction: column; height: 100%; }
 #screen-game.active { display: flex; }
 
 /* Top Bar */
@@ -1137,14 +1137,12 @@ select.field-input       { cursor: pointer; }
 /* Game content scroll area */
 .game-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 14px 14px 8px;
-  align-items: stretch;
-  justify-content: flex-start;
+  display: block;
+  padding: 14px 14px 16px;
 }
+.game-content > * + * { margin-top: 16px; }
 
 .game-question-card {
   background: var(--card);
@@ -1245,6 +1243,13 @@ select.field-input       { cursor: pointer; }
 .game-next-wrap {
   margin-top: auto;
   padding: 8px 0 calc(var(--safe-bottom) + 8px);
+  flex-shrink: 0;
+}
+
+.game-bottom {
+  padding: 12px 14px calc(var(--safe-bottom) + 12px);
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
 .btn-next {

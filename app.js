@@ -1397,7 +1397,7 @@ function renderVF(q) {
 function renderLacunas(q) {
   $('gameOptions').style.display = 'none';
   const la = $('lacunasArea');
-  la.style.display = 'block';
+  la.style.display = 'flex';
   $('lacunasFeedback').className = 'lacunas-feedback';
   $('lacunasFeedback').textContent = '';
   $('lacunasInput').value = '';
