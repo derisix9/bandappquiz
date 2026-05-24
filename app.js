@@ -179,7 +179,7 @@ function closeModal() {
 // ─── LOCAL STORAGE ────────────────────────────────────────
 const LS = {
   get(k)    { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) { console.warn('LS.set falhou (quota?):', k, e.message); } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   del(k)    { localStorage.removeItem(k); }
 };
 
@@ -1090,13 +1090,13 @@ $('startGameBtn').onclick = async () => {
   loadLocalDB();
   loadUsedToday();
 
-  // Modo imagem usa sempre a nuvem: imagens base64 são demasiado grandes para localStorage
+  // Modo imagem vai sempre à nuvem: imagens base64 são demasiado grandes para localStorage
   const forceCloud = State.currentMode === 'imagem';
 
   if (forceCloud || State.dbSource === 'cloud') {
     // Jogar directo da nuvem
     if (!navigator.onLine) {
-      showToast(forceCloud ? 'Quiz por Imagem requer internet. Ligue-se à rede.' : 'Sem conexão. Ligue à internet para jogar na Nuvem, ou escolha Local.');
+      showToast('Sem conexão. Ligue à internet para jogar na Nuvem, ou escolha Local.');
       return;
     }
     showLoading(forceCloud ? 'A carregar Quiz por Imagem...' : 'A carregar perguntas da nuvem...');
@@ -1161,9 +1161,10 @@ function buildPool(db) {
   }
   // Image mode filter
   if (State.currentMode === 'imagem') {
-    pool = pool.filter(q => q.mode === 'imagem' || q.imgA);
+    // Incluir: mode=imagem, ou tem imgA (multipla com imagens nas opções), ou multipla2 (tem questionImg)
+    pool = pool.filter(q => q.mode === 'imagem' || q.imgA || q.answerType === 'multipla2' || q.questionImg);
   } else {
-    pool = pool.filter(q => q.mode !== 'imagem' && !q.imgA);
+    pool = pool.filter(q => q.mode !== 'imagem' && !q.imgA && q.answerType !== 'multipla2' && !q.questionImg);
   }
 
   // Flashcard only allowed in Aprendizado mode
@@ -1337,15 +1338,17 @@ function renderQuestion() {
 
 // ── MÚLTIPLA ESCOLHA ─────────────────────────────────────
 function renderMultipla(q) {
-  // Se a pergunta tem imagens nas opções, activar image-mode independentemente do modo de sessão
+  // Se a pergunta tem imagens nas opções (imgA/imgB/imgC/imgD), activar image-mode
+  // independentemente do modo de sessão e do texto das opções (que pode ser placeholder "Imagem A")
   const hasOptImages = !!(q.imgA || q.imgB || q.imgC || q.imgD);
   const isImageMode  = State.currentMode === 'imagem' || hasOptImages;
+
   const originalOpts = [
     { letter: 'A', text: q.a, img: q.imgA },
     { letter: 'B', text: q.b, img: q.imgB },
     { letter: 'C', text: q.c, img: q.imgC },
     { letter: 'D', text: q.d, img: q.imgD },
-  ].filter(o => o.text || o.img);
+  ].filter(o => o.img || o.text); // aceitar opções com imagem OU texto
 
   const shuffledOpts = shuffle(originalOpts);
   const displayLetters = ['A','B','C','D'];
@@ -1363,7 +1366,8 @@ function renderMultipla(q) {
     btn.dataset.displayLetter  = displayLetter;
     btn.dataset.originalLetter = mappedOpt.letter;
     btn.dataset.optionText     = mappedOpt.text || '';
-    if (isImageMode && mappedOpt.img) {
+    // Mostrar imagem se existir — SEMPRE, independente de isImageMode
+    if (mappedOpt.img) {
       btn.innerHTML = `<div class="option-badge">${displayLetter}</div><img class="option-img" src="${mappedOpt.img}" alt="Opção ${displayLetter}"><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>`;
     } else {
       btn.innerHTML = `<div class="option-badge">${displayLetter}</div><span class="option-text">${mappedOpt.text}</span><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>`;
