@@ -179,7 +179,7 @@ function closeModal() {
 // ─── LOCAL STORAGE ────────────────────────────────────────
 const LS = {
   get(k)    { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) { console.warn('LS.set falhou (quota?):', k, e.message); } },
   del(k)    { localStorage.removeItem(k); }
 };
 
@@ -899,7 +899,7 @@ function updateSetupFlashcardVisibility() {
     if (setupBtns.vf)        setupBtns.vf.style.display        = 'none';
     if (setupBtns.lacunas)   setupBtns.lacunas.style.display   = 'none';
     if (setupBtns.flashcard) setupBtns.flashcard.style.display = 'none';
-    // Renomear multipla e todos para contexto de imagem
+    // Renomear botões para contexto de imagem
     const m1span = setupBtns.multipla?.querySelector('span');
     if (m1span) m1span.textContent = 'Múltipla - Opção 1';
     const todosSpan = setupBtns.todos?.querySelector('span');
@@ -929,8 +929,8 @@ function updateSetupFlashcardVisibility() {
     }
     const m1span = setupBtns.multipla?.querySelector('span');
     if (m1span) m1span.textContent = 'Múltipla Escolha';
-    const todosSpan2 = setupBtns.todos?.querySelector('span');
-    if (todosSpan2) todosSpan2.textContent = 'Todos os Tipos';
+    const todosSpanNorm = setupBtns.todos?.querySelector('span');
+    if (todosSpanNorm) todosSpanNorm.textContent = 'Todos os Tipos';
   }
 }
 
@@ -1090,13 +1090,16 @@ $('startGameBtn').onclick = async () => {
   loadLocalDB();
   loadUsedToday();
 
-  if (State.dbSource === 'cloud') {
+  // Modo imagem usa sempre a nuvem: imagens base64 são demasiado grandes para localStorage
+  const forceCloud = State.currentMode === 'imagem';
+
+  if (forceCloud || State.dbSource === 'cloud') {
     // Jogar directo da nuvem
     if (!navigator.onLine) {
-      showToast('Sem conexão. Ligue à internet para jogar na Nuvem, ou escolha Local.');
+      showToast(forceCloud ? 'Quiz por Imagem requer internet. Ligue-se à rede.' : 'Sem conexão. Ligue à internet para jogar na Nuvem, ou escolha Local.');
       return;
     }
-    showLoading('A carregar perguntas da nuvem...');
+    showLoading(forceCloud ? 'A carregar Quiz por Imagem...' : 'A carregar perguntas da nuvem...');
     try {
       const snap = await db.ref('questions').once('value');
       const data = snap.val();
@@ -1169,20 +1172,13 @@ function buildPool(db) {
   }
 
   const atype = State.currentAnswerType;
-  const isImagemMode = State.currentMode === 'imagem';
+  const isImagemPool = State.currentMode === 'imagem';
   if (atype && atype !== 'todos') {
-    if (isImagemMode && atype === 'multipla') {
-      // No modo imagem "Opção 1" = perguntas multipla com imagens nas opções
-      pool = pool.filter(q => (q.answerType || 'multipla') === 'multipla');
-    } else if (isImagemMode && atype === 'multipla2') {
-      pool = pool.filter(q => q.answerType === 'multipla2');
-    } else {
-      pool = pool.filter(q => (q.answerType || 'multipla') === atype);
-    }
+    pool = pool.filter(q => (q.answerType || 'multipla') === atype);
   } else if (atype === 'todos') {
     // Mix all types: group by answerType then interleave for a balanced 50-question round
     const isAprendizado = State.currentMode === 'aprendizado';
-    const allowedTypes = isImagemMode
+    const allowedTypes = isImagemPool
       ? ['multipla', 'multipla2']
       : isAprendizado
         ? ['multipla', 'vf', 'lacunas', 'flashcard']
@@ -1341,9 +1337,9 @@ function renderQuestion() {
 
 // ── MÚLTIPLA ESCOLHA ─────────────────────────────────────
 function renderMultipla(q) {
-  // Activar image-mode se a pergunta tiver imagens nas opções (independente do modo de sessão)
-  const hasOptImages = q.imgA || q.imgB || q.imgC || q.imgD;
-  const isImageMode  = State.currentMode === 'imagem' || !!hasOptImages;
+  // Se a pergunta tem imagens nas opções, activar image-mode independentemente do modo de sessão
+  const hasOptImages = !!(q.imgA || q.imgB || q.imgC || q.imgD);
+  const isImageMode  = State.currentMode === 'imagem' || hasOptImages;
   const originalOpts = [
     { letter: 'A', text: q.a, img: q.imgA },
     { letter: 'B', text: q.b, img: q.imgB },
