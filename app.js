@@ -1170,9 +1170,12 @@ function buildPool(db) {
   } else if (atype === 'todos') {
     // Mix all types: group by answerType then interleave for a balanced 50-question round
     const isAprendizado = State.currentMode === 'aprendizado';
-    const allowedTypes = isAprendizado
-      ? ['multipla', 'vf', 'lacunas', 'flashcard']
-      : ['multipla', 'vf', 'lacunas'];
+    const isImagem = State.currentMode === 'imagem';
+    const allowedTypes = isImagem
+      ? ['multipla', 'multipla2']
+      : isAprendizado
+        ? ['multipla', 'vf', 'lacunas', 'flashcard']
+        : ['multipla', 'vf', 'lacunas'];
 
     // Separate pool into buckets per type
     const buckets = {};
@@ -1327,7 +1330,9 @@ function renderQuestion() {
 
 // ── MÚLTIPLA ESCOLHA ─────────────────────────────────────
 function renderMultipla(q) {
-  const isImageMode = State.currentMode === 'imagem';
+  // Activar image-mode se a pergunta tiver imagens nas opções (independente do modo de sessão)
+  const hasOptImages = q.imgA || q.imgB || q.imgC || q.imgD;
+  const isImageMode  = State.currentMode === 'imagem' || !!hasOptImages;
   const originalOpts = [
     { letter: 'A', text: q.a, img: q.imgA },
     { letter: 'B', text: q.b, img: q.imgB },
