@@ -3042,7 +3042,7 @@ async function carregarCatalogo() {
     const snap = await db.ref('pacotes').once('value');
     const data = snap.val();
     if (!data) return [];
-    _catalogoCache = Object.values(data).sort((a, b) => (b.lancamento || '').localeCompare(a.lancamento || ''));
+    _catalogoCache = Object.entries(data).map(([id, val]) => ({ id, ...val })).sort((a, b) => (b.lancamento || '').localeCompare(a.lancamento || ''));
     return _catalogoCache;
   } catch (e) {
     console.error('Erro ao carregar pacotes:', e);
@@ -3324,22 +3324,21 @@ $('pacoteSetupConfirmar').onclick = () => {
 // Verificar se o utilizador tem acesso a um pacote
 async function verificarAcessoPacote(pkgId) {
   const uid   = State.user?.uid;
-  // Garantir email — directo do Firebase Auth (não depende do profile estar carregado)
-  const email = State.user?.email || State.profile?.email || '';
-  const phone = State.user?.phoneNumber || State.profile?.phone || '';
+  const email = State.profile?.email || State.user?.email || '';
+  const phone = State.profile?.phone || '';
   if (!uid) return false;
 
+  // Sanitização idêntica à do admin: substitui @  .  +  #  $  [  ]  /
   const sanitize = s => s.replace(/@/g,'_').replace(/\./g,'_').replace(/\+/g,'_')
                           .replace(/#/g,'_').replace(/\$/g,'_')
                           .replace(/\[/g,'_').replace(/\]/g,'_').replace(/\//g,'_');
 
+  // A chave no Firebase é: sanitize(identifier) + '__' + pkgId (pkgId não é sanitizado)
   const identifiers = [email, phone, uid].filter(Boolean);
-  console.log('[verificarAcesso] pkgId:', pkgId, '| identifiers:', identifiers);
   for (const id of identifiers) {
     const key = sanitize(id) + '__' + pkgId;
-    console.log('[verificarAcesso] a testar chave:', key);
+    console.log('[verificarAcesso] tentando chave:', key);
     const snap = await db.ref('userAccess/' + key).once('value');
-    console.log('[verificarAcesso] existe?', snap.exists(), snap.val());
     if (snap.exists() && snap.val().status === 'active') return true;
   }
   return false;
