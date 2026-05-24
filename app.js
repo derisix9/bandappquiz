@@ -1386,7 +1386,7 @@ function renderQuestion() {
   };
   const tb = typeBadgeMap[atype] || typeBadgeMap.multipla;
   $('questionNum').innerHTML = `Questão ${State.qIndex + 1} <span class="qtype-badge ${tb.cls}"><svg viewBox="0 0 24 24">${tb.icon}</svg>${tb.label}</span>`;
-  $('questionText').textContent = (atype === 'lacunas' || atype === 'flashcard') ? '' : (q.question || '');
+  $('questionText').textContent = (atype === 'lacunas' || atype === 'flashcard') ? '' : q.question;
 
   // Reset areas
   $('gameOptions').innerHTML = '';
@@ -1395,7 +1395,7 @@ function renderQuestion() {
   $('lacunasArea').style.display = 'none';
   $('flashcardArea').style.display = 'none';
 
-  // Show/hide question image (multipla2 usa questionImg; suporte a variantes do campo)
+  // Show/hide question image
   const qImg = q.questionImg || q.imgQuestion || (atype === 'multipla2' ? q.img : null);
   if (qImg) {
     $('questionImage').src = qImg;
@@ -1614,7 +1614,6 @@ function checkLacunaAnswer(q) {
   if (State.answered) return;
   const userAns    = $('lacunasInput').value.trim().toLowerCase();
   const correctAns = (q.lacunaResposta || q.lacunaAnswer || q.a || '').trim().toLowerCase();
-  // Comparação exacta (normalizada: sem acentos, minúsculas, espaços extra)
   const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
   const isRight = norm(userAns) === norm(correctAns);
   State.answered = true;
