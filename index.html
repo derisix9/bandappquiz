@@ -1577,29 +1577,5 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script src="app.js"></script>
-<script>
-// PATCH: corrigir verificarAcessoPacote — sanitização idêntica ao admin
-async function verificarAcessoPacote(pkgId) {
-  const uid   = State.user?.uid;
-  const email = State.profile?.email || State.user?.email || '';
-  const phone = State.profile?.phone || '';
-  if (!uid) return false;
-
-  // Sanitiza exactamente como o admin: @ . + # $ [ ] / → _
-  const sanitize = s => s
-    .replace(/@/g, '_').replace(/\./g, '_').replace(/\+/g, '_')
-    .replace(/#/g, '_').replace(/\$/g, '_')
-    .replace(/\[/g, '_').replace(/\]/g, '_').replace(/\//g, '_');
-
-  // Email primeiro (é o identificador usado pelo admin ao activar)
-  const identifiers = [email, phone, uid].filter(Boolean);
-  for (const id of identifiers) {
-    const key = sanitize(id) + '__' + pkgId;
-    const snap = await db.ref('userAccess/' + key).once('value');
-    if (snap.exists() && snap.val().status === 'active') return true;
-  }
-  return false;
-}
-</script>
 </body>
 </html>
