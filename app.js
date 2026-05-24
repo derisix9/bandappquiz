@@ -3434,7 +3434,7 @@ async function atualizarBotaoCard(card, pacote) {
 $('btnJogarPacote').onclick = async () => { if (pacoteAtual) jogarPacote(pacoteAtual); };
 
 
-(function init() {
+(async function init() {
   await loadLocalDB();
   loadRankingLocal();
   injectCustomDiscsIntoSetup(); // Carregar disciplinas personalizadas no selector do jogo
