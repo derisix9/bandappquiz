@@ -3323,20 +3323,21 @@ $('pacoteSetupConfirmar').onclick = () => {
 
 // Verificar se o utilizador tem acesso a um pacote
 async function verificarAcessoPacote(pkgId) {
-  const uid  = State.user?.uid;
+  const uid   = State.user?.uid;
   const email = State.profile?.email || State.user?.email || '';
   const phone = State.profile?.phone || '';
   if (!uid) return false;
 
-  // Sanitização idêntica à usada pelo admin ao criar a chave
-  function sanitizeKey(id) {
-    return id.replace(/[@.+#$\[\]\/]/g, '_');
-  }
+  // Sanitização idêntica à do admin: substitui @  .  +  #  $  [  ]  /
+  const sanitize = s => s.replace(/@/g,'_').replace(/\./g,'_').replace(/\+/g,'_')
+                          .replace(/#/g,'_').replace(/\$/g,'_')
+                          .replace(/\[/g,'_').replace(/\]/g,'_').replace(/\//g,'_');
 
-  // Verificar via userAccess (chave composta por identifier__pkgId)
-  const identifiers = [uid, email, phone].filter(Boolean);
+  // A chave no Firebase é: sanitize(identifier) + '__' + pkgId (pkgId não é sanitizado)
+  const identifiers = [email, phone, uid].filter(Boolean);
   for (const id of identifiers) {
-    const key = sanitizeKey(id) + '__' + pkgId;
+    const key = sanitize(id) + '__' + pkgId;
+    console.log('[verificarAcesso] tentando chave:', key);
     const snap = await db.ref('userAccess/' + key).once('value');
     if (snap.exists() && snap.val().status === 'active') return true;
   }
