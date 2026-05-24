@@ -177,11 +177,79 @@ function closeModal() {
 }
 
 // ─── LOCAL STORAGE ────────────────────────────────────────
+// ─── localStorage — apenas para preferências pequenas ──────
 const LS = {
   get(k)    { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) { console.warn('LS quota:', e.message); } },
   del(k)    { localStorage.removeItem(k); }
 };
+
+// ─── IndexedDB — base de dados de perguntas (suporta 100s MB) ──
+const IDB = (() => {
+  const DB_NAME    = 'bandaquiz';
+  const DB_VERSION = 1;
+  const STORE      = 'questions';
+  let _db = null;
+
+  function open() {
+    if (_db) return Promise.resolve(_db);
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          db.createObjectStore(STORE, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = e => { _db = e.target.result; res(_db); };
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+
+  async function getAll() {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = () => res(req.result || []);
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+
+  async function setAll(qs) {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const tx    = db.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      store.clear();
+      for (const q of qs) store.put(q);
+      tx.oncomplete = () => res();
+      tx.onerror    = e => rej(e.target.error);
+    });
+  }
+
+  async function addOne(q) {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(q);
+      tx.oncomplete = () => res();
+      tx.onerror    = e => rej(e.target.error);
+    });
+  }
+
+  async function clear() {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).clear();
+      tx.oncomplete = () => res();
+      tx.onerror    = e => rej(e.target.error);
+    });
+  }
+
+  return { getAll, setAll, addOne, clear };
+})();
 
 // ─── DISCIPLINAS PERSONALIZADAS (localStorage) ─────────────
 const LS_CUSTOM_DISCS = 'eq_custom_discs';
@@ -201,13 +269,43 @@ function saveCustomDisc(name) {
 // Cache de perguntas da nuvem para o setup do jogo
 let _setupCloudCache = null;
 
-function loadLocalDB() {
-  State.localDB = LS.get('eq_questions') || [];
+async function loadLocalDB() {
+  try {
+    State.localDB = await IDB.getAll();
+    // Migrar dados antigos do localStorage se existirem
+    if (State.localDB.length === 0) {
+      const legacy = LS.get('eq_questions');
+      if (legacy && legacy.length > 0) {
+        await IDB.setAll(legacy);
+        LS.del('eq_questions');
+        State.localDB = legacy;
+        console.log('Migração localStorage → IndexedDB: ' + legacy.length + ' perguntas');
+      }
+    }
+  } catch (e) {
+    console.warn('IDB falhou, fallback localStorage:', e);
+    State.localDB = LS.get('eq_questions') || [];
+  }
 }
 
-function saveLocalDB(qs) {
-  LS.set('eq_questions', qs);
+async function saveLocalDB(qs) {
   State.localDB = qs;
+  try {
+    await IDB.setAll(qs);
+  } catch (e) {
+    console.warn('IDB.setAll falhou, fallback localStorage:', e);
+    LS.set('eq_questions', qs);
+  }
+}
+
+async function addQuestionLocalDB(q) {
+  State.localDB.push(q);
+  try {
+    await IDB.addOne(q);
+  } catch (e) {
+    console.warn('IDB.addOne falhou:', e);
+    LS.set('eq_questions', State.localDB);
+  }
 }
 
 function loadUsedToday() {
@@ -629,7 +727,7 @@ $('editProfileBtn').onclick = () => {
   showScreen('screen-profile-setup');
 };
 
-$('deleteAccountBtn').onclick = () => {
+$('deleteAccountBtn').onclick = async () => {
   showModal({
     icon: '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
     title: 'Eliminar Conta',
@@ -748,7 +846,7 @@ $('recoverEmailTab').onclick = () => {
   $('recoverEmailPanel').style.display = '';
   $('recoverPhonePanel').style.display = 'none';
 };
-$('recoverPhoneTab').onclick = () => {
+$('recoverPhoneTab').onclick = async () => {
   $('recoverPhoneTab').classList.add('active');
   $('recoverEmailTab').classList.remove('active');
   $('recoverPhonePanel').style.display = '';
@@ -799,7 +897,7 @@ $('resetPhonePassBtn').onclick = async () => {
 };
 
 // ─── FORGOT PASSWORD (login screen) ──────────────────────
-$('forgotPassBtn').onclick = () => {
+$('forgotPassBtn').onclick = async () => {
   const email = $('loginEmail').value.trim();
   if (email) $('recoverEmailInput').value = email;
   $('recoverEmailTab').click();
@@ -808,9 +906,9 @@ $('forgotPassBtn').onclick = () => {
 
 // ─── MAIN MENU NAVIGATION ────────────────────────────────
 $('btnJogar').onclick   = () => showScreen('screen-modeselect');
-$('btnRanking').onclick = () => { loadRankingScreen('all'); showScreen('screen-ranking'); };
-$('btnCriar').onclick = () => {
-  loadLocalDB();
+$('btnRanking').onclick = async () => { loadRankingScreen('all'); showScreen('screen-ranking'); };
+$('btnCriar').onclick = async () => {
+  await loadLocalDB();
   updateCreateCounter();
   populateCreateDisc();
   showScreen('screen-create');
@@ -893,7 +991,6 @@ function updateSetupFlashcardVisibility() {
   };
 
   if (isImagem) {
-    // Modo imagem: mostrar todos, multipla1, multipla2 — ocultar vf/lacunas/flashcard
     if (setupBtns.todos)     setupBtns.todos.style.display     = '';
     if (setupBtns.multipla2) setupBtns.multipla2.style.display = '';
     if (setupBtns.vf)        setupBtns.vf.style.display        = 'none';
@@ -903,7 +1000,6 @@ function updateSetupFlashcardVisibility() {
     if (m1span) m1span.textContent = 'Múltipla - Opção 1';
     const todosSpan = setupBtns.todos?.querySelector('span');
     if (todosSpan) todosSpan.textContent = 'Todos';
-    // Resetar para todos se estava em tipo inválido para imagem
     if (!['todos','multipla','multipla2'].includes(State.currentAnswerType)) {
       State.currentAnswerType = 'todos';
       document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(b => {
@@ -971,9 +1067,9 @@ function populateSetupDiscs(cloudQuestions) {
 // ─── GAME SETUP ───────────────────────────────────────────
 $('setupBackBtn').onclick = () => showScreen('screen-modeselect');
 
-$('setupDisc').onchange = () => {
+$('setupDisc').onchange = async () => {
   if (_fillingSetup) return;
-  loadLocalDB();
+  await loadLocalDB();
   _fillSetupCats($('setupDisc').value, (State.dbSource === 'cloud') ? _setupCloudCache : null);
   State.currentCat = 'all';
 };
@@ -1074,7 +1170,7 @@ document.querySelectorAll('#difficultyOptions .timer-opt').forEach(opt => {
 
 // ─── GAME SETUP: ANSWER TYPE SELECTOR ──────────────────────
 document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(btn => {
-  btn.onclick = () => {
+  btn.onclick = async () => {
     document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     State.currentAnswerType = btn.dataset.atype;
@@ -1086,18 +1182,15 @@ document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(b
 $('startGameBtn').onclick = async () => {
   State.currentDisc = $('setupDisc').value;
   State.currentCat  = $('setupCat').value;
-  loadLocalDB();
+  await loadLocalDB();
   loadUsedToday();
 
-  // Modo imagem vai sempre à nuvem (imagens base64 grandes demais para localStorage)
-  const forceCloud = State.currentMode === 'imagem';
-
-  if (forceCloud || State.dbSource === 'cloud') {
+  if (State.dbSource === 'cloud') {
     if (!navigator.onLine) {
-      showToast(forceCloud ? 'Quiz por Imagem requer internet. Ligue-se à rede.' : 'Sem conexão. Ligue à internet para jogar na Nuvem, ou escolha Local.');
+      showToast('Sem conexão. Ligue à internet para jogar na Nuvem, ou escolha Local.');
       return;
     }
-    showLoading(forceCloud ? 'A carregar Quiz por Imagem...' : 'A carregar perguntas da nuvem...');
+    showLoading('A carregar perguntas da nuvem...');
     try {
       const snap = await db.ref('questions').once('value');
       const data = snap.val();
@@ -1113,7 +1206,7 @@ $('startGameBtn').onclick = async () => {
         showToast('Nenhuma pergunta disponível com esses filtros na nuvem.');
         return;
       }
-      startGame(pool);
+      await startGame(pool);
     } catch (e) {
       hideLoading();
       showToast('Erro ao carregar da nuvem: ' + e.message);
@@ -1134,7 +1227,7 @@ $('startGameBtn').onclick = async () => {
         const cloudQs = Object.values(data);
         const localIds = new Set(State.localDB.map(q => q.id));
         const merged = [...State.localDB, ...cloudQs.filter(q => !localIds.has(q.id))];
-        saveLocalDB(merged);
+        await saveLocalDB(merged);
         pool = buildPool(merged);
       }
     } catch (e) {}
@@ -1146,7 +1239,7 @@ $('startGameBtn').onclick = async () => {
     return;
   }
 
-  startGame(pool);
+  await startGame(pool);
 };
 
 function buildPool(db) {
@@ -1157,7 +1250,7 @@ function buildPool(db) {
     const diffFilter = State.currentDiff.toLowerCase();
     pool = pool.filter(q => (q.diff || '').toLowerCase() === diffFilter);
   }
-  // Image mode filter — detecta q.mode, q.imgA, base64 em q.a, ou multipla2 com questionImg
+  // Image mode filter
   const _isImgQ = q => q.mode === 'imagem' || q.answerType === 'multipla2' ||
                         q.questionImg || q.imgA || isImgData(q.a);
   if (State.currentMode === 'imagem') {
@@ -1217,9 +1310,9 @@ function buildPool(db) {
 }
 
 // ─── GAME LOGIC ───────────────────────────────────────────
-function startGame(pool) {
+async function startGame(pool) {
   if (!pool) {
-    loadLocalDB();
+    await loadLocalDB();
     pool = buildPool(State.localDB);
   }
 
@@ -1335,7 +1428,6 @@ function renderQuestion() {
 }
 
 // ── Utilitários de imagem nas opções ────────────────────────
-// Suporte duplo: imagem em q.a/b/c/d (base64) OU em q.imgA/B/C/D
 function isImgData(val) {
   return typeof val === 'string' && val.startsWith('data:image');
 }
@@ -1346,15 +1438,13 @@ function getOptImg(q, letter) {
 
 // ── MÚLTIPLA ESCOLHA ─────────────────────────────────────
 function renderMultipla(q) {
-  // Suporte duplo: imagem em q.a/b/c/d (base64) OU em q.imgA/B/C/D
   const originalOpts = ['A','B','C','D'].map(letter => {
-    const raw = q[letter.toLowerCase()];
+    const raw  = q[letter.toLowerCase()];
     const img  = isImgData(raw) ? raw : (q['img' + letter] || null);
     const text = isImgData(raw) ? '' : (raw || '');
     return { letter, text, img };
   }).filter(o => o.img || o.text);
 
-  // Activar image-mode se alguma opção tiver imagem
   const hasImages   = originalOpts.some(o => o.img);
   const isImageMode = State.currentMode === 'imagem' || hasImages;
 
@@ -1688,13 +1778,11 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
   const selectedOriginalLetter = selectedOpt ? selectedOpt.letter : displayLetter;
   const selectedText           = selectedOpt ? selectedOpt.text   : '';
 
-  // Verificação: posição original OU (se texto disponível) texto coincide
   const isRight =
     selectedOriginalLetter === correctOriginalLetter ||
     (!!(selectedText && correctOriginalText) &&
      selectedText.trim().toLowerCase() === correctOriginalText.trim().toLowerCase());
 
-  // Encontrar display letter que corresponde à resposta certa
   let correctDisplayLetter = null;
   $('gameOptions').querySelectorAll('.option-btn').forEach(btn => {
     const btnOrigLetter = btn.dataset.originalLetter;
@@ -2019,10 +2107,10 @@ function getClassification(pct, mode) {
   return 'A COMEÇAR';
 }
 
-$('resultPlayAgain').onclick = () => {
-  loadLocalDB();
+$('resultPlayAgain').onclick = async () => {
+  await loadLocalDB();
   loadUsedToday();
-  startGame(buildPool(State.localDB));
+  await await startGame(buildPool(State.localDB));
 };
 $('resultMenu').onclick = () => showScreen('screen-mainmenu');
 
@@ -2576,7 +2664,7 @@ if (_qImgInput) {
   };
 }
 
-$('saveQuestionBtn').onclick = () => {
+$('saveQuestionBtn').onclick = async () => {
   let disc = $('createDisc').value.trim();
 
   // Se selecionou "Outros", usar o campo personalizado
@@ -2605,7 +2693,7 @@ $('saveQuestionBtn').onclick = () => {
     const front = $('createFlashFront').value.trim();
     const back  = $('createFlashBack').value.trim();
     if (!front || !back) return showToast('Preencha a frente e o verso do flashcard.');
-    loadLocalDB();
+    await loadLocalDB();
     const entry = {
       id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
       disc, cat, question: front,
@@ -2619,8 +2707,7 @@ $('saveQuestionBtn').onclick = () => {
       createdAt: Date.now(),
       uid: State.user?.uid || 'anon'
     };
-    State.localDB.push(entry);
-    saveLocalDB(State.localDB);
+    await addQuestionLocalDB(entry);
     updateCreateCounter();
     $('createFlashFront').value = '';
     $('createFlashBack').value  = '';
@@ -2635,7 +2722,7 @@ $('saveQuestionBtn').onclick = () => {
     const resp  = $('createLacunaResposta').value.trim();
     if (!frase || !resp) return showToast('Preencha a frase com lacuna e a resposta.');
     if (!frase.includes('___')) return showToast('Use ___ (três underscores) para marcar a lacuna na frase.');
-    loadLocalDB();
+    await loadLocalDB();
     const entry = {
       id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
       disc, cat,
@@ -2650,8 +2737,7 @@ $('saveQuestionBtn').onclick = () => {
       createdAt: Date.now(),
       uid: State.user?.uid || 'anon'
     };
-    State.localDB.push(entry);
-    saveLocalDB(State.localDB);
+    await addQuestionLocalDB(entry);
     updateCreateCounter();
     $('createLacunaFrase').value    = '';
     $('createLacunaResposta').value = '';
@@ -2666,7 +2752,7 @@ $('saveQuestionBtn').onclick = () => {
     if (!_imgData.A || !_imgData.B) return showToast('Carregue imagens para A (Verdadeiro) e B (Falso).');
     const ans = $('createAns').value;
     if (!ans || (ans !== 'A' && ans !== 'B')) return showToast('Selecione A (Verdadeiro) ou B (Falso) como resposta correcta.');
-    loadLocalDB();
+    await loadLocalDB();
     const entry = {
       id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
       disc, cat, question: q,
@@ -2679,8 +2765,7 @@ $('saveQuestionBtn').onclick = () => {
       createdAt: Date.now(),
       uid: State.user?.uid || 'anon'
     };
-    State.localDB.push(entry);
-    saveLocalDB(State.localDB);
+    await addQuestionLocalDB(entry);
     updateCreateCounter();
     imgInputIds.forEach(letter => {
       _imgData[letter] = null;
@@ -2707,7 +2792,7 @@ $('saveQuestionBtn').onclick = () => {
     const b2 = $('createB').value.trim();
     if (!a2 || !b2) return showToast('Preencha pelo menos as alternativas A e B.');
     if (!ans) return showToast('Selecione a resposta correcta.');
-    loadLocalDB();
+    await loadLocalDB();
     const entry = {
       id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
       disc, cat, question: q,
@@ -2722,8 +2807,7 @@ $('saveQuestionBtn').onclick = () => {
       createdAt: Date.now(),
       uid: State.user?.uid || 'anon'
     };
-    State.localDB.push(entry);
-    saveLocalDB(State.localDB);
+    await addQuestionLocalDB(entry);
     updateCreateCounter();
     // Limpar campos
     _imgData.Question = null;
@@ -2746,7 +2830,7 @@ $('saveQuestionBtn').onclick = () => {
     if (!_imgData.A || !_imgData.B || !_imgData.C || !_imgData.D) {
       return showToast('Carregue imagens para todas as alternativas (A, B, C e D).');
     }
-    loadLocalDB();
+    await loadLocalDB();
     const entry = {
       id:         'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
       disc, cat, question: q,
@@ -2759,8 +2843,7 @@ $('saveQuestionBtn').onclick = () => {
       createdAt: Date.now(),
       uid: State.user?.uid || 'anon'
     };
-    State.localDB.push(entry);
-    saveLocalDB(State.localDB);
+    await addQuestionLocalDB(entry);
     updateCreateCounter();
     imgInputIds.forEach(letter => {
       _imgData[letter] = null;
@@ -2786,7 +2869,7 @@ $('saveQuestionBtn').onclick = () => {
   if (createAnswerType !== 'vf' && (!c || !d)) return showToast('Preencha todos os campos da pergunta.');
   if (!ans) return showToast('Selecione a resposta correcta.');
 
-  loadLocalDB();
+  await loadLocalDB();
   const entry = {
     id:        'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     disc, cat, question: q,
@@ -2801,7 +2884,7 @@ $('saveQuestionBtn').onclick = () => {
     uid:       State.user?.uid || 'anon'
   };
   State.localDB.push(entry);
-  saveLocalDB(State.localDB);
+  await saveLocalDB(State.localDB);
   updateCreateCounter();
 
   $('createQ').value = '';
@@ -2829,7 +2912,7 @@ async function loadSyncScreen() {
   $('syncTitle').textContent = navigator.onLine ? 'Ligado à Nuvem' : 'Sem ligação';
   $('syncSub').textContent   = navigator.onLine ? 'Pronto para sincronizar' : 'Ligue-se à internet para sincronizar';
 
-  loadLocalDB();
+  await loadLocalDB();
   $('localQCount').textContent = State.localDB.length;
   $('lastSyncDate').textContent = LS.get('eq_last_sync') ? formatDate(LS.get('eq_last_sync')) : 'Nunca';
 
@@ -2873,14 +2956,14 @@ async function downloadFromCloud() {
     const cloudQs = Object.values(data);
 
     // Preservar as perguntas criadas localmente pelo utilizador (têm id a começar por 'local_')
-    loadLocalDB();
+    await loadLocalDB();
     const userLocalQs = State.localDB.filter(q => q.id && q.id.startsWith('local_'));
 
     // Mesclar: nuvem + locais do utilizador (sem duplicar IDs)
     const cloudIds = new Set(cloudQs.map(q => q.id));
     const merged = [...cloudQs, ...userLocalQs.filter(q => !cloudIds.has(q.id))];
 
-    saveLocalDB(merged);
+    await saveLocalDB(merged);
     LS.set('eq_last_sync', Date.now());
     hideLoading();
     $('localQCount').textContent  = merged.length;
@@ -2900,7 +2983,7 @@ async function checkCloudUpdates() {
     const data = snap.val();
     if (!data) return;
     const cloudCount = Object.keys(data).length;
-    loadLocalDB();
+    await loadLocalDB();
     // Contar apenas as perguntas da nuvem (excluir as criadas localmente pelo utilizador)
     const syncedCount = State.localDB.filter(q => !q.id || !q.id.startsWith('local_')).length;
     if (cloudCount > syncedCount) {
@@ -3163,7 +3246,7 @@ $('btnEnviarComprovativo').onclick = () => {
   window.open(`https://wa.me/${PAG_INFO.whatsapp}?text=${msg}`, '_blank');
 };
 
-$('btnComprarPacote').onclick = () => { if (pacoteAtual) abrirPagamento(pacoteAtual); };
+$('btnComprarPacote').onclick = async () => { if (pacoteAtual) abrirPagamento(pacoteAtual); };
 
 $('lojaBackBtn').onclick   = () => showScreen('screen-mainmenu');
 $('pacoteBackBtn').onclick = () => abrirLoja();
@@ -3327,7 +3410,7 @@ async function iniciarJogoPacote() {
     }
     if (finalPool.length === 0) finalPool = pool; // fallback
 
-    startGame(finalPool);
+    await startGame(finalPool);
   } catch (e) {
     hideLoading();
     showToast('Erro ao carregar questões: ' + e.message);
@@ -3348,11 +3431,11 @@ async function atualizarBotaoCard(card, pacote) {
   }
 }
 
-$('btnJogarPacote').onclick = () => { if (pacoteAtual) jogarPacote(pacoteAtual); };
+$('btnJogarPacote').onclick = async () => { if (pacoteAtual) jogarPacote(pacoteAtual); };
 
 
 (function init() {
-  loadLocalDB();
+  await loadLocalDB();
   loadRankingLocal();
   injectCustomDiscsIntoSetup(); // Carregar disciplinas personalizadas no selector do jogo
   showScreen('screen-splash');
