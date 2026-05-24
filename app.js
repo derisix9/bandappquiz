@@ -3328,10 +3328,15 @@ async function verificarAcessoPacote(pkgId) {
   const phone = State.profile?.phone || '';
   if (!uid) return false;
 
+  // Sanitização idêntica à usada pelo admin ao criar a chave
+  function sanitizeKey(id) {
+    return id.replace(/[@.+#$\[\]\/]/g, '_');
+  }
+
   // Verificar via userAccess (chave composta por identifier__pkgId)
   const identifiers = [uid, email, phone].filter(Boolean);
   for (const id of identifiers) {
-    const key = id.replace(/[@.+#$[\]/]/g, '_') + '__' + pkgId;
+    const key = sanitizeKey(id) + '__' + pkgId;
     const snap = await db.ref('userAccess/' + key).once('value');
     if (snap.exists() && snap.val().status === 'active') return true;
   }
