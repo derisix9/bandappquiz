@@ -1381,11 +1381,12 @@ function renderQuestion() {
     multipla:  { label: 'Múltipla Escolha', cls: 'type-multipla',  icon: '<path d="M18 7l-1.41-1.41-6.34 6.34-2.83-2.83L6 10.5l4.24 4.24L18 7z"/>' },
     vf:        { label: 'Verdadeiro/Falso',  cls: 'type-vf',        icon: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>' },
     lacunas:   { label: 'Preencher Lacuna',  cls: 'type-lacunas',   icon: '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>' },
+    multipla2: { label: 'Múltipla c/ Imagem', cls: 'type-multipla',  icon: '<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>' },
     flashcard: { label: 'Flashcard',         cls: 'type-flashcard', icon: '<path d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.51 15.5 0 12.36 0c-1.9 0-3.56.98-4.56 2.44L6.5 4.5 4.18 2.18A2.5 2.5 0 000 4v16a2 2 0 002 2h16l4-4V8a2 2 0 00-2-2zm-9 11l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/>' },
   };
   const tb = typeBadgeMap[atype] || typeBadgeMap.multipla;
   $('questionNum').innerHTML = `Questão ${State.qIndex + 1} <span class="qtype-badge ${tb.cls}"><svg viewBox="0 0 24 24">${tb.icon}</svg>${tb.label}</span>`;
-  $('questionText').textContent = (atype === 'lacunas' || atype === 'flashcard') ? '' : q.question;
+  $('questionText').textContent = (atype === 'lacunas' || atype === 'flashcard') ? '' : (q.question || '');
 
   // Reset areas
   $('gameOptions').innerHTML = '';
@@ -1394,9 +1395,10 @@ function renderQuestion() {
   $('lacunasArea').style.display = 'none';
   $('flashcardArea').style.display = 'none';
 
-  // Show/hide question image
-  if (q.questionImg) {
-    $('questionImage').src = q.questionImg;
+  // Show/hide question image (multipla2 usa questionImg; suporte a variantes do campo)
+  const qImg = q.questionImg || q.imgQuestion || (atype === 'multipla2' ? q.img : null);
+  if (qImg) {
+    $('questionImage').src = qImg;
     $('questionImageWrap').style.display = 'block';
   } else {
     $('questionImageWrap').style.display = 'none';
@@ -1612,7 +1614,9 @@ function checkLacunaAnswer(q) {
   if (State.answered) return;
   const userAns    = $('lacunasInput').value.trim().toLowerCase();
   const correctAns = (q.lacunaResposta || q.lacunaAnswer || q.a || '').trim().toLowerCase();
-  const isRight    = userAns === correctAns || userAns.includes(correctAns) || correctAns.includes(userAns);
+  // Comparação exacta (normalizada: sem acentos, minúsculas, espaços extra)
+  const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  const isRight = norm(userAns) === norm(correctAns);
   State.answered = true;
   $('lacunasInput').disabled = true;
   $('lacunasCheckBtn').disabled = true;
@@ -3042,7 +3046,7 @@ async function carregarCatalogo() {
     const snap = await db.ref('pacotes').once('value');
     const data = snap.val();
     if (!data) return [];
-    _catalogoCache = Object.entries(data).map(([id, val]) => ({ id, ...val })).sort((a, b) => (b.lancamento || '').localeCompare(a.lancamento || ''));
+    _catalogoCache = Object.values(data).sort((a, b) => (b.lancamento || '').localeCompare(a.lancamento || ''));
     return _catalogoCache;
   } catch (e) {
     console.error('Erro ao carregar pacotes:', e);
@@ -3373,7 +3377,7 @@ async function iniciarJogoPacote() {
     let qs = Object.values(data);
 
     // Misturar todos os tipos aleatoriamente (multipla, vf, lacunas, flashcard)
-    const allowedTypes = ['multipla', 'vf', 'lacunas', 'flashcard'];
+    const allowedTypes = ['multipla', 'multipla2', 'vf', 'lacunas', 'flashcard'];
     const buckets = {};
     allowedTypes.forEach(t => { buckets[t] = []; });
     qs.forEach(q => {
@@ -3409,9 +3413,9 @@ async function iniciarJogoPacote() {
     State.timerSecs    = PacoteGame.timerSecs;
     State.currentMode  = pacoteAtual.categoria || 'aprendizado';
     State.currentMode  = State.currentMode === 'exame' ? 'prova' : State.currentMode;
-    // Flashcards só em aprendizado/exame; para concurso filtrar
+    // Flashcard só em aprendizado; filtrar nos outros modos
     let finalPool = pool;
-    if (State.currentMode === 'concurso') {
+    if (State.currentMode !== 'aprendizado') {
       finalPool = pool.filter(q => (q.answerType || 'multipla') !== 'flashcard');
     }
     if (finalPool.length === 0) finalPool = pool; // fallback
