@@ -1613,7 +1613,8 @@ function renderLacunas(q) {
 function checkLacunaAnswer(q) {
   if (State.answered) return;
   const userAns    = $('lacunasInput').value.trim().toLowerCase();
-  const correctAns = (q.lacunaResposta || q.lacunaAnswer || q.a || '').trim().toLowerCase();
+  const _lac = [q.lacunaAnswer, q.lacunaResposta, q.a].find(v => v && String(v).trim()) || '';
+  const correctAns = _lac.trim().toLowerCase();
   const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
   const isRight = norm(userAns) === norm(correctAns);
   State.answered = true;
@@ -1625,24 +1626,24 @@ function checkLacunaAnswer(q) {
   fb.classList.add('show');
   if (isRight) {
     $('lacunasInput').classList.add('correct');
-    if (blank) { blank.textContent = q.lacunaResposta || q.lacunaAnswer || q.a; blank.classList.add('filled-correct'); }
+    if (blank) { blank.textContent = _lac; blank.classList.add('filled-correct'); }
     fb.className = 'lacunas-feedback show correct-fb';
-    fb.textContent = '✓ Correcto! ' + (q.lacunaResposta || q.lacunaAnswer || q.a);
+    fb.textContent = '✓ Correcto! ' + _lac;
     State.correct++; State.score += getPointsForMode();
     $('gameScoreBadge').textContent = formatScore(State.score) + 'v';
     renderGameStars(); playCorrectSound();
   } else {
     $('lacunasInput').classList.add('wrong');
-    if (blank) { blank.textContent = q.lacunaResposta || q.lacunaAnswer || q.a; blank.classList.add('filled-wrong'); }
+    if (blank) { blank.textContent = _lac; blank.classList.add('filled-wrong'); }
     fb.className = 'lacunas-feedback show wrong-fb';
-    fb.textContent = '✗ Errado! A resposta correcta era: ' + (q.lacunaResposta || q.lacunaAnswer || q.a);
+    fb.textContent = '✗ Errado! A resposta correcta era: ' + _lac;
     State.wrong++; playWrongSound();
   }
   // Registar no histórico
   State.roundHistory.push({
     qIndex: State.qIndex, question: q.lacunaFrase || q.question || '',
     answerType: 'lacunas',
-    correctAnswer: q.lacunaResposta || q.lacunaAnswer || q.a || '',
+    correctAnswer: _lac,
     userAnswer: $('lacunasInput').value.trim(),
     isRight: isRight,
     disc: q.disc || '', cat: q.cat || '', questionImg: null,
@@ -3045,7 +3046,7 @@ async function carregarCatalogo() {
     const snap = await db.ref('pacotes').once('value');
     const data = snap.val();
     if (!data) return [];
-    _catalogoCache = Object.values(data).sort((a, b) => (b.lancamento || '').localeCompare(a.lancamento || ''));
+    _catalogoCache = Object.entries(data).map(([id, val]) => ({ id, ...val })).sort((a, b) => (b.lancamento || '').localeCompare(a.lancamento || ''));
     return _catalogoCache;
   } catch (e) {
     console.error('Erro ao carregar pacotes:', e);
@@ -3412,9 +3413,9 @@ async function iniciarJogoPacote() {
     State.timerSecs    = PacoteGame.timerSecs;
     State.currentMode  = pacoteAtual.categoria || 'aprendizado';
     State.currentMode  = State.currentMode === 'exame' ? 'prova' : State.currentMode;
-    // Flashcard só em aprendizado; filtrar nos outros modos
+    // Flashcards só em aprendizado/exame; para concurso filtrar
     let finalPool = pool;
-    if (State.currentMode !== 'aprendizado') {
+    if (State.currentMode === 'concurso') {
       finalPool = pool.filter(q => (q.answerType || 'multipla') !== 'flashcard');
     }
     if (finalPool.length === 0) finalPool = pool; // fallback
