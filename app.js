@@ -893,20 +893,21 @@ function updateSetupFlashcardVisibility() {
   };
 
   if (isImagem) {
-    // Modo imagem: apenas multipla1 e multipla2
-    if (setupBtns.todos)     setupBtns.todos.style.display     = 'none';
+    // Modo imagem: mostrar todos, multipla1, multipla2 — ocultar vf/lacunas/flashcard
+    if (setupBtns.todos)     setupBtns.todos.style.display     = '';
     if (setupBtns.multipla2) setupBtns.multipla2.style.display = '';
     if (setupBtns.vf)        setupBtns.vf.style.display        = 'none';
     if (setupBtns.lacunas)   setupBtns.lacunas.style.display   = 'none';
     if (setupBtns.flashcard) setupBtns.flashcard.style.display = 'none';
-    // Renomear multipla
     const m1span = setupBtns.multipla?.querySelector('span');
     if (m1span) m1span.textContent = 'Múltipla - Opção 1';
-    // Resetar para multipla se estava em tipo inválido
-    if (!['multipla','multipla2'].includes(State.currentAnswerType)) {
-      State.currentAnswerType = 'multipla';
+    const todosSpan = setupBtns.todos?.querySelector('span');
+    if (todosSpan) todosSpan.textContent = 'Todos';
+    // Resetar para todos se estava em tipo inválido para imagem
+    if (!['todos','multipla','multipla2'].includes(State.currentAnswerType)) {
+      State.currentAnswerType = 'todos';
       document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.atype === 'multipla');
+        b.classList.toggle('active', b.dataset.atype === 'todos');
       });
     }
   } else {
@@ -927,6 +928,8 @@ function updateSetupFlashcardVisibility() {
     }
     const m1span = setupBtns.multipla?.querySelector('span');
     if (m1span) m1span.textContent = 'Múltipla Escolha';
+    const todosSpanNorm = setupBtns.todos?.querySelector('span');
+    if (todosSpanNorm) todosSpanNorm.textContent = 'Todos os Tipos';
   }
 }
 
@@ -1086,13 +1089,15 @@ $('startGameBtn').onclick = async () => {
   loadLocalDB();
   loadUsedToday();
 
-  if (State.dbSource === 'cloud') {
-    // Jogar directo da nuvem
+  // Modo imagem vai sempre à nuvem (imagens base64 grandes demais para localStorage)
+  const forceCloud = State.currentMode === 'imagem';
+
+  if (forceCloud || State.dbSource === 'cloud') {
     if (!navigator.onLine) {
-      showToast('Sem conexão. Ligue à internet para jogar na Nuvem, ou escolha Local.');
+      showToast(forceCloud ? 'Quiz por Imagem requer internet. Ligue-se à rede.' : 'Sem conexão. Ligue à internet para jogar na Nuvem, ou escolha Local.');
       return;
     }
-    showLoading('A carregar perguntas da nuvem...');
+    showLoading(forceCloud ? 'A carregar Quiz por Imagem...' : 'A carregar perguntas da nuvem...');
     try {
       const snap = await db.ref('questions').once('value');
       const data = snap.val();
@@ -1152,11 +1157,13 @@ function buildPool(db) {
     const diffFilter = State.currentDiff.toLowerCase();
     pool = pool.filter(q => (q.diff || '').toLowerCase() === diffFilter);
   }
-  // Image mode filter
+  // Image mode filter — detecta q.mode, q.imgA, base64 em q.a, ou multipla2 com questionImg
+  const _isImgQ = q => q.mode === 'imagem' || q.answerType === 'multipla2' ||
+                        q.questionImg || q.imgA || isImgData(q.a);
   if (State.currentMode === 'imagem') {
-    pool = pool.filter(q => q.mode === 'imagem' || q.imgA);
+    pool = pool.filter(_isImgQ);
   } else {
-    pool = pool.filter(q => q.mode !== 'imagem' && !q.imgA);
+    pool = pool.filter(q => !_isImgQ(q));
   }
 
   // Flashcard only allowed in Aprendizado mode
@@ -1165,14 +1172,16 @@ function buildPool(db) {
   }
 
   const atype = State.currentAnswerType;
+  const _isImagemMode = State.currentMode === 'imagem';
   if (atype && atype !== 'todos') {
     pool = pool.filter(q => (q.answerType || 'multipla') === atype);
   } else if (atype === 'todos') {
-    // Mix all types: group by answerType then interleave for a balanced 50-question round
     const isAprendizado = State.currentMode === 'aprendizado';
-    const allowedTypes = isAprendizado
-      ? ['multipla', 'vf', 'lacunas', 'flashcard']
-      : ['multipla', 'vf', 'lacunas'];
+    const allowedTypes = _isImagemMode
+      ? ['multipla', 'multipla2']
+      : isAprendizado
+        ? ['multipla', 'vf', 'lacunas', 'flashcard']
+        : ['multipla', 'vf', 'lacunas'];
 
     // Separate pool into buckets per type
     const buckets = {};
@@ -1325,15 +1334,29 @@ function renderQuestion() {
   }
 }
 
+// ── Utilitários de imagem nas opções ────────────────────────
+// Suporte duplo: imagem em q.a/b/c/d (base64) OU em q.imgA/B/C/D
+function isImgData(val) {
+  return typeof val === 'string' && val.startsWith('data:image');
+}
+function getOptImg(q, letter) {
+  const val = q[letter.toLowerCase()];
+  return isImgData(val) ? val : (q['img' + letter] || null);
+}
+
 // ── MÚLTIPLA ESCOLHA ─────────────────────────────────────
 function renderMultipla(q) {
-  const isImageMode = State.currentMode === 'imagem';
-  const originalOpts = [
-    { letter: 'A', text: q.a, img: q.imgA },
-    { letter: 'B', text: q.b, img: q.imgB },
-    { letter: 'C', text: q.c, img: q.imgC },
-    { letter: 'D', text: q.d, img: q.imgD },
-  ].filter(o => o.text || o.img);
+  // Suporte duplo: imagem em q.a/b/c/d (base64) OU em q.imgA/B/C/D
+  const originalOpts = ['A','B','C','D'].map(letter => {
+    const raw = q[letter.toLowerCase()];
+    const img  = isImgData(raw) ? raw : (q['img' + letter] || null);
+    const text = isImgData(raw) ? '' : (raw || '');
+    return { letter, text, img };
+  }).filter(o => o.img || o.text);
+
+  // Activar image-mode se alguma opção tiver imagem
+  const hasImages   = originalOpts.some(o => o.img);
+  const isImageMode = State.currentMode === 'imagem' || hasImages;
 
   const shuffledOpts = shuffle(originalOpts);
   const displayLetters = ['A','B','C','D'];
@@ -1351,10 +1374,10 @@ function renderMultipla(q) {
     btn.dataset.displayLetter  = displayLetter;
     btn.dataset.originalLetter = mappedOpt.letter;
     btn.dataset.optionText     = mappedOpt.text || '';
-    if (isImageMode && mappedOpt.img) {
-      btn.innerHTML = `<div class="option-badge">${displayLetter}</div><img class="option-img" src="${mappedOpt.img}" alt="Opção ${displayLetter}"><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>`;
+    if (mappedOpt.img) {
+      btn.innerHTML = `<div class="option-badge">${displayLetter}</div><img class="option-img" src="${mappedOpt.img}" alt="Opção ${displayLetter}">`;
     } else {
-      btn.innerHTML = `<div class="option-badge">${displayLetter}</div><span class="option-text">${mappedOpt.text}</span><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>`;
+      btn.innerHTML = `<div class="option-badge">${displayLetter}</div><span class="option-text">${mappedOpt.text}</span>`;
     }
     btn.onclick = () => handleAnswer(displayLetter, btn, optionMap);
     optWrap.appendChild(btn);
@@ -1388,7 +1411,7 @@ function renderMultipla2(q) {
     btn.dataset.displayLetter  = displayLetter;
     btn.dataset.originalLetter = mappedOpt.letter;
     btn.dataset.optionText     = mappedOpt.text;
-    btn.innerHTML = `<div class="option-badge">${displayLetter}</div><span class="option-text">${mappedOpt.text}</span><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
+    btn.innerHTML = `<div class="option-badge">${displayLetter}</div><span class="option-text">${mappedOpt.text}</span>`;
     btn.onclick = () => handleAnswer(displayLetter, btn, optionMap);
     optWrap.appendChild(btn);
   });
@@ -1656,18 +1679,19 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
   stopTimer();
 
   const q = State.questions[State.qIndex];
-  const correctOriginalLetter = q.answer; // posição original na BD
-  const correctOriginalText   = q[correctOriginalLetter.toLowerCase()];
-  const correctOriginalImg    = q['img' + correctOriginalLetter]; // imgA, imgB, imgC, imgD
+  const correctOriginalLetter = q.answer;
+  const _correctRaw           = q[correctOriginalLetter.toLowerCase()];
+  const correctOriginalText   = isImgData(_correctRaw) ? '' : (_correctRaw || '');
+  const correctOriginalImg    = getOptImg(q, correctOriginalLetter);
 
   const selectedOpt            = optionMap ? optionMap[displayLetter] : null;
   const selectedOriginalLetter = selectedOpt ? selectedOpt.letter : displayLetter;
   const selectedText           = selectedOpt ? selectedOpt.text   : '';
 
-  // Verificação dupla: posição original OU texto coincide
+  // Verificação: posição original OU (se texto disponível) texto coincide
   const isRight =
     selectedOriginalLetter === correctOriginalLetter ||
-    (selectedText && correctOriginalText &&
+    (!!(selectedText && correctOriginalText) &&
      selectedText.trim().toLowerCase() === correctOriginalText.trim().toLowerCase());
 
   // Encontrar display letter que corresponde à resposta certa
@@ -1677,7 +1701,8 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
     const btnText       = btn.dataset.optionText || '';
     const isCorrectBtn  =
       btnOrigLetter === correctOriginalLetter ||
-      (correctOriginalText && btnText.trim().toLowerCase() === correctOriginalText.trim().toLowerCase());
+      (!!(correctOriginalText && btnText) &&
+       btnText.trim().toLowerCase() === correctOriginalText.trim().toLowerCase());
     if (isCorrectBtn) correctDisplayLetter = btn.dataset.displayLetter;
   });
 
@@ -1704,8 +1729,7 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
   }
 
   // Registar no histórico da rodada
-  // Para modo imagem (multipla1): guardar imgs das opções para revisão
-  const _selectedImg = selectedOpt ? (q['img' + selectedOpt.letter] || null) : null;
+  const _selectedImg = selectedOpt ? getOptImg(q, selectedOpt.letter) : null;
   State.roundHistory.push({
     qIndex:        State.qIndex,
     question:      q.question || '',
@@ -1716,11 +1740,10 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
     disc:          q.disc || '',
     cat:           q.cat  || '',
     questionImg:   q.questionImg || null,
-    // Imagens das opções (modo imagem multipla1)
-    imgA: q.imgA || null,
-    imgB: q.imgB || null,
-    imgC: q.imgC || null,
-    imgD: q.imgD || null,
+    imgA: getOptImg(q, 'A'),
+    imgB: getOptImg(q, 'B'),
+    imgC: getOptImg(q, 'C'),
+    imgD: getOptImg(q, 'D'),
     correctImg:    correctOriginalImg || null,
     userImg:       _selectedImg,
     correctLetter: correctOriginalLetter || null,
