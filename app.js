@@ -1090,7 +1090,7 @@ $('startGameBtn').onclick = async () => {
   loadLocalDB();
   loadUsedToday();
 
-  // Modo imagem vai sempre à nuvem: imagens base64 são demasiado grandes para localStorage
+  // Modo imagem vai sempre à nuvem: imagens base64 são grandes demais para localStorage
   const forceCloud = State.currentMode === 'imagem';
 
   if (forceCloud || State.dbSource === 'cloud') {
@@ -1160,11 +1160,18 @@ function buildPool(db) {
     pool = pool.filter(q => (q.diff || '').toLowerCase() === diffFilter);
   }
   // Image mode filter
+  // Detectar perguntas de imagem: mode='imagem', ou tem imgA, ou a/b/c/d são base64, ou multipla2 com questionImg
+  function _isImageQ(q) {
+    return q.mode === 'imagem' ||
+           q.answerType === 'multipla2' ||
+           q.questionImg ||
+           q.imgA ||
+           isImgData(q.a);
+  }
   if (State.currentMode === 'imagem') {
-    // Incluir: mode=imagem, ou tem imgA (multipla com imagens nas opções), ou multipla2 (tem questionImg)
-    pool = pool.filter(q => q.mode === 'imagem' || q.imgA || q.answerType === 'multipla2' || q.questionImg);
+    pool = pool.filter(_isImageQ);
   } else {
-    pool = pool.filter(q => q.mode !== 'imagem' && !q.imgA && q.answerType !== 'multipla2' && !q.questionImg);
+    pool = pool.filter(q => !_isImageQ(q));
   }
 
   // Flashcard only allowed in Aprendizado mode
@@ -1336,19 +1343,29 @@ function renderQuestion() {
   }
 }
 
+// ── Utilitário: detectar se valor é imagem (base64 data URL)
+function isImgData(val) {
+  return typeof val === 'string' && val.startsWith('data:image');
+}
+// Obter imagem da opção: a/b/c/d podem ser base64 directamente
+function getOptImg(q, letter) {
+  const val = q[letter.toLowerCase()];
+  return isImgData(val) ? val : (q['img' + letter] || null);
+}
+
 // ── MÚLTIPLA ESCOLHA ─────────────────────────────────────
 function renderMultipla(q) {
-  // Se a pergunta tem imagens nas opções (imgA/imgB/imgC/imgD), activar image-mode
-  // independentemente do modo de sessão e do texto das opções (que pode ser placeholder "Imagem A")
-  const hasOptImages = !!(q.imgA || q.imgB || q.imgC || q.imgD);
-  const isImageMode  = State.currentMode === 'imagem' || hasOptImages;
+  // Suporte duplo: imagem pode estar em q.a/b/c/d (base64 directo) ou em q.imgA/B/C/D
+  const originalOpts = ['A','B','C','D'].map(letter => {
+    const raw = q[letter.toLowerCase()]; // q.a, q.b, q.c, q.d
+    const img = isImgData(raw) ? raw : (q['img' + letter] || null);
+    const text = isImgData(raw) ? '' : (raw || '');
+    return { letter, text, img };
+  }).filter(o => o.img || o.text);
 
-  const originalOpts = [
-    { letter: 'A', text: q.a, img: q.imgA },
-    { letter: 'B', text: q.b, img: q.imgB },
-    { letter: 'C', text: q.c, img: q.imgC },
-    { letter: 'D', text: q.d, img: q.imgD },
-  ].filter(o => o.img || o.text); // aceitar opções com imagem OU texto
+  // Se alguma opção tem imagem, activar image-mode independentemente do modo de sessão
+  const hasImages = originalOpts.some(o => o.img);
+  const isImageMode = State.currentMode === 'imagem' || hasImages;
 
   const shuffledOpts = shuffle(originalOpts);
   const displayLetters = ['A','B','C','D'];
@@ -1366,8 +1383,8 @@ function renderMultipla(q) {
     btn.dataset.displayLetter  = displayLetter;
     btn.dataset.originalLetter = mappedOpt.letter;
     btn.dataset.optionText     = mappedOpt.text || '';
-    // Mostrar imagem se existir — SEMPRE, independente de isImageMode
     if (mappedOpt.img) {
+      // Mostrar imagem (base64 em q.a/b/c/d ou em q.imgA/B/C/D)
       btn.innerHTML = `<div class="option-badge">${displayLetter}</div><img class="option-img" src="${mappedOpt.img}" alt="Opção ${displayLetter}"><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>`;
     } else {
       btn.innerHTML = `<div class="option-badge">${displayLetter}</div><span class="option-text">${mappedOpt.text}</span><svg class="option-icon correct-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><svg class="option-icon wrong-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/></svg>`;
@@ -1671,17 +1688,18 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
 
   const q = State.questions[State.qIndex];
   const correctOriginalLetter = q.answer; // posição original na BD
-  const correctOriginalText   = q[correctOriginalLetter.toLowerCase()];
-  const correctOriginalImg    = q['img' + correctOriginalLetter]; // imgA, imgB, imgC, imgD
+  const _correctRaw           = q[correctOriginalLetter.toLowerCase()];
+  const correctOriginalText   = isImgData(_correctRaw) ? '' : _correctRaw;
+  const correctOriginalImg    = getOptImg(q, correctOriginalLetter);
 
   const selectedOpt            = optionMap ? optionMap[displayLetter] : null;
   const selectedOriginalLetter = selectedOpt ? selectedOpt.letter : displayLetter;
   const selectedText           = selectedOpt ? selectedOpt.text   : '';
 
-  // Verificação dupla: posição original OU texto coincide
+  // Verificação: posição original coincide OU (se texto disponível) texto coincide
   const isRight =
     selectedOriginalLetter === correctOriginalLetter ||
-    (selectedText && correctOriginalText &&
+    (!!(selectedText && correctOriginalText) &&
      selectedText.trim().toLowerCase() === correctOriginalText.trim().toLowerCase());
 
   // Encontrar display letter que corresponde à resposta certa
@@ -1691,7 +1709,8 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
     const btnText       = btn.dataset.optionText || '';
     const isCorrectBtn  =
       btnOrigLetter === correctOriginalLetter ||
-      (correctOriginalText && btnText.trim().toLowerCase() === correctOriginalText.trim().toLowerCase());
+      (!!(correctOriginalText && btnText) &&
+       btnText.trim().toLowerCase() === correctOriginalText.trim().toLowerCase());
     if (isCorrectBtn) correctDisplayLetter = btn.dataset.displayLetter;
   });
 
@@ -1718,8 +1737,7 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
   }
 
   // Registar no histórico da rodada
-  // Para modo imagem (multipla1): guardar imgs das opções para revisão
-  const _selectedImg = selectedOpt ? (q['img' + selectedOpt.letter] || null) : null;
+  const _selectedImg = selectedOpt ? getOptImg(q, selectedOpt.letter) : null;
   State.roundHistory.push({
     qIndex:        State.qIndex,
     question:      q.question || '',
@@ -1730,11 +1748,11 @@ function handleAnswer(displayLetter, clickedBtn, optionMap) {
     disc:          q.disc || '',
     cat:           q.cat  || '',
     questionImg:   q.questionImg || null,
-    // Imagens das opções (modo imagem multipla1)
-    imgA: q.imgA || null,
-    imgB: q.imgB || null,
-    imgC: q.imgC || null,
-    imgD: q.imgD || null,
+    // Imagens das opções: suporte a base64 em a/b/c/d ou em imgA/B/C/D
+    imgA: getOptImg(q, 'A'),
+    imgB: getOptImg(q, 'B'),
+    imgC: getOptImg(q, 'C'),
+    imgD: getOptImg(q, 'D'),
     correctImg:    correctOriginalImg || null,
     userImg:       _selectedImg,
     correctLetter: correctOriginalLetter || null,
