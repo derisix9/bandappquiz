@@ -893,20 +893,22 @@ function updateSetupFlashcardVisibility() {
   };
 
   if (isImagem) {
-    // Modo imagem: apenas multipla1 e multipla2
-    if (setupBtns.todos)     setupBtns.todos.style.display     = 'none';
+    // Modo imagem: mostrar todos, multipla1, multipla2 — ocultar vf/lacunas/flashcard
+    if (setupBtns.todos)     setupBtns.todos.style.display     = '';
     if (setupBtns.multipla2) setupBtns.multipla2.style.display = '';
     if (setupBtns.vf)        setupBtns.vf.style.display        = 'none';
     if (setupBtns.lacunas)   setupBtns.lacunas.style.display   = 'none';
     if (setupBtns.flashcard) setupBtns.flashcard.style.display = 'none';
-    // Renomear multipla
+    // Renomear multipla e todos para contexto de imagem
     const m1span = setupBtns.multipla?.querySelector('span');
     if (m1span) m1span.textContent = 'Múltipla - Opção 1';
-    // Resetar para multipla se estava em tipo inválido
-    if (!['multipla','multipla2'].includes(State.currentAnswerType)) {
-      State.currentAnswerType = 'multipla';
+    const todosSpan = setupBtns.todos?.querySelector('span');
+    if (todosSpan) todosSpan.textContent = 'Todos';
+    // Resetar para todos se estava em tipo inválido para imagem
+    if (!['todos','multipla','multipla2'].includes(State.currentAnswerType)) {
+      State.currentAnswerType = 'todos';
       document.querySelectorAll('#setupAnswerTypeSelector .answer-type-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.atype === 'multipla');
+        b.classList.toggle('active', b.dataset.atype === 'todos');
       });
     }
   } else {
@@ -927,6 +929,8 @@ function updateSetupFlashcardVisibility() {
     }
     const m1span = setupBtns.multipla?.querySelector('span');
     if (m1span) m1span.textContent = 'Múltipla Escolha';
+    const todosSpan2 = setupBtns.todos?.querySelector('span');
+    if (todosSpan2) todosSpan2.textContent = 'Todos os Tipos';
   }
 }
 
@@ -1165,13 +1169,20 @@ function buildPool(db) {
   }
 
   const atype = State.currentAnswerType;
+  const isImagemMode = State.currentMode === 'imagem';
   if (atype && atype !== 'todos') {
-    pool = pool.filter(q => (q.answerType || 'multipla') === atype);
+    if (isImagemMode && atype === 'multipla') {
+      // No modo imagem "Opção 1" = perguntas multipla com imagens nas opções
+      pool = pool.filter(q => (q.answerType || 'multipla') === 'multipla');
+    } else if (isImagemMode && atype === 'multipla2') {
+      pool = pool.filter(q => q.answerType === 'multipla2');
+    } else {
+      pool = pool.filter(q => (q.answerType || 'multipla') === atype);
+    }
   } else if (atype === 'todos') {
     // Mix all types: group by answerType then interleave for a balanced 50-question round
     const isAprendizado = State.currentMode === 'aprendizado';
-    const isImagem = State.currentMode === 'imagem';
-    const allowedTypes = isImagem
+    const allowedTypes = isImagemMode
       ? ['multipla', 'multipla2']
       : isAprendizado
         ? ['multipla', 'vf', 'lacunas', 'flashcard']
