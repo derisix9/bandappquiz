@@ -1208,13 +1208,13 @@ select.field-input       { cursor: pointer; }
 .option-btn.correct                    { background: #22C55E; border-color: #16A34A; animation: correctPulse 0.4s ease; }
 .option-btn.correct .option-badge      { background: white; color: #22C55E; border-color: #16A34A; }
 .option-btn.correct .option-text       { color: white; font-weight: 800; }
-.option-btn.correct .option-icon       { display: block; fill: white; }
+.option-btn.correct .option-icon       { display: none; }
 
 /* Wrong state */
 .option-btn.wrong                      { background: #EF4444; border-color: #DC2626; animation: wrongShake 0.35s ease; }
 .option-btn.wrong .option-badge        { background: white; color: #EF4444; border-color: #DC2626; }
 .option-btn.wrong .option-text         { color: white; font-weight: 800; }
-.option-btn.wrong .option-icon         { display: block; fill: white; }
+.option-btn.wrong .option-icon         { display: none; }
 
 /* Dimmed (others after answer) */
 .option-btn:disabled:not(.correct):not(.wrong) { background: #C8A500; border-color: #A88700; opacity: 0.7; }
@@ -1237,7 +1237,7 @@ select.field-input       { cursor: pointer; }
 .option-btn.image-option .option-badge { width: 100%; height: 32px; border-radius: 0; font-size: 0.9rem; }
 .option-btn.image-option .option-img   { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
 .option-btn.image-option .option-text  { display: none; }
-.option-btn.image-option .option-icon  { position: absolute; top: 36px; right: 6px; width: 28px; height: 28px; background: rgba(0, 0, 0, 0.55); border-radius: 50%; padding: 4px; }
+.option-btn.image-option .option-icon  { display: none !important; }
 
 /* Next Button */
 .game-next-wrap {
