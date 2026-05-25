@@ -1612,11 +1612,12 @@ function renderLacunas(q) {
 
 function checkLacunaAnswer(q) {
   if (State.answered) return;
-  const userAns = $('lacunasInput').value.trim();
-  // Pegar na resposta correcta — ignorar campos vazios, priorizar lacunaAnswer
-  const _lac = [q.lacunaAnswer, q.lacunaResposta, q.a].find(v => typeof v === 'string' && v.trim() !== '') || '';
+  const userAns    = $('lacunasInput').value.trim().toLowerCase();
+  // lacunaResposta é o campo guardado no Firebase pelo admin
+  // lacunaAnswer é o campo do JSON original (fallback)
+  const _resposta = q.lacunaResposta || q.lacunaAnswer || q.a || '';
+  const correctAns = _resposta.trim().toLowerCase();
   const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
-  const correctAns = _lac;
   const isRight = norm(userAns) === norm(correctAns);
   State.answered = true;
   $('lacunasInput').disabled = true;
@@ -1627,24 +1628,24 @@ function checkLacunaAnswer(q) {
   fb.classList.add('show');
   if (isRight) {
     $('lacunasInput').classList.add('correct');
-    if (blank) { blank.textContent = _lac; blank.classList.add('filled-correct'); }
+    if (blank) { blank.textContent = _resposta; blank.classList.add('filled-correct'); }
     fb.className = 'lacunas-feedback show correct-fb';
-    fb.textContent = '✓ Correcto! ' + _lac;
+    fb.textContent = '✓ Correcto! ' + _resposta;
     State.correct++; State.score += getPointsForMode();
     $('gameScoreBadge').textContent = formatScore(State.score) + 'v';
     renderGameStars(); playCorrectSound();
   } else {
     $('lacunasInput').classList.add('wrong');
-    if (blank) { blank.textContent = _lac; blank.classList.add('filled-wrong'); }
+    if (blank) { blank.textContent = _resposta; blank.classList.add('filled-wrong'); }
     fb.className = 'lacunas-feedback show wrong-fb';
-    fb.textContent = '✗ Errado! A resposta correcta era: ' + _lac;
+    fb.textContent = '✗ Errado! A resposta correcta era: ' + _resposta;
     State.wrong++; playWrongSound();
   }
   // Registar no histórico
   State.roundHistory.push({
     qIndex: State.qIndex, question: q.lacunaFrase || q.question || '',
     answerType: 'lacunas',
-    correctAnswer: _lac,
+    correctAnswer: _resposta,
     userAnswer: $('lacunasInput').value.trim(),
     isRight: isRight,
     disc: q.disc || '', cat: q.cat || '', questionImg: null,
@@ -3414,8 +3415,9 @@ async function iniciarJogoPacote() {
     State.timerSecs    = PacoteGame.timerSecs;
     State.currentMode  = pacoteAtual.categoria || 'aprendizado';
     State.currentMode  = State.currentMode === 'exame' ? 'prova' : State.currentMode;
+    // Flashcards só em aprendizado/exame; para concurso filtrar
     let finalPool = pool;
-    if (State.currentMode !== 'aprendizado') {
+    if (State.currentMode === 'concurso') {
       finalPool = pool.filter(q => (q.answerType || 'multipla') !== 'flashcard');
     }
     if (finalPool.length === 0) finalPool = pool; // fallback
