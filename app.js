@@ -3410,6 +3410,8 @@ setTimeout(() => verificarNotifNovoPacote(), 3000);
 const PacoteGame = {
   timerSecs: 0,
   maxQtd: 20,
+  diff: 'all',
+  cat: 'all',
 };
 
 // Selectors do modal de setup
@@ -3427,6 +3429,42 @@ document.querySelectorAll('.pkg-qtd').forEach(btn => {
     PacoteGame.maxQtd = parseInt(btn.dataset.qtd); // 0 = todas
   };
 });
+// Difficulty handler (delegated since buttons are static)
+document.getElementById('pacoteSetupOverlay').addEventListener('click', (e) => {
+  const btn = e.target.closest('.pkg-diff');
+  if (btn) {
+    document.querySelectorAll('.pkg-diff').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    PacoteGame.diff = btn.dataset.diff;
+  }
+  const catBtn = e.target.closest('.pkg-cat');
+  if (catBtn) {
+    document.querySelectorAll('.pkg-cat').forEach(b => b.classList.remove('active'));
+    catBtn.classList.add('active');
+    PacoteGame.cat = catBtn.dataset.cat;
+  }
+});
+
+// Popula categorias no modal a partir das questões do pacote
+async function popularCategoriasPacote(pkgId) {
+  const wrap = document.getElementById('pkgCatWrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<button class="timer-opt pkg-cat active" data-cat="all">Todas</button>';
+  PacoteGame.cat = 'all';
+  try {
+    const snap = await db.ref('pacoteQuestions/' + pkgId).once('value');
+    const data = snap.val();
+    if (!data) return;
+    const cats = [...new Set(Object.values(data).map(q => q.cat).filter(Boolean))].sort();
+    cats.forEach(cat => {
+      const b = document.createElement('button');
+      b.className = 'timer-opt pkg-cat';
+      b.dataset.cat = cat;
+      b.textContent = cat;
+      wrap.appendChild(b);
+    });
+  } catch(e) { /* silencioso */ }
+}
 $('pacoteSetupCancelar').onclick = () => $('pacoteSetupOverlay').classList.remove('show');
 $('pacoteSetupOverlay').onclick  = (e) => { if (e.target === $('pacoteSetupOverlay')) $('pacoteSetupOverlay').classList.remove('show'); };
 
@@ -3465,9 +3503,13 @@ async function jogarPacote(pacote) {
   // Reset defaults
   PacoteGame.timerSecs = 0;
   PacoteGame.maxQtd    = 20;
+  PacoteGame.diff      = 'all';
+  PacoteGame.cat       = 'all';
   document.querySelectorAll('.pkg-timer').forEach(b => b.classList.toggle('active', b.dataset.seconds === '0'));
   document.querySelectorAll('.pkg-qtd').forEach(b => b.classList.toggle('active', b.dataset.qtd === '20'));
+  document.querySelectorAll('.pkg-diff').forEach(b => b.classList.toggle('active', b.dataset.diff === 'all'));
   $('pacoteSetupOverlay').classList.add('show');
+  popularCategoriasPacote(pacote.id);
 }
 
 // Iniciar o jogo depois de confirmar no modal
@@ -3510,8 +3552,17 @@ async function iniciarJogoPacote() {
     }
 
     // Limitar pelo nº de perguntas configurado
-    const max = PacoteGame.maxQtd > 0 ? PacoteGame.maxQtd : mixed.length;
-    const pool = mixed.slice(0, max);
+    let filtered = mixed;
+    if (PacoteGame.diff !== 'all') {
+      const d = PacoteGame.diff.toLowerCase();
+      filtered = filtered.filter(q => (q.diff || '').toLowerCase() === d);
+    }
+    if (PacoteGame.cat !== 'all') {
+      filtered = filtered.filter(q => q.cat === PacoteGame.cat);
+    }
+    if (filtered.length === 0) filtered = mixed; // fallback: sem match, usa todas
+    const max = PacoteGame.maxQtd > 0 ? PacoteGame.maxQtd : filtered.length;
+    const pool = filtered.slice(0, max);
 
     hideLoading();
     if (pool.length === 0) {

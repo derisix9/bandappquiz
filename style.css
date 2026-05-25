@@ -2155,5 +2155,14 @@ body.light-mode .rank-filter.active { background: var(--gold); color: #fff; bord
 body.light-mode .auth-tab.active   { background: var(--gold); color: #fff; }
 body.light-mode .option-badge-label { background: var(--gold); color: #fff; }
 
+body.light-mode .flashcard-front { background: linear-gradient(135deg, #FFFFFF, #EFF4FB); border: 1.5px solid rgba(0,80,180,0.18); }
+body.light-mode .flashcard-back  { background: linear-gradient(135deg, #E8F5E9, #C8E6C9); border: 1.5px solid rgba(22,163,74,0.4); }
+body.light-mode .flashcard-front-text,
+body.light-mode .flashcard-back-text { color: #0A1A3A; }
+body.light-mode .flashcard-label { color: #3A5580; opacity: 0.7; }
+body.light-mode .flashcard-tap-hint { color: #6B85A8; }
+body.light-mode .fc-wrong { background: rgba(220,38,38,0.08); color: #DC2626; border-color: rgba(220,38,38,0.25); }
+body.light-mode .fc-hard  { background: rgba(180,83,9,0.08);  color: #B45309; border-color: rgba(180,83,9,0.25); }
+body.light-mode .fc-good  { background: rgba(22,163,74,0.10); color: #16A34A; border-color: rgba(22,163,74,0.3); }
 body.light-mode .theme-switch { background: rgba(212, 112, 10, 0.2); border-color: var(--gold); }
 body.light-mode .theme-switch::after { background: var(--gold); transform: translateX(20px); }

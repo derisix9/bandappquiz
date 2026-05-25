@@ -36,7 +36,7 @@
   color: #fff !important;
 }
 .btn-ver-pacote-jogar svg { fill: #fff !important; }
-.pkg-timer.active, .pkg-qtd.active { background: var(--primary, #4F46E5); color: #fff; border-color: var(--primary, #4F46E5); }
+.pkg-timer.active, .pkg-qtd.active, .pkg-diff.active, .pkg-cat.active { background: var(--primary, #4F46E5); color: #fff; border-color: var(--primary, #4F46E5); }
 </style>
 </head>
 <body>
@@ -1601,6 +1601,25 @@
         <button class="timer-opt pkg-qtd" data-qtd="30">30</button>
         <button class="timer-opt pkg-qtd" data-qtd="50">50</button>
         <button class="timer-opt pkg-qtd" data-qtd="0">Todas</button>
+      </div>
+    </div>
+
+    <!-- Dificuldade -->
+    <div style="margin:10px 0 8px">
+      <div class="setup-label" style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" style="width:14px;height:14px;flex-shrink:0;fill:currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg> Dificuldade</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="timer-opt pkg-diff active" data-diff="all">Todas</button>
+        <button class="timer-opt pkg-diff" data-diff="fácil">Fácil</button>
+        <button class="timer-opt pkg-diff" data-diff="médio">Médio</button>
+        <button class="timer-opt pkg-diff" data-diff="difícil">Difícil</button>
+      </div>
+    </div>
+
+    <!-- Categoria -->
+    <div style="margin:10px 0 16px">
+      <div class="setup-label" style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" style="width:14px;height:14px;flex-shrink:0;fill:currentColor"><path d="M12 2l-5.5 9h11L12 2zm0 3.84L13.93 9h-3.87L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5S15.01 22 17.5 22 22 19.99 22 17.5 19.99 13 17.5 13zm0 7c-1.38 0-2.5-1.12-2.5-2.5S16.12 15 17.5 15s2.5 1.12 2.5 2.5S18.88 20 17.5 20zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z"/></svg> Categoria</div>
+      <div id="pkgCatWrap" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="timer-opt pkg-cat active" data-cat="all">Todas</button>
       </div>
     </div>
 
