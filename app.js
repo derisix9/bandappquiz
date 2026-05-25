@@ -1542,7 +1542,7 @@ function renderVF(q) {
     btn.className = `vf-btn vf-${opt.label.toLowerCase()}`;
     btn.dataset.displayLetter = btn.dataset.originalLetter = opt.letter;
     btn.dataset.optionText = opt.label;
-    btn.innerHTML = `<svg viewBox="0 0 24 24">${opt.icon}</svg> ${opt.label}`;
+    btn.innerHTML = opt.label;
     btn.onclick = () => {
       vfWrap.querySelectorAll('.vf-btn').forEach(b => b.disabled = true);
       const isRight = opt.letter === q.answer;
@@ -2981,6 +2981,116 @@ async function downloadFromCloud() {
   }
 }
 
+
+// ─── ELIMINAR PERGUNTAS LOCAIS ────────────────────────────
+let localElimOpen = false;
+let localElimFilters = { modo: 'todos', tipo: 'todos', disc: 'todos', cat: 'todos' };
+
+function getLocalElimChipCSS(active) {
+  return active
+    ? 'padding:5px 11px;border-radius:20px;border:1px solid #F5A623;background:rgba(245,166,35,0.15);color:#F5A623;font-size:0.72rem;font-weight:700;cursor:pointer'
+    : 'padding:5px 11px;border-radius:20px;border:1px solid #1E2D45;background:#111827;color:#8899BB;font-size:0.72rem;font-weight:700;cursor:pointer';
+}
+
+function getLocalElimUnique(qs, field) {
+  return [...new Set(qs.map(q => q[field]).filter(Boolean))].sort();
+}
+
+function applyLocalElimFilters(qs) {
+  return qs.filter(q => {
+    if (localElimFilters.modo !== 'todos' && q.mode !== localElimFilters.modo) return false;
+    if (localElimFilters.tipo !== 'todos' && q.answerType !== localElimFilters.tipo) return false;
+    if (localElimFilters.disc !== 'todos' && q.disc !== localElimFilters.disc) return false;
+    if (localElimFilters.cat  !== 'todos' && q.cat  !== localElimFilters.cat)  return false;
+    return true;
+  });
+}
+
+function buildLocalElimChips(containerId, field, values, allQs) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = ['todos', ...values].map(v => {
+    const active = localElimFilters[field] === v;
+    const label = v === 'todos' ? 'Todos' : v;
+    return `<button style="${getLocalElimChipCSS(active)}" onclick="setLocalElimFilter('${field}','${encodeURIComponent(v)}')">${label}</button>`;
+  }).join('');
+}
+
+function renderLocalElimFilters(allQs) {
+  buildLocalElimChips('localChipsModo', 'modo', getLocalElimUnique(allQs, 'mode'), allQs);
+  buildLocalElimChips('localChipsTipo', 'tipo', getLocalElimUnique(allQs, 'answerType'), allQs);
+  buildLocalElimChips('localChipsDisc', 'disc', getLocalElimUnique(allQs, 'disc'), allQs);
+  buildLocalElimChips('localChipsCat',  'cat',  getLocalElimUnique(allQs, 'cat'), allQs);
+  const filtered = applyLocalElimFilters(allQs);
+  const countEl = document.getElementById('localElimVisCount');
+  if (countEl) countEl.textContent = filtered.length;
+}
+
+window.setLocalElimFilter = function(field, rawVal) {
+  const value = decodeURIComponent(rawVal);
+  localElimFilters[field] = value;
+  loadLocalDB().then(() => {
+    renderLocalElimFilters(State.localDB);
+  });
+};
+
+document.getElementById('localElimToggleBtn').onclick = async () => {
+  localElimOpen = !localElimOpen;
+  const filtersDiv = document.getElementById('localElimFilters');
+  const toggleText = document.getElementById('localElimToggleText');
+  if (!filtersDiv || !toggleText) return;
+  if (localElimOpen) {
+    // Reset filters and show
+    localElimFilters = { modo: 'todos', tipo: 'todos', disc: 'todos', cat: 'todos' };
+    await loadLocalDB();
+    renderLocalElimFilters(State.localDB);
+    filtersDiv.style.display = 'block';
+    toggleText.textContent = 'FECHAR';
+  } else {
+    filtersDiv.style.display = 'none';
+    toggleText.textContent = 'ELIMINAR PERGUNTAS LOCAIS';
+  }
+};
+
+document.getElementById('localElimVisBtn').onclick = async () => {
+  await loadLocalDB();
+  const filtered = applyLocalElimFilters(State.localDB);
+  if (!filtered.length) { showToast('Nenhuma pergunta visível para eliminar.'); return; }
+
+  const isAll = localElimFilters.modo === 'todos' && localElimFilters.tipo === 'todos'
+    && localElimFilters.disc === 'todos' && localElimFilters.cat === 'todos';
+
+  const msg = isAll
+    ? `Tens a certeza que queres eliminar TODAS as ${filtered.length} perguntas armazenadas neste dispositivo?`
+    : `Tens a certeza que queres eliminar as ${filtered.length} perguntas filtradas?`;
+
+  showModal({
+    icon: '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
+    title: 'Eliminar Perguntas',
+    msg,
+    btns: [
+      { label: 'CANCELAR', cls: 'btn-outline' },
+      { label: 'ELIMINAR', cls: 'btn-danger', action: async () => {
+        const filteredIds = new Set(filtered.map(q => q.id));
+        const remaining = State.localDB.filter(q => !filteredIds.has(q.id));
+        await saveLocalDB(remaining);
+        State.localDB = remaining;
+        const countEl = document.getElementById('localQCount');
+        if (countEl) countEl.textContent = remaining.length;
+        // Reset filters and re-render
+        localElimFilters = { modo: 'todos', tipo: 'todos', disc: 'todos', cat: 'todos' };
+        renderLocalElimFilters(remaining);
+        showToast(`${filtered.length} pergunta(s) eliminadas do dispositivo.`);
+        if (!remaining.length) {
+          document.getElementById('localElimFilters').style.display = 'none';
+          document.getElementById('localElimToggleText').textContent = 'ELIMINAR PERGUNTAS LOCAIS';
+          localElimOpen = false;
+        }
+      }}
+    ]
+  });
+};
+
 // ─── CLOUD UPDATES NOTIFICATION ──────────────────────────
 async function checkCloudUpdates() {
   if (!navigator.onLine) return;
@@ -3048,7 +3158,11 @@ async function carregarCatalogo() {
     const snap = await db.ref('pacotes').once('value');
     const data = snap.val();
     if (!data) return [];
-    _catalogoCache = Object.entries(data).map(([id, val]) => ({ id, ...val })).sort((a, b) => (b.lancamento || '').localeCompare(a.lancamento || ''));
+    _catalogoCache = Object.entries(data).map(([id, val]) => {
+      // O admin guarda a capa como 'coverBase64'; o app lê como 'capa'
+      const capa = val.coverBase64 || val.capa || null;
+      return { id, ...val, capa };
+    }).sort((a, b) => (b.lancamento || '').localeCompare(a.lancamento || ''));
     return _catalogoCache;
   } catch (e) {
     console.error('Erro ao carregar pacotes:', e);

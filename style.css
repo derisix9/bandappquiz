@@ -1291,7 +1291,7 @@ select.field-input       { cursor: pointer; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 0;
   padding: 26px 10px;
   border-radius: var(--radius);
   font-family: var(--font-display);
@@ -1302,7 +1302,7 @@ select.field-input       { cursor: pointer; }
   transition: all 0.2s;
   letter-spacing: 0.04em;
 }
-.vf-btn svg         { width: 30px; height: 30px; fill: currentColor; }
+.vf-btn svg         { display: none; }  /* ícones removidos por design */
 .vf-verdadeiro      { background: rgba(34, 197, 94, 0.12); color: var(--green); border-color: rgba(34, 197, 94, 0.25); }
 .vf-falso           { background: rgba(239, 68, 68, 0.10); color: var(--red); border-color: rgba(239, 68, 68, 0.2); }
 .vf-btn.correct     { background: rgba(34, 197, 94, 0.3); border-color: var(--green); transform: scale(1.02); }
