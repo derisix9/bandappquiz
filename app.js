@@ -1363,10 +1363,6 @@ function renderQuestion() {
 
   State.answered = false;
 
-  // Cleanup V/F wrap from previous question
-  const oldVfWrap = document.querySelector('.vf-options');
-  if (oldVfWrap) oldVfWrap.remove();
-
   // Barra de progresso
   const pct = ((State.qIndex) / State.questions.length) * 100;
   $('gameProgressFill').style.width = Math.max(2, pct) + '%';
@@ -1530,21 +1526,20 @@ function renderVF(q) {
     });
     return;
   }
-  $('gameOptions').style.display = 'none';
-  const vfWrap = document.createElement('div');
-  vfWrap.className = 'vf-options';
+  $('gameOptions').style.display = 'flex';
+  $('gameOptions').classList.remove('image-mode');
   const options = [
-    { letter: 'A', label: 'Verdadeiro', icon: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>' },
-    { letter: 'B', label: 'Falso',      icon: '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 17.59 13.41 12z"/>' },
+    { letter: 'A', label: q.a || 'Verdadeiro' },
+    { letter: 'B', label: q.b || 'Falso' },
   ];
   options.forEach(opt => {
     const btn = document.createElement('button');
-    btn.className = `vf-btn vf-${opt.label.toLowerCase()}`;
+    btn.className = 'option-btn';
     btn.dataset.displayLetter = btn.dataset.originalLetter = opt.letter;
     btn.dataset.optionText = opt.label;
-    btn.innerHTML = opt.label;
+    btn.innerHTML = `<div class="option-badge">${opt.letter}</div><span class="option-text">${opt.label}</span>`;
     btn.onclick = () => {
-      vfWrap.querySelectorAll('.vf-btn').forEach(b => b.disabled = true);
+      $('gameOptions').querySelectorAll('.option-btn').forEach(b => b.disabled = true);
       const isRight = opt.letter === q.answer;
       if (isRight) {
         btn.classList.add('correct');
@@ -1553,7 +1548,7 @@ function renderVF(q) {
         renderGameStars(); playCorrectSound();
       } else {
         btn.classList.add('wrong');
-        vfWrap.querySelectorAll('.vf-btn').forEach(b => { if (b.dataset.displayLetter === q.answer) b.classList.add('correct'); });
+        $('gameOptions').querySelectorAll('.option-btn').forEach(b => { if (b.dataset.displayLetter === q.answer) b.classList.add('correct'); });
         State.wrong++; playWrongSound();
       }
       // Registar no histórico
@@ -1576,9 +1571,8 @@ function renderVF(q) {
       $('nextBtnText').textContent = State.qIndex + 1 >= State.questions.length ? 'VER RESULTADO' : 'PRÓXIMA';
       if (State.timerSecs > 0) setTimeout(() => { if (State.answered) advanceQuestion(); }, 1600);
     };
-    vfWrap.appendChild(btn);
+    $('gameOptions').appendChild(btn);
   });
-  $('gameOptions').insertAdjacentElement('afterend', vfWrap);
 }
 
 // ── LACUNAS ───────────────────────────────────────────────

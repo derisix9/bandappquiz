@@ -2134,6 +2134,13 @@ body.light-mode .auth-bg       { background: radial-gradient(ellipse 70% 50% at 
 body.light-mode .result-bg     { background: radial-gradient(ellipse 80% 60% at 50% 20%, rgba(0, 80, 180, 0.06) 0%, transparent 65%); }
 body.light-mode .loading-overlay { background: rgba(240, 246, 253, 0.92); }
 body.light-mode .notif-banner  { background: linear-gradient(135deg, #DAEAF8, #EFF4FB); border-bottom: 2px solid var(--gold); }
+body.light-mode .notif-banner-text strong { color: var(--gold); }
+body.light-mode .notif-banner-text span   { color: var(--text2); }
+body.light-mode .notif-banner-close svg   { fill: var(--text3); }
+body.light-mode .notif-pacote-banner { background: linear-gradient(135deg, #DAEAF8, #EFF4FB); border: 1.5px solid var(--gold); box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
+body.light-mode .notif-pacote-text strong { color: #0A1A3A; }
+body.light-mode .notif-pacote-text span   { color: #3A5580; }
+body.light-mode .notif-pacote-close svg   { fill: #6B85A8; }
 
 body.light-mode .btn-primary   { color: #fff; }
 body.light-mode .btn-next      { color: #fff; }
