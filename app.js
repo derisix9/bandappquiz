@@ -1612,10 +1612,11 @@ function renderLacunas(q) {
 
 function checkLacunaAnswer(q) {
   if (State.answered) return;
-  const userAns    = $('lacunasInput').value.trim().toLowerCase();
-  const _lac = [q.lacunaAnswer, q.lacunaResposta, q.a].find(v => v && String(v).trim()) || '';
-  const correctAns = _lac.trim().toLowerCase();
+  const userAns = $('lacunasInput').value.trim();
+  // Pegar na resposta correcta — ignorar campos vazios, priorizar lacunaAnswer
+  const _lac = [q.lacunaAnswer, q.lacunaResposta, q.a].find(v => typeof v === 'string' && v.trim() !== '') || '';
   const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  const correctAns = _lac;
   const isRight = norm(userAns) === norm(correctAns);
   State.answered = true;
   $('lacunasInput').disabled = true;
@@ -3413,9 +3414,8 @@ async function iniciarJogoPacote() {
     State.timerSecs    = PacoteGame.timerSecs;
     State.currentMode  = pacoteAtual.categoria || 'aprendizado';
     State.currentMode  = State.currentMode === 'exame' ? 'prova' : State.currentMode;
-    // Flashcards só em aprendizado/exame; para concurso filtrar
     let finalPool = pool;
-    if (State.currentMode === 'concurso') {
+    if (State.currentMode !== 'aprendizado') {
       finalPool = pool.filter(q => (q.answerType || 'multipla') !== 'flashcard');
     }
     if (finalPool.length === 0) finalPool = pool; // fallback
