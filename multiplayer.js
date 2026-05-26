@@ -332,7 +332,13 @@ function mpLoadSalas() {
     list.innerHTML = minhasSalas.map(s => {
       const players   = s.players ? Object.values(s.players) : [];
       const isHost    = s.host === myUid;
-      const modoLabel = s.modoJogo ? ({ aprendizado:'📚 Aprendizado', concurso:'🏆 Concurso', prova:'📝 Prova', imagem:'🖼️ Imagem' }[s.modoJogo] || s.modoJogo) : '';
+      const modoIcons = {
+        aprendizado: `<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>`,
+        concurso:    `<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.86 10.4 5 9.3 5 8zm14 0c0 1.3-.86 2.4-2 2.82V7h2v1z"/></svg>`,
+        prova:       `<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`,
+        imagem:      `<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>`,
+      };
+      const modoLabel = s.modoJogo ? ((modoIcons[s.modoJogo] || '') + ({ aprendizado:'Aprendizado', concurso:'Concurso', prova:'Prova', imagem:'Imagem' }[s.modoJogo] || s.modoJogo)) : '';
       const dots = Array.from({length: s.maxplayers || 2}, (_, i) =>
         `<span class="mp-sala-player-dot ${players[i] ? 'active' : ''}"></span>`
       ).join('');
@@ -344,7 +350,7 @@ function mpLoadSalas() {
       const actionBtn = isHost
         ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
              <button class="mp-sala-join" data-salaid="${s._key}">▶ Entrar</button>
-             <button class="mp-sala-delete" data-salaid="${s._key}" style="background:transparent;border:1.5px solid #EF4444;color:#EF4444;border-radius:10px;padding:5px 12px;font-size:0.75rem;font-weight:700;cursor:pointer">🗑 Eliminar</button>
+             <button class="mp-sala-delete" data-salaid="${s._key}" style="background:#EF4444;border:none;color:#fff;border-radius:10px;padding:5px 12px;font-size:0.75rem;font-weight:700;cursor:pointer"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Eliminar</button>
            </div>`
         : `<button class="mp-sala-join" data-salaid="${s._key}">▶ Entrar</button>`;
 
@@ -353,7 +359,7 @@ function mpLoadSalas() {
           <div class="mp-sala-badge"><span>SALA</span><strong>#${s.roomNum || '?'}</strong></div>
           <div class="mp-sala-info">
             <div class="mp-sala-name">${s.disciplina || 'Geral'} — ${s.nivel || 'Todos'} ${hostBadge}</div>
-            <div class="mp-sala-meta">${modoLabel} · ${players.length}/${s.maxplayers || 2} jogadores · ${s.modoPerg === 'realtime' ? '⚡ Tempo Real' : '⏳ Assíncrono'}</div>
+            <div class="mp-sala-meta">${modoLabel} · ${players.length}/${s.maxplayers || 2} jogadores · ${s.modoPerg === 'realtime' ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real' : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono'}</div>
             <div class="mp-sala-players" style="margin-top:4px">${dots}</div>
           </div>
           ${actionBtn}
@@ -502,7 +508,7 @@ function mpShowSalaScreen(salaRef) {
     const s = snap.val();
     if (!s) return;
     mpEl('mpSalaNumDisplay').textContent  = `Sala #${s.roomNum || '?'}`;
-    mpEl('mpSalaModeDisplay').textContent = s.modoPerg === 'realtime' ? '⚡ Tempo Real' : '⏳ Assíncrono';
+    mpEl('mpSalaModeDisplay').textContent = s.modoPerg === 'realtime' ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real' : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono';
 
     // Mostrar botão eliminar apenas ao host, só na fase de espera
     const myUid = MP.myUid;
@@ -601,7 +607,7 @@ function mpRenderPlayersGrid(players, maxPlayers) {
       </div>`;
     }
     return `<div class="mp-player-slot">
-      <div class="mp-player-slot-avatar" style="background:rgba(99,102,241,0.15);font-size:1.2rem">👤</div>
+      <div class="mp-player-slot-avatar" style="background:rgba(99,102,241,0.15);font-size:1.2rem"><svg viewBox="0 0 24 24" style="width:1.2rem;height:1.2rem;fill:var(--primary,#6366F1);vertical-align:middle"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
       <div class="mp-player-slot-empty">Aguardando...</div>
     </div>`;
   });
@@ -629,7 +635,7 @@ function mpUpdateScoreChips(answers) {
     if (chip) {
       chip.classList.add(data.correct ? 'answered-right' : 'answered-wrong');
       const ind = chip.querySelector('.mp-score-indicator');
-      if (ind) ind.textContent = data.correct ? '✅' : '❌';
+      if (ind) ind.innerHTML = data.correct ? '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>' : '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
     }
   });
 }
@@ -720,7 +726,7 @@ function mpRenderQuestion(round) {
   mpEl('mpQNum').textContent  = `${round.index + 1}/${round.total}`;
   const turnEl = mpEl('mpQTurn');
   if (turnEl) {
-    turnEl.textContent = isMyTurn ? '🎯 A tua vez!' : '⏳ Aguarda...';
+    turnEl.textContent = isMyTurn ? '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-8.5l-5.5 5.5-2.5-2.5-1 1 3.5 3.5 6.5-6.5-1-1z"/></svg>A tua vez!' : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Aguarda...';
     turnEl.className   = 'mp-q-turn' + (isMyTurn ? ' my-turn' : '');
     turnEl.style.display = 'inline-block';
   }
@@ -771,7 +777,7 @@ function mpRenderQuestion(round) {
       );
     }
   } else {
-    answersEl.innerHTML = `<div class="mp-q-blocked">🔒 Aguarda a tua vez de responder</div>`;
+    answersEl.innerHTML = `<div class="mp-q-blocked"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>Aguarda a tua vez de responder</div>`;
   }
 
   // Timer
@@ -885,11 +891,11 @@ function mpRenderLiveFeed(answers) {
   const items = Object.values(answers);
   if (!items.length) return;
 
-  feed.innerHTML = `<div class="mp-section-title" style="font-size:0.75rem;margin:0 0 8px">🔴 Actividade em tempo real</div>` +
+  feed.innerHTML = `<div class="mp-section-title" style="font-size:0.75rem;margin:0 0 8px"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:#EF4444;vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="8"/></svg>Actividade em tempo real</div>` +
     items.map(a => `
       <div class="mp-feed-item">
         <span class="mp-feed-dot ${a.correct ? 'ok' : 'err'}"></span>
-        <span class="mp-feed-msg"><strong>${a.name}</strong> ${a.correct ? '✅ acertou' : '❌ errou'} <span style="opacity:.6">(${a.points || 0} pts)</span></span>
+        <span class="mp-feed-msg"><strong>${a.name}</strong> ${a.correct ? '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>acertou' : '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>errou'} <span style="opacity:.6">(${a.points || 0} pts)</span></span>
       </div>`).join('');
 }
 
@@ -915,7 +921,7 @@ async function mpShowResults() {
 
   const qtd    = data.qtd || ranked.reduce((acc, p) => acc + Object.keys(p.answers).length, 0) / players.length || 10;
   const perQ   = 20 / qtd;
-  const medals = ['🥇','🥈','🥉'];
+  const medals = ['<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#F59E0B;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>','<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#9CA3AF;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>','<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#CD7F32;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>'];
   const me     = mpGetMyInfoSync();
 
   // Dar estrelas com base na posição
@@ -926,7 +932,7 @@ async function mpShowResults() {
       MP.myStars += starsGanhas;
       const starsEl = mpEl('mpUserStars');
       if (starsEl) starsEl.textContent = MP.myStars;
-      mpShowToast(`+${starsGanhas} estrelas ganhas! 🌟`);
+      mpShowToast(`+${starsGanhas} estrelas ganhas! <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:var(--gold,#F59E0B);vertical-align:middle"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`);
     }
   });
 
@@ -935,7 +941,7 @@ async function mpShowResults() {
   if (podiumEl) {
     podiumEl.innerHTML = ranked.slice(0, 3).map((p, i) => `
       <div class="mp-podium-place p${i+1}">
-        <div class="mp-podium-medal">${medals[i] || '🎖'}</div>
+        <div class="mp-podium-medal">${medals[i] || '<svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:var(--primary,#6366F1);vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>'}</div>
         <div class="mp-podium-name">${p.name}</div>
         <div class="mp-podium-pts">${(p.total * perQ / 10).toFixed(1)} val.</div>
       </div>`).join('');
@@ -1006,7 +1012,7 @@ function mpMostrarPopupDesafio(key, d) {
   const antigo = document.getElementById('mp-desafio-popup');
   if (antigo) antigo.remove();
 
-  const modoLabels = { aprendizado:'📚 Aprendizado', concurso:'🏆 Concurso', prova:'📝 Prova', imagem:'🖼️ Imagem' };
+  const modoLabels = { aprendizado:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>Aprendizado', concurso:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg>Concurso', prova:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Prova', imagem:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>Imagem' };
   const popup = document.createElement('div');
   popup.id = 'mp-desafio-popup';
   popup.style.cssText = `
@@ -1021,14 +1027,14 @@ function mpMostrarPopupDesafio(key, d) {
     <style>
       @keyframes mpSlideUp { from { opacity:0; transform:translateX(-50%) translateY(30px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
     </style>
-    <div style="font-weight:700;font-size:1rem;margin-bottom:4px">⚔️ Novo Desafio!</div>
+    <div style="font-weight:700;font-size:1rem;margin-bottom:4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M6.92 5H5L3 3l1-1 2 2v-.08l7 7-.71.71L6.92 5zM19.71 2.29l-2 2 .01.01-1.42 1.42-.01-.01-2.12 2.12.01.01-1.42 1.42-.01-.01-1.06 1.06 3.54 3.54 1.06-1.06-.01-.01 1.42-1.42.01.01 2.12-2.12-.01-.01 1.42-1.42.01.01 2-2L21 3l-1.29-.71zM3 17c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>Novo Desafio!</div>
     <div style="font-size:0.85rem;margin-bottom:2px"><strong>${d.fromName || 'Jogador'}</strong> desafia-te!</div>
     <div style="font-size:0.75rem;color:var(--text2,#888);margin-bottom:12px">
       ${d.disciplina || 'Geral'} · ${modoLabels[d.modoJogo] || d.modoJogo || ''} · ${d.qtd || 10} perguntas
     </div>
     <div style="display:flex;gap:10px">
-      <button id="mpPopupAceitar" style="flex:1;padding:9px;border-radius:10px;background:var(--primary,#6366F1);color:#fff;border:none;font-weight:600;cursor:pointer;font-size:0.85rem">✅ Aceitar</button>
-      <button id="mpPopupRecusar" style="flex:1;padding:9px;border-radius:10px;background:transparent;color:var(--text2,#888);border:1.5px solid var(--border,#ddd);font-weight:600;cursor:pointer;font-size:0.85rem">❌ Recusar</button>
+      <button id="mpPopupAceitar" style="flex:1;padding:9px;border-radius:10px;background:var(--primary,#6366F1);color:#fff;border:none;font-weight:600;cursor:pointer;font-size:0.85rem"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>Aceitar</button>
+      <button id="mpPopupRecusar" style="flex:1;padding:9px;border-radius:10px;background:transparent;color:var(--text2,#888);border:1.5px solid var(--border,#ddd);font-weight:600;cursor:pointer;font-size:0.85rem"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>Recusar</button>
     </div>
   `;
   document.body.appendChild(popup);
@@ -1066,7 +1072,7 @@ function mpLoadDesafiosRecebidos() {
       return;
     }
 
-    const modoLabels = { aprendizado:'📚 Aprendizado', concurso:'🏆 Concurso', prova:'📝 Prova', imagem:'🖼️ Imagem' };
+    const modoLabels = { aprendizado:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>Aprendizado', concurso:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg>Concurso', prova:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Prova', imagem:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>Imagem' };
 
     el.innerHTML = desafios.map(d => `
       <div class="mp-desafio-card">
@@ -1076,13 +1082,13 @@ function mpLoadDesafiosRecebidos() {
             <div class="mp-desafio-name">${d.fromName || 'Jogador'}</div>
             <div class="mp-desafio-meta">
               ${d.disciplina || 'Geral'} · ${modoLabels[d.modoJogo] || d.modoJogo || ''} · Nível: ${d.nivel || 'Todos'}<br>
-              ${d.qtd} perguntas · ${d.modoPerg === 'realtime' ? '⚡ Tempo Real' : '⏳ Assíncrono'}
+              ${d.qtd} perguntas · ${d.modoPerg === 'realtime' ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real' : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono'}
             </div>
           </div>
         </div>
         <div class="mp-desafio-actions">
-          <button class="mp-btn-aceitar" data-key="${d._key}" data-sala="${d.salaId}">✅ Aceitar</button>
-          <button class="mp-btn-recusar" data-key="${d._key}">❌ Recusar</button>
+          <button class="mp-btn-aceitar" data-key="${d._key}" data-sala="${d.salaId}"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>Aceitar</button>
+          <button class="mp-btn-recusar" data-key="${d._key}"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>Recusar</button>
         </div>
       </div>`).join('');
 
@@ -1153,7 +1159,7 @@ if (enviarBtn) enviarBtn.addEventListener('click', async () => {
     createdAt: firebase.database.ServerValue.TIMESTAMP,
   });
 
-  mpShowToast(`Desafio enviado para ${MP.config.targetName}! 🎯`);
+  mpShowToast(`Desafio enviado para ${MP.config.targetName}! <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-8.5l-5.5 5.5-2.5-2.5-1 1 3.5 3.5 6.5-6.5-1-1z"/></svg>`);
   await mpEntrarSala(salaRef.key);
 });
 
@@ -1242,7 +1248,7 @@ function mpRenderPlayerCards(results, container) {
         <div class="mp-player-card-name">${nome}</div>
         <div class="mp-player-card-meta">${u.email || u.phone || ''} &nbsp;·&nbsp; ${mpStarIcon()} ${stars} estrelas</div>
       </div>
-      <button class="mp-player-challenge-btn" data-uid="${u.uid}" data-name="${nome}">⚔️ Desafiar</button>
+      <button class="mp-player-challenge-btn" data-uid="${u.uid}" data-name="${nome}"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M6.92 5H5L3 3l1-1 2 2v-.08l7 7-.71.71L6.92 5zM19.71 2.29l-2 2 .01.01-1.42 1.42-.01-.01-2.12 2.12.01.01-1.42 1.42-.01-.01-1.06 1.06 3.54 3.54 1.06-1.06-.01-.01 1.42-1.42.01.01 2.12-2.12-.01-.01 1.42-1.42.01.01 2-2L21 3l-1.29-.71zM3 17c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>Desafiar</button>
     </div>`;
   }).join('');
 
@@ -1298,7 +1304,7 @@ function mpLoadRanking() {
       return;
     }
 
-    const medals = ['🥇','🥈','🥉'];
+    const medals = ['<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#F59E0B;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>','<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#9CA3AF;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>','<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#CD7F32;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>'];
     el.innerHTML = top.map((p, i) => {
       const rank    = i + 1;
       const pos     = rank <= 3 ? medals[rank-1] : rank;
