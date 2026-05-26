@@ -107,6 +107,7 @@ function showScreen(id) {
   const el = $(id);
   if (el) el.classList.add('active');
   window.scrollTo(0, 0);
+  if (id === 'screen-mainmenu') { setActiveNav('jogar'); }
 }
 
 function showToast(msg, duration = 2800) {
@@ -125,6 +126,52 @@ function showLoading(text = 'A carregar...') {
 function hideLoading() {
   $('loadingOverlay').classList.remove('show');
 }
+// ─── PROGRESS BAR LOADER ────────────────────────────────
+let _progressTimer = null;
+
+function showProgressLoader(title, sub) {
+  $('progressLoadingTitle').textContent = title || 'Carregando...';
+  $('progressLoadingSub').textContent   = sub   || 'Por favor aguarde';
+  $('progressBarFill').style.width  = '0%';
+  $('progressBarGlow').style.width  = '0%';
+  $('progressBarPct').textContent   = '0%';
+  $('progressLoadingOverlay').classList.add('show');
+}
+
+function updateProgressLoader(pct, sub) {
+  const p = Math.min(100, Math.max(0, pct));
+  $('progressBarFill').style.width = p + '%';
+  $('progressBarGlow').style.width = p + '%';
+  $('progressBarPct').textContent  = p + '%';
+  if (sub) $('progressLoadingSub').textContent = sub;
+}
+
+function hideProgressLoader() {
+  $('progressLoadingOverlay').classList.remove('show');
+  if (_progressTimer) { clearInterval(_progressTimer); _progressTimer = null; }
+}
+
+function runProgressAnim(title, sub, durationMs, steps, onDone) {
+  showProgressLoader(title, sub);
+  let cur = 0;
+  const increment = 100 / steps;
+  const interval = durationMs / steps;
+  if (_progressTimer) clearInterval(_progressTimer);
+  _progressTimer = setInterval(() => {
+    cur = Math.min(100, cur + increment + (Math.random() * increment * 0.4));
+    updateProgressLoader(Math.round(cur));
+    if (cur >= 100) {
+      updateProgressLoader(100);
+      clearInterval(_progressTimer);
+      _progressTimer = null;
+      setTimeout(() => {
+        hideProgressLoader();
+        if (onDone) onDone();
+      }, 320);
+    }
+  }, interval);
+}
+
 
 function formatDate(ts) {
   if (!ts) return '';
@@ -912,7 +959,15 @@ $('forgotPassBtn').onclick = async () => {
 };
 
 // ─── MAIN MENU NAVIGATION ────────────────────────────────
-if($('btnJogar'))  $('btnJogar').onclick   = () => { setActiveNav('jogar'); showScreen('screen-modeselect'); };
+if($('btnJogar')) $('btnJogar').onclick = () => {
+  setActiveNav('jogar');
+  runProgressAnim(
+    'A carregar Quiz',
+    'Carregando modos, níveis e categorias...',
+    1800, 22,
+    () => showScreen('screen-modeselect')
+  );
+};
 if($('btnRanking')) $('btnRanking').onclick = async () => { setActiveNav('ranking'); loadRankingScreen('all'); showScreen('screen-ranking'); };
 if($('btnCriar')) $('btnCriar').onclick = async () => {
   setActiveNav('criar');
@@ -929,7 +984,7 @@ function setActiveNav(name) {
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.nav === name));
 }
 
-$('navJogar').onclick   = () => { setActiveNav('jogar'); showScreen('screen-modeselect'); };
+$('navJogar').onclick   = () => { setActiveNav('jogar'); showScreen('screen-mainmenu'); };
 $('navRanking').onclick = async () => { setActiveNav('ranking'); loadRankingScreen('all'); showScreen('screen-ranking'); };
 $('navCriar').onclick   = async () => {
   setActiveNav('criar');
@@ -1443,6 +1498,19 @@ async function startGame(pool) {
 
   const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso Público', prova: 'Prova Escolar', imagem: 'Quiz por Imagem' };
   $('gameModeLabel').textContent = modeNames[State.currentMode] || State.currentMode;
+
+  // Determine source label for loading message
+  const srcLabel = State.dbSource === 'cloud' ? 'nuvem' : 'base de dados local';
+  const nQs = final.length;
+
+  await new Promise(resolve => {
+    runProgressAnim(
+      'A carregar perguntas',
+      'Carregando ' + nQs + ' perguntas da ' + srcLabel + '...',
+      2000, 25,
+      resolve
+    );
+  });
 
   showScreen('screen-game');
   renderQuestion();
