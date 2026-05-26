@@ -112,36 +112,30 @@ async function mpAddStars(uid, amount) {
 
 // ─── OBTER INFO DO UTILIZADOR ACTUAL ──────────────────────
 async function mpGetMyInfoAsync() {
-  const user  = firebase.auth().currentUser;
-  let uid, name, email, phone;
+  // Se já temos cache válido, usar
+  if (MP.myProfile && MP.myProfile.uid) return MP.myProfile;
 
-  if (user) {
-    uid   = user.uid;
-    email = user.email || '';
-    phone = user.phoneNumber || '';
-    name  = user.displayName || '';
-  } else if (typeof State !== 'undefined' && State.phoneUser) {
-    uid   = State.phoneUser.uid;
-    email = State.phoneUser.email || '';
-    phone = State.phoneUser.phone || '';
-    name  = State.phoneUser.nome || '';
-  } else {
-    return null;
-  }
+  const user = firebase.auth().currentUser;
+  if (!user) return null;
 
-  // Nome a partir do profile do app
+  const uid   = user.uid;
+  const email = user.email || '';
+  const phone = user.phoneNumber || '';
+  let name    = user.displayName || '';
+
+  // Tentar nome do State.profile (app.js carrega isto)
   if (!name && typeof State !== 'undefined' && State.profile) {
     name = ((State.profile.firstName || '') + ' ' + (State.profile.lastName || '')).trim();
   }
-  // Tentar buscar nome do Firebase
+
+  // Ir sempre ao Firebase buscar o perfil completo (inclui utilizadores de telefone/anónimos)
   if (!name) {
     try {
       const snap = await db.ref(`users/${uid}`).once('value');
       const data = snap.val();
       if (data) {
-        name = ((data.firstName || '') + ' ' + (data.lastName || '')).trim() || data.nome || '';
-        email = email || data.email || '';
-        phone = phone || data.phone || '';
+        name = ((data.firstName || '') + ' ' + (data.lastName || '')).trim()
+               || data.nome || data.displayName || '';
       }
     } catch(e) {}
   }
@@ -149,11 +143,20 @@ async function mpGetMyInfoAsync() {
 
   const stars = await mpGetStars(uid);
   MP.myStars = stars;
-  return { uid, name, email, phone, stars };
+
+  // Guardar em cache — mpGetMyInfoSync vai usar este
+  const profile = { uid, name, email, phone, stars };
+  MP.myProfile = profile;
+  MP.myUid     = uid;
+  return profile;
 }
 
-// Versão síncrona rápida para uso imediato (sem await)
+// Versão síncrona rápida — usa o cache de MP.myProfile carregado em mpInit
 function mpGetMyInfoSync() {
+  // 1. Usar cache definido por mpInit (sempre preferir este)
+  if (MP.myProfile && MP.myProfile.uid) return MP.myProfile;
+
+  // 2. Fallback: tentar construir a partir do firebase.auth()
   const user = firebase.auth().currentUser;
   let uid, name, email, phone;
   if (user) {
@@ -161,14 +164,10 @@ function mpGetMyInfoSync() {
     email = user.email || '';
     phone = user.phoneNumber || '';
     name  = user.displayName || '';
-  } else if (typeof State !== 'undefined' && State.phoneUser) {
-    uid   = State.phoneUser.uid;
-    email = '';
-    phone = State.phoneUser.phone || '';
-    name  = State.phoneUser.nome || '';
   } else {
     return null;
   }
+  // Tentar nome do State.profile
   if (!name && typeof State !== 'undefined' && State.profile) {
     name = ((State.profile.firstName || '') + ' ' + (State.profile.lastName || '')).trim();
   }
@@ -180,6 +179,8 @@ function mpGetMyInfoSync() {
 
 // ─── INICIALIZAÇÃO DO HUB ─────────────────────────────────
 async function mpInit() {
+  // Forçar re-fetch do perfil (limpar cache para obter nome/estrelas actualizados)
+  MP.myProfile = null;
   const me = await mpGetMyInfoAsync();
   if (!me) {
     mpShowToast('Inicia sessão para aceder ao Multiplayer.');
@@ -1336,12 +1337,18 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Iniciar listener global de desafios assim que o utilizador estiver autenticado
-  // Funciona mesmo antes de abrir o ecrã multiplayer
-  firebase.auth().onAuthStateChanged(user => {
+  // Também faz o pre-load do perfil para que mpGetMyInfoSync funcione em qualquer altura
+  firebase.auth().onAuthStateChanged(async user => {
     if (user) {
-      mpIniciarListenerGlobalDesafios(user.uid);
-    } else if (typeof State !== 'undefined' && State.phoneUser && State.phoneUser.uid) {
-      mpIniciarListenerGlobalDesafios(State.phoneUser.uid);
+      // Pré-carregar o perfil em cache (nome, estrelas) — necessário para utilizadores anónimos/telefone
+      await mpGetMyInfoAsync();
+      // Arrancar listener global de desafios com o uid real
+      const uid = MP.myUid || user.uid;
+      mpIniciarListenerGlobalDesafios(uid);
+    } else {
+      // Limpar cache ao fazer logout
+      MP.myProfile = null;
+      MP.myUid     = null;
     }
   });
 });
