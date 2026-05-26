@@ -1088,62 +1088,78 @@ $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
     if (statusEl) statusEl.textContent  = msg;
   }
 
-  // Verifica conectividade REAL fazendo um fetch leve
-  // (navigator.onLine é falso no Android com dados ligados)
+  // Verifica conectividade fazendo fetch ao próprio app (mesmo domínio = sem CORS)
+  // É a forma mais fiável em browsers mobile com dados 4G/5G
   async function checkRealConnectivity() {
-    // Tenta um fetch com cache-bust a um endpoint confiável e de baixa latência
-    const endpoints = [
-      'https://www.gstatic.com/generate_204',      // Google — 0 bytes, 204
-      'https://connectivitycheck.gstatic.com/generate_204',
-      'https://clients3.google.com/generate_204',
-    ];
-    for (const url of endpoints) {
-      try {
-        const ctrl = new AbortController();
-        const tid  = setTimeout(() => ctrl.abort(), 4000); // 4s timeout
-        const res  = await fetch(url + '?_=' + Date.now(), {
-          method: 'HEAD',
-          mode:   'no-cors',   // evita CORS — apenas verifica que chegou
-          cache:  'no-store',
-          signal: ctrl.signal,
-        });
-        clearTimeout(tid);
-        return true; // chegou resposta → há internet
-      } catch(e) {
-        // Continua para próximo endpoint
-      }
+    // Estratégia 1: fetch ao favicon do próprio site (cache-bust para forçar rede)
+    // Funciona sempre porque é same-origin, sem restrições CORS
+    const selfUrl = (location.origin + '/favicon.ico?_=' + Date.now());
+    try {
+      const ctrl = new AbortController();
+      const tid  = setTimeout(() => ctrl.abort(), 5000);
+      const res  = await fetch(selfUrl, {
+        method: 'HEAD',
+        cache:  'no-store',
+        signal: ctrl.signal,
+      });
+      clearTimeout(tid);
+      // Qualquer resposta HTTP (mesmo 404) significa que o servidor respondeu = há rede
+      return true;
+    } catch(e) {
+      // fetch falhou = sem rede real
     }
-    return false; // todos falharam → sem internet real
+
+    // Estratégia 2 (fallback): verificar se o Firebase já inicializou e respondeu
+    // Se db estiver acessível, há internet
+    try {
+      const ctrl2 = new AbortController();
+      const tid2  = setTimeout(() => ctrl2.abort(), 5000);
+      // Tenta ler um nó público mínimo do Firebase RTDB
+      const fbUrl = 'https://bandaquiz-f669f-default-rtdb.firebaseio.com/.json?shallow=true&_=' + Date.now();
+      const res2  = await fetch(fbUrl, { cache: 'no-store', signal: ctrl2.signal });
+      clearTimeout(tid2);
+      return true;
+    } catch(e2) {
+      // Também falhou
+    }
+
+    return false;
   }
 
   async function runLoader() {
     const phases = [
-      { pct: 10, msg: 'A iniciar aplicação...', ms: 280 },
-      { pct: 28, msg: 'A carregar recursos...',  ms: 350 },
-      { pct: 44, msg: 'A verificar ligação...',  ms: 0   }, // ms=0 → não espera, vai logo checar
-      { pct: 62, msg: 'A sincronizar dados...',  ms: 380 },
-      { pct: 78, msg: 'A configurar ambiente...', ms: 320 },
-      { pct: 90, msg: 'Quase pronto...',           ms: 250 },
-      { pct:100, msg: 'Bem-vindo!',                ms: 550 },
+      { pct: 15, msg: 'A iniciar aplicação...', ms: 300 },
+      { pct: 35, msg: 'A carregar recursos...',  ms: 300 },
+      { pct: 55, msg: 'A verificar ligação...',  ms: 0   },
+      { pct: 75, msg: 'A sincronizar dados...',  ms: 300 },
+      { pct: 90, msg: 'Quase pronto...',          ms: 250 },
+      { pct:100, msg: 'Bem-vindo!',               ms: 400 },
     ];
 
     for (let i = 0; i < phases.length; i++) {
       const p = phases[i];
       setProgress(p.pct, p.msg);
 
-      // Na fase de "verificar ligação" faz o teste real
+      // Na fase de "verificar ligação": testa conectividade real
       if (p.msg.includes('ligação')) {
         const online = await checkRealConnectivity();
         if (!online) {
-          setProgress(p.pct, 'Sem ligação à internet...');
-          await new Promise(r => setTimeout(r, 700));
-          _splashDismissed = true;
-          showScreen('screen-offline');
-          return;
+          // Confirmar com uma segunda tentativa antes de mostrar offline
+          await new Promise(r => setTimeout(r, 500));
+          const online2 = await checkRealConnectivity();
+          if (!online2) {
+            setProgress(p.pct, 'Sem ligação à internet...');
+            await new Promise(r => setTimeout(r, 600));
+            _splashDismissed = true;
+            showScreen('screen-offline');
+            return;
+          }
         }
+        // Há rede — continua normalmente (sem delay extra)
+        continue;
       }
 
-      if (p.ms > 0) await new Promise(r => setTimeout(r, p.ms + Math.random() * 150));
+      if (p.ms > 0) await new Promise(r => setTimeout(r, p.ms));
     }
 
     // Tudo OK — avançar
@@ -1180,21 +1196,26 @@ $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
   if (!btn) return;
   // Verifica conectividade real (mesma função do splash)
   async function checkRealConnectivityRetry() {
-    const endpoints = [
-      'https://www.gstatic.com/generate_204',
-      'https://connectivitycheck.gstatic.com/generate_204',
-    ];
-    for (const url of endpoints) {
-      try {
-        const ctrl = new AbortController();
-        const tid  = setTimeout(() => ctrl.abort(), 4000);
-        await fetch(url + '?_=' + Date.now(), {
-          method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: ctrl.signal,
-        });
-        clearTimeout(tid);
-        return true;
-      } catch(e) {}
-    }
+    // Mesmo método: fetch same-origin ao favicon, sem problemas de CORS
+    try {
+      const ctrl = new AbortController();
+      const tid  = setTimeout(() => ctrl.abort(), 5000);
+      await fetch(location.origin + '/favicon.ico?_=' + Date.now(), {
+        method: 'HEAD', cache: 'no-store', signal: ctrl.signal,
+      });
+      clearTimeout(tid);
+      return true;
+    } catch(e) {}
+    // Fallback Firebase
+    try {
+      const ctrl2 = new AbortController();
+      const tid2  = setTimeout(() => ctrl2.abort(), 5000);
+      await fetch('https://bandaquiz-f669f-default-rtdb.firebaseio.com/.json?shallow=true&_=' + Date.now(), {
+        cache: 'no-store', signal: ctrl2.signal,
+      });
+      clearTimeout(tid2);
+      return true;
+    } catch(e2) {}
     return false;
   }
 
