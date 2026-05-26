@@ -1903,7 +1903,10 @@ function handleFlashcardResult(result) {
 
 // ─── AUDIO FEEDBACK ────────────────────────────────────────
 function playCorrectSound() {
-  const cfg = (typeof AudioSystem !== 'undefined') ? AudioSystem.cfg : null;
+  // Usar getCfg() para garantir leitura do estado actual dos toggles
+  const cfg = (typeof AudioSystem !== 'undefined' && AudioSystem.getCfg)
+    ? AudioSystem.getCfg()
+    : null;
   // Efeito sonoro — só toca se fxOn estiver activo (ou AudioSystem ainda não carregou)
   if (!cfg || cfg.fxOn) {
     try {
@@ -1940,7 +1943,10 @@ function playCorrectSound() {
 }
 
 function playWrongSound() {
-  const cfg = (typeof AudioSystem !== 'undefined') ? AudioSystem.cfg : null;
+  // Usar getCfg() para garantir leitura do estado actual dos toggles
+  const cfg = (typeof AudioSystem !== 'undefined' && AudioSystem.getCfg)
+    ? AudioSystem.getCfg()
+    : null;
   // Efeito sonoro — só toca se fxOn estiver activo
   if (!cfg || cfg.fxOn) {
     try {
@@ -3869,7 +3875,9 @@ const AudioSystem = (function() {
   function loadCfg() {
     try {
       const s = localStorage.getItem(LS_KEY);
-      if (s) cfg = Object.assign({}, DEFAULTS, JSON.parse(s));
+      // IMPORTANTE: mutar o objecto existente em vez de reatribuir,
+      // para que AudioSystem.cfg (referência exportada) nunca fique obsoleto
+      if (s) Object.assign(cfg, DEFAULTS, JSON.parse(s));
     } catch(e) {}
   }
   function saveCfg() {
@@ -4086,7 +4094,9 @@ const AudioSystem = (function() {
   }
 
   // ── Public API ────────────────────────────────────────────
-  return { init, onAnswer, pauseMusic, stopMusic, resumeMusic, startMusic, cfg };
+  // getCfg() devolve sempre o objecto cfg actual (nunca uma referência obsoleta)
+  function getCfg() { return cfg; }
+  return { init, onAnswer, pauseMusic, stopMusic, resumeMusic, startMusic, cfg, getCfg };
 })();
 
 // Initialise audio system when DOM is ready
