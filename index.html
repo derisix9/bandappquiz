@@ -321,6 +321,32 @@
             </div>
           </div>
         </button>
+
+        <!-- MULTIPLAYER BUTTON -->
+        <button class="btn-multiplayer" id="btnMultiplayer">
+          <div class="btn-mp-aurora"></div>
+          <div class="btn-mp-inner">
+            <div class="btn-mp-hexagons">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <div class="btn-mp-orbit">
+              <span class="btn-mp-orb"></span>
+              <span class="btn-mp-orb"></span>
+              <span class="btn-mp-orb"></span>
+            </div>
+            <div class="btn-mp-icon">
+              <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            </div>
+            <div class="btn-mp-text">
+              <span class="btn-mp-label">MULTIPLAYER</span>
+              <span class="btn-mp-sub">Desafios em tempo real</span>
+            </div>
+            <div class="btn-mp-live">
+              <span class="btn-mp-live-dot"></span>
+              LIVE
+            </div>
+          </div>
+        </button>
       </div>
     </div>
 
@@ -1652,9 +1678,241 @@
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SCREEN: MULTIPLAYER HUB                                    -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-multiplayer">
+  <div class="mp-hub-bg">
+    <div class="mp-hub-grid"></div>
+  </div>
+
+  <!-- Header -->
+  <div class="page-header mp-header">
+    <button class="icon-btn" id="mpBackBtn">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <div class="mp-header-title">
+      <h2 class="page-title">MULTIPLAYER</h2>
+      <div class="mp-header-live"><span class="mp-live-dot"></span> Online</div>
+    </div>
+    <div class="mp-header-stars">
+      <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      <span id="mpUserStars">0</span>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="mp-tabs">
+    <button class="mp-tab active" data-tab="salas">🏟️ Salas</button>
+    <button class="mp-tab" data-tab="desafios">⚔️ Desafios</button>
+    <button class="mp-tab" data-tab="ranking">🏆 Ranking</button>
+    <button class="mp-tab" data-tab="buscar">🔍 Buscar</button>
+  </div>
+
+  <div class="scroll-content mp-scroll">
+
+    <!-- TAB: SALAS ACTIVAS -->
+    <div class="mp-tab-content active" id="mpTabSalas">
+      <div class="mp-section-title">Salas em jogo agora</div>
+      <div id="mpSalasList" class="mp-salas-list">
+        <div class="mp-empty-state">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+          <p>Nenhuma sala activa de momento</p>
+          <button class="btn-mp-action" id="btnCriarSala">Criar Sala</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: DESAFIOS -->
+    <div class="mp-tab-content" id="mpTabDesafios">
+
+      <!-- Desafios Recebidos -->
+      <div class="mp-section-title" style="margin-top:0">
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--gold)"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 11.5v-3h-4v3H9v-3H7v-1.5h2v-3h2v3h4v-3h2v3h2v1.5h-2v3h-2z"/></svg>
+        Desafios Recebidos
+      </div>
+      <div id="mpDesafiosRecebidos" class="mp-desafios-list">
+        <p class="mp-sub-empty">Sem desafios pendentes</p>
+      </div>
+
+      <!-- Enviar Desafio -->
+      <div class="mp-section-title">
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--blue)"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        Enviar Desafio
+      </div>
+      <div class="mp-challenge-form">
+        <div class="mp-form-row">
+          <label>Jogador alvo</label>
+          <div class="mp-search-box">
+            <input type="text" id="mpDesafioTarget" placeholder="Nome, email ou telefone..." />
+            <button id="mpBuscarJogador">
+              <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            </button>
+          </div>
+          <div id="mpSearchResults" class="mp-search-results"></div>
+        </div>
+        <div class="mp-form-row">
+          <label>Modo</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt active" data-mpopt="modo" data-v="realtime">⚡ Tempo Real</button>
+            <button class="mp-opt" data-mpopt="modo" data-v="async">⏳ Assíncrono</button>
+          </div>
+        </div>
+        <div class="mp-form-row">
+          <label>Nível</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt active" data-mpopt="nivel" data-v="fácil">Fácil</button>
+            <button class="mp-opt" data-mpopt="nivel" data-v="médio">Médio</button>
+            <button class="mp-opt" data-mpopt="nivel" data-v="difícil">Difícil</button>
+          </div>
+        </div>
+        <div class="mp-form-row">
+          <label>Disciplina</label>
+          <select id="mpDesafioDisciplina" class="mp-select"></select>
+        </div>
+        <div class="mp-form-row">
+          <label>Categoria</label>
+          <select id="mpDesafioCategoria" class="mp-select"></select>
+        </div>
+        <div class="mp-form-row">
+          <label>Tipo de Perguntas</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt active" data-mpopt="tipo" data-v="todos">Todos</button>
+            <button class="mp-opt" data-mpopt="tipo" data-v="multipla">Múltipla</button>
+            <button class="mp-opt" data-mpopt="tipo" data-v="vf">V/F</button>
+          </div>
+        </div>
+        <div class="mp-form-row">
+          <label>Tempo por pergunta</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt" data-mpopt="tempo" data-v="0">Livre</button>
+            <button class="mp-opt active" data-mpopt="tempo" data-v="30">30s</button>
+            <button class="mp-opt" data-mpopt="tempo" data-v="60">60s</button>
+          </div>
+        </div>
+        <div class="mp-form-row">
+          <label>Nº de Perguntas</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt active" data-mpopt="qtd" data-v="10">10</button>
+            <button class="mp-opt" data-mpopt="qtd" data-v="20">20</button>
+            <button class="mp-opt" data-mpopt="qtd" data-v="30">30</button>
+          </div>
+        </div>
+        <div class="mp-form-row">
+          <label>Nº Máx. Jogadores (2-10)</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt active" data-mpopt="maxplayers" data-v="2">2</button>
+            <button class="mp-opt" data-mpopt="maxplayers" data-v="4">4</button>
+            <button class="mp-opt" data-mpopt="maxplayers" data-v="6">6</button>
+            <button class="mp-opt" data-mpopt="maxplayers" data-v="10">10</button>
+          </div>
+        </div>
+        <button class="btn-mp-send" id="btnEnviarDesafio">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          ENVIAR DESAFIO
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB: RANKING -->
+    <div class="mp-tab-content" id="mpTabRanking">
+      <div class="mp-section-title">🏆 Ranking Global — Estrelas</div>
+      <div id="mpRankingList" class="mp-ranking-list">
+        <div class="mp-loading-rank">A carregar ranking...</div>
+      </div>
+    </div>
+
+    <!-- TAB: BUSCAR JOGADORES -->
+    <div class="mp-tab-content" id="mpTabBuscar">
+      <div class="mp-section-title">🔍 Encontrar Jogadores</div>
+      <div class="mp-search-box" style="margin-bottom:16px">
+        <input type="text" id="mpBuscarInput" placeholder="Nome, email ou telefone..." />
+        <button id="mpBuscarBtn">
+          <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        </button>
+      </div>
+      <div id="mpBuscarResultados" class="mp-player-results"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SCREEN: SALA DE JOGO MULTIPLAYER                          -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-mp-sala">
+  <div class="mp-sala-bg">
+    <div class="mp-sala-bg-grid"></div>
+  </div>
+
+  <div class="mp-sala-header">
+    <button class="icon-btn" id="mpSalaBackBtn">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <div>
+      <div class="mp-sala-num" id="mpSalaNumDisplay">Sala #0000</div>
+      <div class="mp-sala-mode" id="mpSalaModeDisplay">Tempo Real</div>
+    </div>
+    <div class="mp-sala-timer-wrap">
+      <div class="mp-sala-timer" id="mpSalaTimer">--</div>
+    </div>
+  </div>
+
+  <!-- Scoreboard barra no topo -->
+  <div class="mp-scoreboard" id="mpScoreboard"></div>
+
+  <div class="scroll-content mp-sala-scroll">
+
+    <!-- Estado: Aguardando jogadores -->
+    <div id="mpSalaWaiting" class="mp-sala-state">
+      <div class="mp-waiting-anim">
+        <div class="mp-waiting-ring"></div>
+        <div class="mp-waiting-ring"></div>
+        <div class="mp-waiting-ring"></div>
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+      </div>
+      <p class="mp-waiting-txt">Aguardando jogadores...</p>
+      <div class="mp-players-grid" id="mpPlayersGrid"></div>
+      <button class="btn-mp-action" id="btnIniciarDesafio" style="display:none">▶ INICIAR DESAFIO</button>
+    </div>
+
+    <!-- Estado: Em jogo -->
+    <div id="mpSalaGame" style="display:none">
+      <!-- Pergunta -->
+      <div class="mp-question-card" id="mpQuestionCard">
+        <div class="mp-q-header">
+          <span class="mp-q-num" id="mpQNum">1/10</span>
+          <span class="mp-q-turn" id="mpQTurn"></span>
+        </div>
+        <p class="mp-q-text" id="mpQText">Carregando pergunta...</p>
+        <div class="mp-q-answers" id="mpQAnswers"></div>
+      </div>
+
+      <!-- Feed ao vivo das respostas dos outros -->
+      <div class="mp-live-feed" id="mpLiveFeed">
+        <div class="mp-section-title" style="font-size:0.75rem;margin:0 0 8px">Actividade em tempo real</div>
+      </div>
+
+      <!-- Histórico da sala -->
+      <div class="mp-sala-history" id="mpSalaHistory"></div>
+    </div>
+
+    <!-- Estado: Resultado final -->
+    <div id="mpSalaResult" style="display:none">
+      <div class="mp-result-header">
+        <div class="mp-result-trophy">🏆</div>
+        <h2 class="mp-result-title">Desafio Concluído!</h2>
+      </div>
+      <div class="mp-result-podium" id="mpResultPodium"></div>
+      <div class="mp-result-table" id="mpResultTable"></div>
+      <button class="btn-mp-action" id="btnMpSalaVoltar">Voltar ao Hub</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script src="app.js"></script>
+<script src="multiplayer.js"></script>
 </body>
 </html>
