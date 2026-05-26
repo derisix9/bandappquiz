@@ -1087,6 +1087,8 @@ function mpLoadRanking() {
     snap.forEach(c => {
       const u = c.val();
       const stars = (u.stats && u.stats.stars) || u.moedas || 0;
+      // Excluir do ranking global quem não tem nenhuma estrela
+      if (stars <= 0) return;
       players.push({ uid: c.key, ...u, _stars: stars });
     });
     players.sort((a, b) => b._stars - a._stars);
@@ -1129,13 +1131,24 @@ async function mpPreencherDisciplinas() {
     const snap = await db.ref('questions').once('value');
     const discs = new Set();
     if (snap.val()) {
-      Object.values(snap.val()).forEach(q => { if (q.disciplina) discs.add(q.disciplina); });
+      Object.values(snap.val()).forEach(q => {
+        // Suporta campo 'disciplina' (Firebase) e 'disc' (local)
+        if (q.disciplina) discs.add(q.disciplina);
+        else if (q.disc)  discs.add(q.disc);
+      });
+    }
+    // Também incluir disciplinas da BD local do app
+    if (typeof State !== 'undefined' && State.localDB) {
+      State.localDB.forEach(q => {
+        if (q.disc)        discs.add(q.disc);
+        if (q.disciplina)  discs.add(q.disciplina);
+      });
     }
     if (discs.size === 0) {
       ['Matemática','Português','História','Biologia','Física','Química','Geografia','Inglês']
         .forEach(d => discs.add(d));
     }
-    discs.forEach(d => {
+    [...discs].sort().forEach(d => {
       const opt = document.createElement('option');
       opt.value = d; opt.textContent = d; sel.appendChild(opt);
     });
@@ -1158,11 +1171,19 @@ async function mpPreencherCategorias(disciplina) {
   if (!disciplina) return;
 
   try {
-    const snap = await db.ref('questions').orderByChild('disciplina').equalTo(disciplina).once('value');
     const cats = new Set();
-    snap.forEach(c => { const q = c.val(); if (q.categoria) cats.add(q.categoria); });
+    // Firebase: campo 'disciplina'
+    const snap = await db.ref('questions').orderByChild('disciplina').equalTo(disciplina).once('value');
+    snap.forEach(c => { const q = c.val(); if (q.categoria) cats.add(q.categoria); else if (q.cat) cats.add(q.cat); });
+    // Fallback: campo 'disc' na BD local
+    if (typeof State !== 'undefined' && State.localDB) {
+      State.localDB.forEach(q => {
+        if ((q.disc === disciplina || q.disciplina === disciplina) && (q.cat || q.categoria))
+          cats.add(q.cat || q.categoria);
+      });
+    }
     if (cats.size > 0) {
-      cats.forEach(cat => {
+      [...cats].sort().forEach(cat => {
         const opt = document.createElement('option');
         opt.value = cat; opt.textContent = cat; sel.appendChild(opt);
       });

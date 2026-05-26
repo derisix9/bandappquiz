@@ -110,16 +110,11 @@ function showScreen(id) {
   if (id === 'screen-mainmenu') { setActiveNav('jogar'); }
 
   // ── Gestão de música ──────────────────────────────────
-  // Para completamente a música na tela offline e no splash
-  if (id === 'screen-offline' || id === 'screen-splash') {
-    if (typeof AudioSystem !== 'undefined') {
-      AudioSystem.stopMusic();
-    }
+  // Para a música no splash, retoma nas outras telas
+  if (id === 'screen-splash') {
+    if (typeof AudioSystem !== 'undefined') AudioSystem.stopMusic();
   } else {
-    // Em qualquer outra tela, retoma a música (se estiver ativa e configurada)
-    if (typeof AudioSystem !== 'undefined') {
-      setTimeout(() => AudioSystem.resumeMusic(), 200);
-    }
+    if (typeof AudioSystem !== 'undefined') setTimeout(() => AudioSystem.resumeMusic(), 200);
   }
 }
 
@@ -1080,89 +1075,29 @@ $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
   const statusEl = $('splashLoadingStatus');
   const enterBtn = $('splashEnterBtn');
 
-  // Hide enter button — auto-advance now
   if (enterBtn) enterBtn.style.display = 'none';
 
   function setProgress(pct, msg) {
-    if (fillEl)   fillEl.style.width    = pct + '%';
-    if (statusEl) statusEl.textContent  = msg;
-  }
-
-  // Verifica conectividade fazendo fetch ao próprio app (mesmo domínio = sem CORS)
-  // É a forma mais fiável em browsers mobile com dados 4G/5G
-  async function checkRealConnectivity() {
-    // Estratégia 1: fetch ao favicon do próprio site (cache-bust para forçar rede)
-    // Funciona sempre porque é same-origin, sem restrições CORS
-    const selfUrl = (location.origin + '/favicon.ico?_=' + Date.now());
-    try {
-      const ctrl = new AbortController();
-      const tid  = setTimeout(() => ctrl.abort(), 5000);
-      const res  = await fetch(selfUrl, {
-        method: 'HEAD',
-        cache:  'no-store',
-        signal: ctrl.signal,
-      });
-      clearTimeout(tid);
-      // Qualquer resposta HTTP (mesmo 404) significa que o servidor respondeu = há rede
-      return true;
-    } catch(e) {
-      // fetch falhou = sem rede real
-    }
-
-    // Estratégia 2 (fallback): verificar se o Firebase já inicializou e respondeu
-    // Se db estiver acessível, há internet
-    try {
-      const ctrl2 = new AbortController();
-      const tid2  = setTimeout(() => ctrl2.abort(), 5000);
-      // Tenta ler um nó público mínimo do Firebase RTDB
-      const fbUrl = 'https://bandaquiz-f669f-default-rtdb.firebaseio.com/.json?shallow=true&_=' + Date.now();
-      const res2  = await fetch(fbUrl, { cache: 'no-store', signal: ctrl2.signal });
-      clearTimeout(tid2);
-      return true;
-    } catch(e2) {
-      // Também falhou
-    }
-
-    return false;
+    if (fillEl)   fillEl.style.width   = pct + '%';
+    if (statusEl) statusEl.textContent = msg;
   }
 
   async function runLoader() {
     const phases = [
       { pct: 15, msg: 'A iniciar aplicação...', ms: 300 },
       { pct: 35, msg: 'A carregar recursos...',  ms: 300 },
-      { pct: 55, msg: 'A verificar ligação...',  ms: 0   },
-      { pct: 75, msg: 'A sincronizar dados...',  ms: 300 },
-      { pct: 90, msg: 'Quase pronto...',          ms: 250 },
+      { pct: 60, msg: 'A sincronizar dados...',  ms: 350 },
+      { pct: 80, msg: 'A configurar ambiente...', ms: 280 },
+      { pct: 95, msg: 'Quase pronto...',          ms: 250 },
       { pct:100, msg: 'Bem-vindo!',               ms: 400 },
     ];
 
-    for (let i = 0; i < phases.length; i++) {
-      const p = phases[i];
+    for (const p of phases) {
       setProgress(p.pct, p.msg);
-
-      // Na fase de "verificar ligação": testa conectividade real
-      if (p.msg.includes('ligação')) {
-        const online = await checkRealConnectivity();
-        if (!online) {
-          // Confirmar com uma segunda tentativa antes de mostrar offline
-          await new Promise(r => setTimeout(r, 500));
-          const online2 = await checkRealConnectivity();
-          if (!online2) {
-            setProgress(p.pct, 'Sem ligação à internet...');
-            await new Promise(r => setTimeout(r, 600));
-            _splashDismissed = true;
-            showScreen('screen-offline');
-            return;
-          }
-        }
-        // Há rede — continua normalmente (sem delay extra)
-        continue;
-      }
-
-      if (p.ms > 0) await new Promise(r => setTimeout(r, p.ms));
+      await new Promise(r => setTimeout(r, p.ms));
     }
 
-    // Tudo OK — avançar
+    // Avançar directamente — sem verificação de rede
     _splashDismissed = true;
     if (State.user) {
       loadUserProfile(State.user.uid);
@@ -1171,10 +1106,8 @@ $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
     }
   }
 
-  // Pequeno delay inicial para o browser renderizar o splash
   setTimeout(runLoader, 180);
 })();
-
 // Criar partículas no splash
 (function createParticles() {
   const container = $('splashParticles');
@@ -1190,70 +1123,6 @@ $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
   }
 })();
 
-// ─── BOTÃO RETRY DA TELA OFFLINE ─────────────────────────
-(function setupOfflineRetry() {
-  const btn = $('offlineRetryBtn');
-  if (!btn) return;
-  // Verifica conectividade real (mesma função do splash)
-  async function checkRealConnectivityRetry() {
-    // Mesmo método: fetch same-origin ao favicon, sem problemas de CORS
-    try {
-      const ctrl = new AbortController();
-      const tid  = setTimeout(() => ctrl.abort(), 5000);
-      await fetch(location.origin + '/favicon.ico?_=' + Date.now(), {
-        method: 'HEAD', cache: 'no-store', signal: ctrl.signal,
-      });
-      clearTimeout(tid);
-      return true;
-    } catch(e) {}
-    // Fallback Firebase
-    try {
-      const ctrl2 = new AbortController();
-      const tid2  = setTimeout(() => ctrl2.abort(), 5000);
-      await fetch('https://bandaquiz-f669f-default-rtdb.firebaseio.com/.json?shallow=true&_=' + Date.now(), {
-        cache: 'no-store', signal: ctrl2.signal,
-      });
-      clearTimeout(tid2);
-      return true;
-    } catch(e2) {}
-    return false;
-  }
-
-  btn.addEventListener('click', async () => {
-    btn.disabled = true;
-    btn.textContent = 'A verificar...';
-    const online = await checkRealConnectivityRetry();
-    btn.disabled = false;
-    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg> TENTAR NOVAMENTE';
-    if (online) {
-      _splashDismissed = true;
-      if (State.user) {
-        loadUserProfile(State.user.uid);
-      } else {
-        showScreen('screen-login');
-      }
-    } else {
-      btn.classList.add('shake');
-      setTimeout(() => btn.classList.remove('shake'), 600);
-      if (typeof showToast === 'function') showToast('Ainda sem ligação. Verifica a tua rede.');
-    }
-  });
-  // Auto-reconnect detection
-  window.addEventListener('online', async () => {
-    const offlineScreen = document.getElementById('screen-offline');
-    if (offlineScreen && offlineScreen.classList.contains('active')) {
-      const realOnline = await checkRealConnectivityRetry();
-      if (realOnline) {
-        _splashDismissed = true;
-        if (State.user) {
-          loadUserProfile(State.user.uid);
-        } else {
-          showScreen('screen-login');
-        }
-      }
-    }
-  });
-})();
 
 // ─── MODE SELECTION ───────────────────────────────────────
 $('modeBackBtn').onclick = () => showScreen('screen-mainmenu');
@@ -2034,59 +1903,77 @@ function handleFlashcardResult(result) {
 
 // ─── AUDIO FEEDBACK ────────────────────────────────────────
 function playCorrectSound() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [523.25, 659.25, 783.99];
-    notes.forEach((freq, i) => {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.1);
-      gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + i * 0.1 + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.3);
-      osc.start(ctx.currentTime + i * 0.1);
-      osc.stop(ctx.currentTime + i * 0.1 + 0.35);
-    });
-    setTimeout(() => {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance('Resposta certa');
-      utter.lang = 'pt-BR';
-      utter.rate = 1.0;
-      utter.pitch = 1.1;
-      window.speechSynthesis.speak(utter);
-    }, 420);
-  } catch (e) {}
+  const cfg = (typeof AudioSystem !== 'undefined') ? AudioSystem.cfg : null;
+  // Efeito sonoro — só toca se fxOn estiver activo (ou AudioSystem ainda não carregou)
+  if (!cfg || cfg.fxOn) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const notes = [523.25, 659.25, 783.99];
+      notes.forEach((freq, i) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.1);
+        gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + i * 0.1 + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.3);
+        osc.start(ctx.currentTime + i * 0.1);
+        osc.stop(ctx.currentTime + i * 0.1 + 0.35);
+      });
+    } catch (e) {}
+  }
+  // Voz de feedback — só fala se voiceOn estiver activo
+  if (!cfg || cfg.voiceOn) {
+    try {
+      setTimeout(() => {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance('Resposta certa');
+        utter.lang = 'pt-BR';
+        utter.rate = 1.0;
+        utter.pitch = 1.1;
+        window.speechSynthesis.speak(utter);
+      }, 420);
+    } catch (e) {}
+  }
 }
 
 function playWrongSound() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [300, 220];
-    notes.forEach((freq, i) => {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sawtooth';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.18);
-      gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + i * 0.18 + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.35);
-      osc.start(ctx.currentTime + i * 0.18);
-      osc.stop(ctx.currentTime + i * 0.18 + 0.4);
-    });
-    setTimeout(() => {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance('Resposta errada');
-      utter.lang = 'pt-BR';
-      utter.rate = 1.0;
-      utter.pitch = 0.85;
-      window.speechSynthesis.speak(utter);
-    }, 470);
-  } catch (e) {}
+  const cfg = (typeof AudioSystem !== 'undefined') ? AudioSystem.cfg : null;
+  // Efeito sonoro — só toca se fxOn estiver activo
+  if (!cfg || cfg.fxOn) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const notes = [300, 220];
+      notes.forEach((freq, i) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.18);
+        gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + i * 0.18 + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.35);
+        osc.start(ctx.currentTime + i * 0.18);
+        osc.stop(ctx.currentTime + i * 0.18 + 0.4);
+      });
+    } catch (e) {}
+  }
+  // Voz de feedback — só fala se voiceOn estiver activo
+  if (!cfg || cfg.voiceOn) {
+    try {
+      setTimeout(() => {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance('Resposta errada');
+        utter.lang = 'pt-BR';
+        utter.rate = 1.0;
+        utter.pitch = 0.85;
+        window.speechSynthesis.speak(utter);
+      }, 470);
+    } catch (e) {}
+  }
 }
 
 function handleAnswer(displayLetter, clickedBtn, optionMap) {
@@ -4092,11 +3979,9 @@ const AudioSystem = (function() {
 
   function resumeMusic() {
     if (!cfg.musicOn) return;
-    // Never resume on offline or splash screens
-    const offlineEl = document.getElementById('screen-offline');
-    const splashEl  = document.getElementById('screen-splash');
-    if (offlineEl && offlineEl.classList.contains('active')) return;
-    if (splashEl  && splashEl.classList.contains('active'))  return;
+    // Never resume on splash screen
+    const splashEl = document.getElementById('screen-splash');
+    if (splashEl && splashEl.classList.contains('active')) return;
     const el = getMusicEl();
     if (!el) return;
     if (_musicPaused || el.paused) {
