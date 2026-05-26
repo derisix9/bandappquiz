@@ -108,6 +108,19 @@ function showScreen(id) {
   if (el) el.classList.add('active');
   window.scrollTo(0, 0);
   if (id === 'screen-mainmenu') { setActiveNav('jogar'); }
+
+  // ── Gestão de música ──────────────────────────────────
+  // Para completamente a música na tela offline e no splash
+  if (id === 'screen-offline' || id === 'screen-splash') {
+    if (typeof AudioSystem !== 'undefined') {
+      AudioSystem.stopMusic();
+    }
+  } else {
+    // Em qualquer outra tela, retoma a música (se estiver ativa e configurada)
+    if (typeof AudioSystem !== 'undefined') {
+      setTimeout(() => AudioSystem.resumeMusic(), 200);
+    }
+  }
 }
 
 function showToast(msg, duration = 2800) {
@@ -1063,58 +1076,87 @@ $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
 
 // ─── SPLASH COM LOADING AUTOMÁTICO ───────────────────────
 (function initSplashLoader() {
-  const fillEl    = $('splashLoaderFill');
-  const statusEl  = $('splashLoadingStatus');
-  const enterBtn  = $('splashEnterBtn');
-  const steps = [
-    { pct:  8, msg: 'A iniciar aplicação...' },
-    { pct: 22, msg: 'A carregar recursos...' },
-    { pct: 38, msg: 'A verificar ligação...' },
-    { pct: 55, msg: 'A sincronizar dados...' },
-    { pct: 72, msg: 'A configurar ambiente...' },
-    { pct: 88, msg: 'Quase pronto...' },
-    { pct:100, msg: 'Bem-vindo!' },
-  ];
-  let stepIdx = 0;
+  const fillEl   = $('splashLoaderFill');
+  const statusEl = $('splashLoadingStatus');
+  const enterBtn = $('splashEnterBtn');
+
+  // Hide enter button — auto-advance now
+  if (enterBtn) enterBtn.style.display = 'none';
 
   function setProgress(pct, msg) {
-    if (fillEl) fillEl.style.width = pct + '%';
-    if (statusEl) statusEl.textContent = msg;
+    if (fillEl)   fillEl.style.width    = pct + '%';
+    if (statusEl) statusEl.textContent  = msg;
   }
 
-  function nextStep() {
-    if (stepIdx >= steps.length) return;
-    const s = steps[stepIdx++];
-    setProgress(s.pct, s.msg);
-    if (stepIdx < steps.length) {
-      // Vary timing for a natural feel
-      const delay = stepIdx === 1 ? 300
-                  : stepIdx === 3 ? 600   // internet check takes longer
-                  : 400 + Math.random() * 300;
-      setTimeout(nextStep, delay);
-    } else {
-      // Loading complete — auto-advance after brief pause
-      setTimeout(() => {
-        _splashDismissed = true;
-        // Check connectivity first
-        if (!navigator.onLine) {
+  // Verifica conectividade REAL fazendo um fetch leve
+  // (navigator.onLine é falso no Android com dados ligados)
+  async function checkRealConnectivity() {
+    // Tenta um fetch com cache-bust a um endpoint confiável e de baixa latência
+    const endpoints = [
+      'https://www.gstatic.com/generate_204',      // Google — 0 bytes, 204
+      'https://connectivitycheck.gstatic.com/generate_204',
+      'https://clients3.google.com/generate_204',
+    ];
+    for (const url of endpoints) {
+      try {
+        const ctrl = new AbortController();
+        const tid  = setTimeout(() => ctrl.abort(), 4000); // 4s timeout
+        const res  = await fetch(url + '?_=' + Date.now(), {
+          method: 'HEAD',
+          mode:   'no-cors',   // evita CORS — apenas verifica que chegou
+          cache:  'no-store',
+          signal: ctrl.signal,
+        });
+        clearTimeout(tid);
+        return true; // chegou resposta → há internet
+      } catch(e) {
+        // Continua para próximo endpoint
+      }
+    }
+    return false; // todos falharam → sem internet real
+  }
+
+  async function runLoader() {
+    const phases = [
+      { pct: 10, msg: 'A iniciar aplicação...', ms: 280 },
+      { pct: 28, msg: 'A carregar recursos...',  ms: 350 },
+      { pct: 44, msg: 'A verificar ligação...',  ms: 0   }, // ms=0 → não espera, vai logo checar
+      { pct: 62, msg: 'A sincronizar dados...',  ms: 380 },
+      { pct: 78, msg: 'A configurar ambiente...', ms: 320 },
+      { pct: 90, msg: 'Quase pronto...',           ms: 250 },
+      { pct:100, msg: 'Bem-vindo!',                ms: 550 },
+    ];
+
+    for (let i = 0; i < phases.length; i++) {
+      const p = phases[i];
+      setProgress(p.pct, p.msg);
+
+      // Na fase de "verificar ligação" faz o teste real
+      if (p.msg.includes('ligação')) {
+        const online = await checkRealConnectivity();
+        if (!online) {
+          setProgress(p.pct, 'Sem ligação à internet...');
+          await new Promise(r => setTimeout(r, 700));
+          _splashDismissed = true;
           showScreen('screen-offline');
           return;
         }
-        if (State.user) {
-          loadUserProfile(State.user.uid);
-        } else {
-          showScreen('screen-login');
-        }
-      }, 600);
+      }
+
+      if (p.ms > 0) await new Promise(r => setTimeout(r, p.ms + Math.random() * 150));
+    }
+
+    // Tudo OK — avançar
+    _splashDismissed = true;
+    if (State.user) {
+      loadUserProfile(State.user.uid);
+    } else {
+      showScreen('screen-login');
     }
   }
 
-  // Hide the enter button (we auto-advance now)
-  if (enterBtn) enterBtn.style.display = 'none';
-
-  // Start loader after a tiny delay
-  setTimeout(nextStep, 200);
+  // Pequeno delay inicial para o browser renderizar o splash
+  setTimeout(runLoader, 180);
 })();
 
 // Criar partículas no splash
@@ -1136,8 +1178,33 @@ $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
 (function setupOfflineRetry() {
   const btn = $('offlineRetryBtn');
   if (!btn) return;
-  btn.addEventListener('click', () => {
-    if (navigator.onLine) {
+  // Verifica conectividade real (mesma função do splash)
+  async function checkRealConnectivityRetry() {
+    const endpoints = [
+      'https://www.gstatic.com/generate_204',
+      'https://connectivitycheck.gstatic.com/generate_204',
+    ];
+    for (const url of endpoints) {
+      try {
+        const ctrl = new AbortController();
+        const tid  = setTimeout(() => ctrl.abort(), 4000);
+        await fetch(url + '?_=' + Date.now(), {
+          method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: ctrl.signal,
+        });
+        clearTimeout(tid);
+        return true;
+      } catch(e) {}
+    }
+    return false;
+  }
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'A verificar...';
+    const online = await checkRealConnectivityRetry();
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg> TENTAR NOVAMENTE';
+    if (online) {
       _splashDismissed = true;
       if (State.user) {
         loadUserProfile(State.user.uid);
@@ -1145,20 +1212,23 @@ $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
         showScreen('screen-login');
       }
     } else {
-      // Shake the button to show still offline
       btn.classList.add('shake');
       setTimeout(() => btn.classList.remove('shake'), 600);
+      if (typeof showToast === 'function') showToast('Ainda sem ligação. Verifica a tua rede.');
     }
   });
   // Auto-reconnect detection
-  window.addEventListener('online', () => {
+  window.addEventListener('online', async () => {
     const offlineScreen = document.getElementById('screen-offline');
     if (offlineScreen && offlineScreen.classList.contains('active')) {
-      _splashDismissed = true;
-      if (State.user) {
-        loadUserProfile(State.user.uid);
-      } else {
-        showScreen('screen-login');
+      const realOnline = await checkRealConnectivityRetry();
+      if (realOnline) {
+        _splashDismissed = true;
+        if (State.user) {
+          loadUserProfile(State.user.uid);
+        } else {
+          showScreen('screen-login');
+        }
       }
     }
   });
@@ -3990,8 +4060,22 @@ const AudioSystem = (function() {
     _musicPaused = true;
   }
 
+  function stopMusic() {
+    const el = getMusicEl();
+    if (!el) return;
+    el.pause();
+    el.currentTime = 0;
+    _musicPaused  = false;
+    _musicStarted = false;
+  }
+
   function resumeMusic() {
     if (!cfg.musicOn) return;
+    // Never resume on offline or splash screens
+    const offlineEl = document.getElementById('screen-offline');
+    const splashEl  = document.getElementById('screen-splash');
+    if (offlineEl && offlineEl.classList.contains('active')) return;
+    if (splashEl  && splashEl.classList.contains('active'))  return;
     const el = getMusicEl();
     if (!el) return;
     if (_musicPaused || el.paused) {
@@ -4096,7 +4180,7 @@ const AudioSystem = (function() {
   }
 
   // ── Public API ────────────────────────────────────────────
-  return { init, onAnswer, pauseMusic, resumeMusic, startMusic, cfg };
+  return { init, onAnswer, pauseMusic, stopMusic, resumeMusic, startMusic, cfg };
 })();
 
 // Initialise audio system when DOM is ready
