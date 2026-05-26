@@ -857,12 +857,94 @@ async function mpShowResults() {
   };
 }
 
-// ─── DESAFIOS RECEBIDOS ───────────────────────────────────
-function mpLoadDesafiosRecebidos() {
-  const me = mpGetMyInfoSync();
-  if (!me) return;
+// ─── LISTENER GLOBAL DE DESAFIOS (funciona em qualquer ecrã) ─────
+// Guardamos referência para poder cancelar quando necessário
+let _mpDesafiosGlobalRef   = null;
+let _mpDesafiosGlobalFn    = null;
+let _mpDesafiosGlobalUid   = null;
+let _mpDesafiosVistos      = new Set(); // evita re-notificar o mesmo desafio
 
-  const ref = db.ref('mp_desafios').orderByChild('targetUid').equalTo(me.uid);
+function mpIniciarListenerGlobalDesafios(uid) {
+  if (!uid) return;
+  // Não duplicar listener para o mesmo uid
+  if (_mpDesafiosGlobalUid === uid) return;
+
+  // Cancelar listener anterior se existir
+  if (_mpDesafiosGlobalRef && _mpDesafiosGlobalFn) {
+    _mpDesafiosGlobalRef.off('child_added', _mpDesafiosGlobalFn);
+  }
+
+  _mpDesafiosGlobalUid = uid;
+  _mpDesafiosGlobalRef = db.ref('mp_desafios').orderByChild('targetUid').equalTo(uid);
+
+  _mpDesafiosGlobalFn = snap => {
+    const d = snap.val();
+    if (!d || d.status !== 'pending') return;
+    if (_mpDesafiosVistos.has(snap.key)) return;
+    _mpDesafiosVistos.add(snap.key);
+
+    // Se o ecrã multiplayer já estiver activo, o listener normal trata disso
+    // Caso contrário mostrar popup de notificação
+    mpMostrarPopupDesafio(snap.key, d);
+  };
+
+  _mpDesafiosGlobalRef.on('child_added', _mpDesafiosGlobalFn);
+}
+
+function mpMostrarPopupDesafio(key, d) {
+  // Remover popup anterior se existir
+  const antigo = document.getElementById('mp-desafio-popup');
+  if (antigo) antigo.remove();
+
+  const modoLabels = { aprendizado:'📚 Aprendizado', concurso:'🏆 Concurso', prova:'📝 Prova', imagem:'🖼️ Imagem' };
+  const popup = document.createElement('div');
+  popup.id = 'mp-desafio-popup';
+  popup.style.cssText = `
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--card,#fff); border-radius:16px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.22); padding:18px 20px;
+    z-index:9999; min-width:300px; max-width:90vw;
+    border:2px solid var(--primary,#6366F1);
+    animation: mpSlideUp 0.3s ease;
+  `;
+  popup.innerHTML = `
+    <style>
+      @keyframes mpSlideUp { from { opacity:0; transform:translateX(-50%) translateY(30px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+    </style>
+    <div style="font-weight:700;font-size:1rem;margin-bottom:4px">⚔️ Novo Desafio!</div>
+    <div style="font-size:0.85rem;margin-bottom:2px"><strong>${d.fromName || 'Jogador'}</strong> desafia-te!</div>
+    <div style="font-size:0.75rem;color:var(--text2,#888);margin-bottom:12px">
+      ${d.disciplina || 'Geral'} · ${modoLabels[d.modoJogo] || d.modoJogo || ''} · ${d.qtd || 10} perguntas
+    </div>
+    <div style="display:flex;gap:10px">
+      <button id="mpPopupAceitar" style="flex:1;padding:9px;border-radius:10px;background:var(--primary,#6366F1);color:#fff;border:none;font-weight:600;cursor:pointer;font-size:0.85rem">✅ Aceitar</button>
+      <button id="mpPopupRecusar" style="flex:1;padding:9px;border-radius:10px;background:transparent;color:var(--text2,#888);border:1.5px solid var(--border,#ddd);font-weight:600;cursor:pointer;font-size:0.85rem">❌ Recusar</button>
+    </div>
+  `;
+  document.body.appendChild(popup);
+
+  document.getElementById('mpPopupAceitar').onclick = async () => {
+    popup.remove();
+    // Se o multiplayer não estiver inicializado, inicializar primeiro
+    if (!MP.myUid) await mpInit();
+    await mpAceitarDesafio(key, d.salaId);
+  };
+  document.getElementById('mpPopupRecusar').onclick = async () => {
+    popup.remove();
+    await mpRecusarDesafio(key);
+  };
+
+  // Auto-fechar após 30 segundos
+  setTimeout(() => { if (popup.parentNode) popup.remove(); }, 30000);
+}
+
+
+function mpLoadDesafiosRecebidos() {
+  // Use MP.myUid set by mpInit — mpGetMyInfoSync() can return null at this point
+  const uid = MP.myUid;
+  if (!uid) return;
+
+  const ref = db.ref('mp_desafios').orderByChild('targetUid').equalTo(uid);
   mpAddListener(ref, 'value', snap => {
     const el = mpEl('mpDesafiosRecebidos');
     if (!el) return;
@@ -1251,5 +1333,15 @@ document.addEventListener('DOMContentLoaded', () => {
     mpClearListeners();
     mpShowScreen('screen-multiplayer');
     mpLoadSalas();
+  });
+
+  // Iniciar listener global de desafios assim que o utilizador estiver autenticado
+  // Funciona mesmo antes de abrir o ecrã multiplayer
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+      mpIniciarListenerGlobalDesafios(user.uid);
+    } else if (typeof State !== 'undefined' && State.phoneUser && State.phoneUser.uid) {
+      mpIniciarListenerGlobalDesafios(State.phoneUser.uid);
+    }
   });
 });
