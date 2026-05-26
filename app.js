@@ -912,17 +912,17 @@ $('forgotPassBtn').onclick = async () => {
 };
 
 // ─── MAIN MENU NAVIGATION ────────────────────────────────
-$('btnJogar').onclick   = () => { setActiveNav('jogar'); showScreen('screen-modeselect'); };
-$('btnRanking').onclick = async () => { setActiveNav('ranking'); loadRankingScreen('all'); showScreen('screen-ranking'); };
-$('btnCriar').onclick = async () => {
+if($('btnJogar'))  $('btnJogar').onclick   = () => { setActiveNav('jogar'); showScreen('screen-modeselect'); };
+if($('btnRanking')) $('btnRanking').onclick = async () => { setActiveNav('ranking'); loadRankingScreen('all'); showScreen('screen-ranking'); };
+if($('btnCriar')) $('btnCriar').onclick = async () => {
   setActiveNav('criar');
   await loadLocalDB();
   updateCreateCounter();
   populateCreateDisc();
   showScreen('screen-create');
 };
-$('btnSync').onclick    = () => { setActiveNav('sync'); loadSyncScreen(); showScreen('screen-sync'); };
-$('btnSobre').onclick   = () => { setActiveNav('sobre'); showScreen('screen-sobre'); };
+if($('btnSync'))  $('btnSync').onclick    = () => { setActiveNav('sync'); loadSyncScreen(); showScreen('screen-sync'); };
+if($('btnSobre')) $('btnSobre').onclick   = () => { setActiveNav('sobre'); showScreen('screen-sobre'); };
 
 // ── Bottom Nav handlers ───────────────────────────────────
 function setActiveNav(name) {
@@ -3464,7 +3464,7 @@ $('btnComprarPacote').onclick = async () => { if (pacoteAtual) abrirPagamento(pa
 $('lojaBackBtn').onclick   = () => showScreen('screen-mainmenu');
 $('pacoteBackBtn').onclick = () => abrirLoja();
 $('pagBackBtn').onclick    = () => showScreen('screen-pacote');
-$('btnLoja').onclick       = () => { setActiveNav('loja'); abrirLoja(); };
+if($('btnLoja')) $('btnLoja').onclick = () => { setActiveNav('loja'); abrirLoja(); };
 
 // ── Notificação de novo pacote ───────────────────────────
 async function verificarNotifNovoPacote() {
