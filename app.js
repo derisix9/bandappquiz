@@ -1061,16 +1061,61 @@ document.addEventListener('click', (e) => {
 });
 $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
 
-// ─── SPLASH ───────────────────────────────────────────────
-$('splashEnterBtn').onclick = () => {
-  _splashDismissed = true;
-  if (State.user) {
-    // Utilizador já autenticado — carregar perfil
-    loadUserProfile(State.user.uid);
-  } else {
-    showScreen('screen-login');
+// ─── SPLASH COM LOADING AUTOMÁTICO ───────────────────────
+(function initSplashLoader() {
+  const fillEl    = $('splashLoaderFill');
+  const statusEl  = $('splashLoadingStatus');
+  const enterBtn  = $('splashEnterBtn');
+  const steps = [
+    { pct:  8, msg: 'A iniciar aplicação...' },
+    { pct: 22, msg: 'A carregar recursos...' },
+    { pct: 38, msg: 'A verificar ligação...' },
+    { pct: 55, msg: 'A sincronizar dados...' },
+    { pct: 72, msg: 'A configurar ambiente...' },
+    { pct: 88, msg: 'Quase pronto...' },
+    { pct:100, msg: 'Bem-vindo!' },
+  ];
+  let stepIdx = 0;
+
+  function setProgress(pct, msg) {
+    if (fillEl) fillEl.style.width = pct + '%';
+    if (statusEl) statusEl.textContent = msg;
   }
-};
+
+  function nextStep() {
+    if (stepIdx >= steps.length) return;
+    const s = steps[stepIdx++];
+    setProgress(s.pct, s.msg);
+    if (stepIdx < steps.length) {
+      // Vary timing for a natural feel
+      const delay = stepIdx === 1 ? 300
+                  : stepIdx === 3 ? 600   // internet check takes longer
+                  : 400 + Math.random() * 300;
+      setTimeout(nextStep, delay);
+    } else {
+      // Loading complete — auto-advance after brief pause
+      setTimeout(() => {
+        _splashDismissed = true;
+        // Check connectivity first
+        if (!navigator.onLine) {
+          showScreen('screen-offline');
+          return;
+        }
+        if (State.user) {
+          loadUserProfile(State.user.uid);
+        } else {
+          showScreen('screen-login');
+        }
+      }, 600);
+    }
+  }
+
+  // Hide the enter button (we auto-advance now)
+  if (enterBtn) enterBtn.style.display = 'none';
+
+  // Start loader after a tiny delay
+  setTimeout(nextStep, 200);
+})();
 
 // Criar partículas no splash
 (function createParticles() {
@@ -1085,6 +1130,38 @@ $('splashEnterBtn').onclick = () => {
     p.style.width = p.style.height = (2 + Math.random() * 3) + 'px';
     container.appendChild(p);
   }
+})();
+
+// ─── BOTÃO RETRY DA TELA OFFLINE ─────────────────────────
+(function setupOfflineRetry() {
+  const btn = $('offlineRetryBtn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (navigator.onLine) {
+      _splashDismissed = true;
+      if (State.user) {
+        loadUserProfile(State.user.uid);
+      } else {
+        showScreen('screen-login');
+      }
+    } else {
+      // Shake the button to show still offline
+      btn.classList.add('shake');
+      setTimeout(() => btn.classList.remove('shake'), 600);
+    }
+  });
+  // Auto-reconnect detection
+  window.addEventListener('online', () => {
+    const offlineScreen = document.getElementById('screen-offline');
+    if (offlineScreen && offlineScreen.classList.contains('active')) {
+      _splashDismissed = true;
+      if (State.user) {
+        loadUserProfile(State.user.uid);
+      } else {
+        showScreen('screen-login');
+      }
+    }
+  });
 })();
 
 // ─── MODE SELECTION ───────────────────────────────────────
@@ -3786,4 +3863,285 @@ $('btnJogarPacote').onclick = async () => { if (pacoteAtual) jogarPacote(pacoteA
   loadRankingLocal();
   injectCustomDiscsIntoSetup(); // Carregar disciplinas personalizadas no selector do jogo
   showScreen('screen-splash');
+})();
+
+// ══════════════════════════════════════════════════════════
+// SISTEMA DE ÁUDIO — BandaQuiz
+// Música de fundo + SFX + Voz + Configurações
+// ══════════════════════════════════════════════════════════
+
+const AudioSystem = (function() {
+  'use strict';
+
+  // ── Configuração padrão (guardada em localStorage) ──────
+  const DEFAULTS = { musicOn: true, voiceOn: true, fxOn: true, musicTrack: 1 };
+  const LS_KEY   = 'bq_audio_cfg';
+
+  let cfg = Object.assign({}, DEFAULTS);
+  let _musicStarted = false;
+  let _musicPaused  = false;
+
+  // Música names for UI
+  const MUSIC_NAMES = {
+    1: 'Aprender e Vencer',
+    2: 'Cognizant Metronome'
+  };
+
+  // ── Load / Save config ──────────────────────────────────
+  function loadCfg() {
+    try {
+      const s = localStorage.getItem(LS_KEY);
+      if (s) cfg = Object.assign({}, DEFAULTS, JSON.parse(s));
+    } catch(e) {}
+  }
+  function saveCfg() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(e) {}
+  }
+
+  // ── Generate SFX using Web Audio API ─────────────────────
+  let _audioCtx = null;
+  function getAudioCtx() {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return _audioCtx;
+  }
+
+  function playSfxCorrect() {
+    if (!cfg.fxOn) return;
+    try {
+      const ctx = getAudioCtx();
+      const o1 = ctx.createOscillator();
+      const o2 = ctx.createOscillator();
+      const g  = ctx.createGain();
+      o1.connect(g); o2.connect(g); g.connect(ctx.destination);
+      o1.frequency.value = 523; // C5
+      o2.frequency.value = 659; // E5
+      g.gain.setValueAtTime(0.18, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      o1.start(); o2.start();
+      o1.stop(ctx.currentTime + 0.5); o2.stop(ctx.currentTime + 0.5);
+    } catch(e) {}
+  }
+
+  function playSfxWrong() {
+    if (!cfg.fxOn) return;
+    try {
+      const ctx = getAudioCtx();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(200, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.35);
+      g.gain.setValueAtTime(0.12, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      o.start(); o.stop(ctx.currentTime + 0.35);
+    } catch(e) {}
+  }
+
+  // ── Voice synthesis via Web Speech API ───────────────────
+  function speakVoice(text) {
+    if (!cfg.voiceOn) return;
+    if (!('speechSynthesis' in window)) return;
+    try {
+      const msg = new SpeechSynthesisUtterance(text);
+      msg.lang   = 'pt-PT';
+      msg.rate   = 1.1;
+      msg.pitch  = 1.0;
+      msg.volume = 0.9;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(msg);
+    } catch(e) {}
+  }
+
+  // ── Background music ─────────────────────────────────────
+  function getMusicEl() {
+    return document.getElementById('bgMusic');
+  }
+
+  function setMusicSrc(track) {
+    const el = getMusicEl();
+    if (!el) return;
+    const src = track === 2 ? 'Cognizant_Metronome.mp3' : 'Aprender_Vencer.mp3';
+    if (!el.src || !el.src.endsWith(src)) {
+      const wasPlaying = !el.paused;
+      el.src = src;
+      el.load();
+      if (wasPlaying && cfg.musicOn) el.play().catch(() => {});
+    }
+  }
+
+  function startMusic() {
+    if (!cfg.musicOn) return;
+    const el = getMusicEl();
+    if (!el) return;
+    setMusicSrc(cfg.musicTrack);
+    el.volume = 0.35;
+    el.loop   = true;
+    const p = el.play();
+    if (p && p.catch) p.catch(() => {});
+    _musicStarted = true;
+    _musicPaused  = false;
+  }
+
+  function pauseMusic() {
+    const el = getMusicEl();
+    if (!el || el.paused) return;
+    el.pause();
+    _musicPaused = true;
+  }
+
+  function resumeMusic() {
+    if (!cfg.musicOn) return;
+    const el = getMusicEl();
+    if (!el) return;
+    if (_musicPaused || el.paused) {
+      el.play().catch(() => {});
+      _musicPaused = false;
+    }
+  }
+
+  // ── Main API: called on answer ────────────────────────────
+  function onAnswer(isCorrect) {
+    pauseMusic();
+    if (isCorrect) {
+      playSfxCorrect();
+      setTimeout(() => speakVoice('Correto!'), 300);
+    } else {
+      playSfxWrong();
+      setTimeout(() => speakVoice('Errado!'), 300);
+    }
+    // Resume music after voice finishes (~1.5s total)
+    setTimeout(() => resumeMusic(), 1600);
+  }
+
+  // ── Apply config toggles ──────────────────────────────────
+  function applyMusicToggle() {
+    const el = getMusicEl();
+    if (!el) return;
+    if (cfg.musicOn) {
+      if (!_musicStarted || el.paused) startMusic();
+    } else {
+      el.pause();
+      _musicStarted = false;
+    }
+    saveCfg();
+  }
+
+  // ── Build settings UI ─────────────────────────────────────
+  function bindSettingsUI() {
+    const musicToggle = document.getElementById('soundMusicToggle');
+    const voiceToggle = document.getElementById('soundVoiceToggle');
+    const fxToggle    = document.getElementById('soundFxToggle');
+    const music1Btn   = document.getElementById('music1Btn');
+    const music2Btn   = document.getElementById('music2Btn');
+    const musicLabel  = document.getElementById('currentMusicLabel');
+    const chooserRow  = document.getElementById('musicChooserRow');
+
+    function refreshUI() {
+      if (musicToggle) musicToggle.checked = cfg.musicOn;
+      if (voiceToggle) voiceToggle.checked = cfg.voiceOn;
+      if (fxToggle)    fxToggle.checked    = cfg.fxOn;
+      if (music1Btn) music1Btn.classList.toggle('active', cfg.musicTrack === 1);
+      if (music2Btn) music2Btn.classList.toggle('active', cfg.musicTrack === 2);
+      if (musicLabel) musicLabel.textContent = MUSIC_NAMES[cfg.musicTrack] || 'Faixa 1';
+      if (chooserRow) chooserRow.style.opacity = cfg.musicOn ? '1' : '0.4';
+      if (chooserRow) chooserRow.style.pointerEvents = cfg.musicOn ? 'auto' : 'none';
+    }
+
+    if (musicToggle) musicToggle.addEventListener('change', () => {
+      cfg.musicOn = musicToggle.checked;
+      applyMusicToggle();
+      refreshUI();
+    });
+    if (voiceToggle) voiceToggle.addEventListener('change', () => {
+      cfg.voiceOn = voiceToggle.checked;
+      saveCfg();
+      if (cfg.voiceOn) speakVoice('Voz ativada!');
+    });
+    if (fxToggle) fxToggle.addEventListener('change', () => {
+      cfg.fxOn = fxToggle.checked;
+      saveCfg();
+      if (cfg.fxOn) playSfxCorrect();
+    });
+    if (music1Btn) music1Btn.addEventListener('click', () => {
+      cfg.musicTrack = 1; saveCfg();
+      setMusicSrc(1);
+      refreshUI();
+    });
+    if (music2Btn) music2Btn.addEventListener('click', () => {
+      cfg.musicTrack = 2; saveCfg();
+      setMusicSrc(2);
+      refreshUI();
+    });
+
+    refreshUI();
+  }
+
+  // ── Auto-start music on first user interaction ────────────
+  function setupAutoStart() {
+    const startOnce = () => {
+      if (!_musicStarted && cfg.musicOn) startMusic();
+      document.removeEventListener('click', startOnce);
+      document.removeEventListener('touchstart', startOnce);
+    };
+    document.addEventListener('click', startOnce);
+    document.addEventListener('touchstart', startOnce);
+  }
+
+  // ── INIT ──────────────────────────────────────────────────
+  function init() {
+    loadCfg();
+    bindSettingsUI();
+    setupAutoStart();
+  }
+
+  // ── Public API ────────────────────────────────────────────
+  return { init, onAnswer, pauseMusic, resumeMusic, startMusic, cfg };
+})();
+
+// Initialise audio system when DOM is ready
+document.addEventListener('DOMContentLoaded', () => AudioSystem.init());
+
+// ── Patch the answer handler to trigger audio ──────────────
+// Hook into existing answer checking logic
+// We intercept checkAnswer / evaluateAnswer calls using MutationObserver
+// on the feedback elements, as the original code has various answer paths
+(function patchAnswerAudio() {
+  // Watch for correct/wrong class being added to answer buttons
+  const observer = new MutationObserver(mutations => {
+    mutations.forEach(m => {
+      if (m.type === 'attributes' && m.attributeName === 'class') {
+        const el = m.target;
+        if (el.classList && el.classList.contains('correct') && !el._audioFired) {
+          el._audioFired = true;
+          AudioSystem.onAnswer(true);
+        } else if (el.classList && el.classList.contains('wrong') && !el._audioFired) {
+          el._audioFired = true;
+          AudioSystem.onAnswer(false);
+        }
+      }
+    });
+  });
+
+  // Observe the quiz answer area
+  function observeAnswers() {
+    const targets = document.querySelectorAll('.answer-btn, .mp-q-answer, [class*="answer"]');
+    targets.forEach(t => {
+      t._audioFired = false;
+      observer.observe(t, { attributes: true, attributeFilter: ['class'] });
+    });
+  }
+
+  // Re-observe when new questions load (class changes on body/screens signal navigation)
+  const screenObserver = new MutationObserver(() => {
+    observeAnswers();
+    // Reset audio fired flags on new question
+    document.querySelectorAll('.answer-btn, .mp-q-answer').forEach(t => {
+      t._audioFired = false;
+    });
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    observeAnswers();
+    screenObserver.observe(document.body, { childList: true, subtree: true });
+  });
 })();

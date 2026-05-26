@@ -3325,80 +3325,247 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
 .mp-podium-pts { font-family: var(--font-display); font-size: 1.1rem; font-weight: 800; color: var(--gold); }
 .mp-result-table { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 20px; overflow-x: auto; }
 
-/* ─── MULTIPLAYER EXTRAS v2.0 ─────────────────────────── */
+/* ════════════════════════════════════════════════════════
+   SPLASH LOADER BAR
+   ════════════════════════════════════════════════════════ */
+.splash-loader-bar {
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(320px, 80vw);
+  height: 4px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px;
+  overflow: hidden;
+  z-index: 10;
+}
+.splash-loader-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #6366F1, #8B5CF6, #EC4899);
+  border-radius: 4px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 12px rgba(139,92,246,0.6);
+}
+.splash-loading-status {
+  position: absolute;
+  bottom: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.06em;
+  text-align: center;
+  white-space: nowrap;
+  z-index: 10;
+  transition: opacity 0.3s;
+}
 
-/* Minha linha no resultado */
-.mp-my-row { background: rgba(99,102,241,0.08); font-weight: 700; }
+/* ════════════════════════════════════════════════════════
+   OFFLINE SCREEN
+   ════════════════════════════════════════════════════════ */
+#screen-offline {
+  background: var(--bg, #0B0F1A);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
 
-/* Input numérico no formulário de desafio */
-.mp-input-num {
+.offline-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.offline-waves {
+  position: absolute;
+  bottom: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  height: 400px;
+}
+.offline-wave {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(99,102,241,0.15);
+  animation: offlineWavePulse 3s ease-out infinite;
+}
+.offline-wave:nth-child(2) { animation-delay: 1s; }
+.offline-wave:nth-child(3) { animation-delay: 2s; }
+@keyframes offlineWavePulse {
+  0%   { transform: scale(0.5); opacity: 0.5; }
+  100% { transform: scale(2);   opacity: 0; }
+}
+
+.offline-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 24px;
+  text-align: center;
+  max-width: 340px;
+}
+
+.offline-icon-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+.offline-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(239,68,68,0.3);
+  animation: offlineRingPulse 2s ease-out infinite;
+}
+.offline-ring2 { animation-delay: 0.7s; border-color: rgba(239,68,68,0.15); }
+@keyframes offlineRingPulse {
+  0%   { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+.offline-icon {
+  width: 52px;
+  height: 52px;
+  fill: #EF4444;
+  filter: drop-shadow(0 0 16px rgba(239,68,68,0.5));
+}
+
+.offline-title {
+  font-family: var(--font-display, 'Rajdhani', sans-serif);
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text, #F0F4FF);
+  margin: 0 0 12px;
+}
+.offline-msg {
+  font-size: 0.88rem;
+  color: var(--text2, rgba(240,244,255,0.6));
+  line-height: 1.6;
+  margin: 0 0 24px;
+}
+.offline-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 32px;
   width: 100%;
-  padding: 10px 14px;
+}
+.offline-tip {
+  background: rgba(99,102,241,0.08);
+  border: 1px solid rgba(99,102,241,0.15);
   border-radius: 10px;
-  border: 1.5px solid rgba(99,102,241,0.3);
-  background: var(--bg3, #1e2340);
-  color: var(--text);
-  font-size: 0.95rem;
-  font-family: var(--font-body);
-  box-sizing: border-box;
-  transition: border-color 0.2s;
-}
-.mp-input-num:focus {
-  outline: none;
-  border-color: rgba(99,102,241,0.7);
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: var(--text2, rgba(240,244,255,0.65));
+  text-align: left;
 }
 
-/* Turn indicator melhorado */
-.mp-q-turn.my-turn {
-  background: rgba(34,197,94,0.15);
-  color: #22C55E;
-  animation: pulseTurn 1s ease-in-out infinite alternate;
+.offline-retry {
+  width: 100%;
+  gap: 8px;
 }
-@keyframes pulseTurn {
-  from { box-shadow: 0 0 0 0 rgba(34,197,94,0.3); }
-  to   { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+.offline-retry.shake {
+  animation: shakeBtn 0.5s ease;
+}
+@keyframes shakeBtn {
+  0%,100% { transform: translateX(0); }
+  20%      { transform: translateX(-8px); }
+  40%      { transform: translateX(8px); }
+  60%      { transform: translateX(-6px); }
+  80%      { transform: translateX(6px); }
 }
 
-/* Lacunas */
-.mp-lacuna-wrap { display: flex; gap: 8px; align-items: center; }
-.mp-lacuna-input {
+/* ════════════════════════════════════════════════════════
+   SOUND SETTINGS
+   ════════════════════════════════════════════════════════ */
+.settings-sound-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  gap: 12px;
+}
+.settings-sound-row:last-child { border-bottom: none; }
+.settings-sound-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   flex: 1;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1.5px solid rgba(99,102,241,0.3);
-  background: var(--bg3, #1e2340);
-  color: var(--text);
-  font-size: 0.9rem;
-  font-family: var(--font-body);
+  min-width: 0;
 }
-.mp-lacuna-input:focus { outline: none; border-color: rgba(99,102,241,0.7); }
-.mp-lacuna-btn {
-  padding: 10px 16px;
-  border-radius: 10px;
-  background: var(--primary, #4F46E5);
-  color: #fff;
-  border: none;
-  font-weight: 700;
-  font-size: 0.85rem;
+.settings-sound-chooser {
+  transition: opacity 0.3s;
+}
+.sound-toggle-wrap {
+  flex-shrink: 0;
+}
+
+/* Toggle switch */
+.sound-switch {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 26px;
+}
+.sound-switch input { opacity: 0; width: 0; height: 0; }
+.sound-slider {
+  position: absolute;
   cursor: pointer;
+  inset: 0;
+  background: rgba(99,102,241,0.2);
+  border-radius: 26px;
+  transition: 0.3s;
+  border: 1px solid rgba(99,102,241,0.3);
+}
+.sound-slider:before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 2px;
+  top: 2px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.3s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+.sound-switch input:checked + .sound-slider { background: #6366F1; border-color: #6366F1; }
+.sound-switch input:checked + .sound-slider:before { transform: translateX(20px); }
+
+/* Music choice buttons */
+.music-choice-btns {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.music-choice-btn {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(99,102,241,0.3);
+  background: var(--bg3, #1E2340);
+  color: var(--text2);
+  font-weight: 800;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
   font-family: var(--font-body);
 }
-.mp-lacuna-btn:active { opacity: 0.8; }
-
-/* Sala card — modo label */
-.mp-sala-meta { font-size: 0.72rem; color: var(--text2); margin-top: 2px; line-height: 1.4; }
-
-/* Ranking — linhas top */
-.mp-rank-item.top1 { background: linear-gradient(135deg, rgba(255,215,0,0.07), transparent); border-color: rgba(255,215,0,0.25); }
-.mp-rank-item.top2 { border-color: rgba(192,192,192,0.2); }
-.mp-rank-item.top3 { border-color: rgba(205,127,50,0.2); }
-
-/* Opts row scroll */
-.mp-opts-row { flex-wrap: wrap; }
-
-/* Opts para modo de jogo (4 botões) */
-.mp-opts-row .mp-opt[data-mpopt="modoJogo"],
-.mp-opts-row .mp-opt[data-mpopt="tipo"] {
-  font-size: 0.75rem;
-  padding: 7px 10px;
+.music-choice-btn.active {
+  background: #6366F1;
+  border-color: #6366F1;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.4);
 }
+.music-choice-btn:active { transform: scale(0.92); }

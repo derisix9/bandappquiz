@@ -75,11 +75,46 @@
 </div>
 
 <!-- ══════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════ -->
+<!-- SCREEN: OFFLINE (sem internet)           -->
+<!-- ══════════════════════════════════════════ -->
+<div class="screen" id="screen-offline">
+  <div class="offline-bg">
+    <div class="offline-waves">
+      <div class="offline-wave"></div>
+      <div class="offline-wave"></div>
+      <div class="offline-wave"></div>
+    </div>
+  </div>
+  <div class="offline-content">
+    <div class="offline-icon-wrap">
+      <div class="offline-ring offline-ring1"></div>
+      <div class="offline-ring offline-ring2"></div>
+      <svg class="offline-icon" viewBox="0 0 24 24">
+        <path d="M23.64 7c-.45-.34-4.35-3-11.64-3-1.5 0-2.89.19-4.15.48L18.18 13.8 23.64 7zm-6.6 8.22L3.27 1.44 2 2.72l2.05 2.06C1.91 5.76.59 6.82.36 7L12 21.5l4-5.09 2.27 2.27 1.27-1.27-2.6-2.19zM3.82 7.14C2.38 7.95 1.6 8.55 1.36 8.78L12 22l1.04-1.33L3.82 7.14z"/>
+      </svg>
+    </div>
+    <h2 class="offline-title">Sem Ligação</h2>
+    <p class="offline-msg">Não foi possível ligar à internet.<br>Verifica a tua conexão e tenta novamente.</p>
+    <div class="offline-tips">
+      <div class="offline-tip">📶 Ativa o Wi-Fi ou dados móveis</div>
+      <div class="offline-tip">✈️ Desativa o modo avião</div>
+      <div class="offline-tip">🔄 Reinicia a ligação</div>
+    </div>
+    <button class="btn-primary offline-retry" id="offlineRetryBtn">
+      <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+      TENTAR NOVAMENTE
+    </button>
+  </div>
+</div>
+
 <!-- SCREEN: SPLASH -->
 <!-- ══════════════════════════════════════════ -->
 <div class="screen active" id="screen-splash">
   <div class="splash-bg">
     <div class="splash-particles" id="splashParticles"></div>
+    <div class="splash-loader-bar" id="splashLoaderBar"><div class="splash-loader-fill" id="splashLoaderFill"></div></div>
+    <div class="splash-loading-status" id="splashLoadingStatus">A iniciar...</div>
     <div class="splash-content">
       <div class="splash-logo">
       <div class="mainmenu-logo-area">
@@ -1115,6 +1150,87 @@
       </button>
     </div>
 
+
+    <!-- SOM E MÚSICA -->
+    <div class="settings-section" id="soundSettingsSection">
+      <div class="settings-section-title">🎵 Som e Música</div>
+
+      <!-- Música de fundo -->
+      <div class="settings-sound-row">
+        <div class="settings-sound-info">
+          <div class="settings-row-icon" style="background:linear-gradient(135deg,#8B5CF6,#6D28D9)">
+            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          </div>
+          <div class="settings-row-info">
+            <div class="settings-row-title">Música de Fundo</div>
+            <div class="settings-row-sub">Música contínua durante o jogo</div>
+          </div>
+        </div>
+        <div class="sound-toggle-wrap">
+          <label class="sound-switch">
+            <input type="checkbox" id="soundMusicToggle" checked>
+            <span class="sound-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Escolher música -->
+      <div class="settings-sound-row settings-sound-chooser" id="musicChooserRow">
+        <div class="settings-sound-info">
+          <div class="settings-row-icon" style="background:linear-gradient(135deg,#EC4899,#BE185D)">
+            <svg viewBox="0 0 24 24"><path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 5h-3v5.5c0 1.38-1.12 2.5-2.5 2.5S10 13.88 10 12.5s1.12-2.5 2.5-2.5c.57 0 1.08.19 1.5.51V5h4v2zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6z"/></svg>
+          </div>
+          <div class="settings-row-info">
+            <div class="settings-row-title">Escolher Música</div>
+            <div class="settings-row-sub" id="currentMusicLabel">Aprender e Vencer</div>
+          </div>
+        </div>
+        <div class="music-choice-btns">
+          <button class="music-choice-btn active" id="music1Btn" data-music="1">1</button>
+          <button class="music-choice-btn" id="music2Btn" data-music="2">2</button>
+        </div>
+      </div>
+
+      <!-- Voz (certo/errado) -->
+      <div class="settings-sound-row">
+        <div class="settings-sound-info">
+          <div class="settings-row-icon" style="background:linear-gradient(135deg,#10B981,#047857)">
+            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          </div>
+          <div class="settings-row-info">
+            <div class="settings-row-title">Voz de Feedback</div>
+            <div class="settings-row-sub">Diz "certo" ou "errado" ao responder</div>
+          </div>
+        </div>
+        <div class="sound-toggle-wrap">
+          <label class="sound-switch">
+            <input type="checkbox" id="soundVoiceToggle" checked>
+            <span class="sound-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Sons de resposta -->
+      <div class="settings-sound-row">
+        <div class="settings-sound-info">
+          <div class="settings-row-icon" style="background:linear-gradient(135deg,#F59E0B,#B45309)">
+            <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+          </div>
+          <div class="settings-row-info">
+            <div class="settings-row-title">Sons de Resposta</div>
+            <div class="settings-row-sub">Efeito sonoro ao acertar ou errar</div>
+          </div>
+        </div>
+        <div class="sound-toggle-wrap">
+          <label class="sound-switch">
+            <input type="checkbox" id="soundFxToggle" checked>
+            <span class="sound-slider"></span>
+          </label>
+        </div>
+      </div>
+
+    </div>
+
     <!-- SEGURANÇA -->
     <div class="settings-section">
       <div class="settings-section-title">Segurança e Dados</div>
@@ -1741,8 +1857,6 @@
         Enviar Desafio
       </div>
       <div class="mp-challenge-form">
-
-        <!-- Jogador alvo -->
         <div class="mp-form-row">
           <label>Jogador alvo</label>
           <div class="mp-search-box">
@@ -1753,87 +1867,62 @@
           </div>
           <div id="mpSearchResults" class="mp-search-results"></div>
         </div>
-
-        <!-- Modo do Jogo -->
         <div class="mp-form-row">
-          <label>Modo do Jogo</label>
+          <label>Modo</label>
           <div class="mp-opts-row">
-            <button class="mp-opt active" data-mpopt="modoJogo" data-v="aprendizado">📚 Aprendizado</button>
-            <button class="mp-opt" data-mpopt="modoJogo" data-v="concurso">🏆 Concurso</button>
-            <button class="mp-opt" data-mpopt="modoJogo" data-v="prova">📝 Prova</button>
-            <button class="mp-opt" data-mpopt="modoJogo" data-v="imagem">🖼️ Imagem</button>
+            <button class="mp-opt active" data-mpopt="modo" data-v="realtime">⚡ Tempo Real</button>
+            <button class="mp-opt" data-mpopt="modo" data-v="async">⏳ Assíncrono</button>
           </div>
         </div>
-
-        <!-- Modo de Pergunta -->
-        <div class="mp-form-row">
-          <label>Modo de Pergunta</label>
-          <div class="mp-opts-row">
-            <button class="mp-opt active" data-mpopt="modoPerg" data-v="realtime">⚡ Tempo Real</button>
-            <button class="mp-opt" data-mpopt="modoPerg" data-v="async">⏳ Assíncrono</button>
-          </div>
-        </div>
-
-        <!-- Nível -->
         <div class="mp-form-row">
           <label>Nível</label>
           <div class="mp-opts-row">
-            <button class="mp-opt active" data-mpopt="nivel" data-v="todos">Todos</button>
-            <button class="mp-opt" data-mpopt="nivel" data-v="fácil">Fácil</button>
+            <button class="mp-opt active" data-mpopt="nivel" data-v="fácil">Fácil</button>
             <button class="mp-opt" data-mpopt="nivel" data-v="médio">Médio</button>
             <button class="mp-opt" data-mpopt="nivel" data-v="difícil">Difícil</button>
           </div>
         </div>
-
-        <!-- Disciplina -->
         <div class="mp-form-row">
           <label>Disciplina</label>
           <select id="mpDesafioDisciplina" class="mp-select"></select>
         </div>
-
-        <!-- Categoria (preenchida dinamicamente) -->
         <div class="mp-form-row">
           <label>Categoria</label>
-          <select id="mpDesafioCategoria" class="mp-select">
-            <option value="">-- Todas as Categorias --</option>
-          </select>
+          <select id="mpDesafioCategoria" class="mp-select"></select>
         </div>
-
-        <!-- Tipo de Perguntas (dinâmico conforme Modo do Jogo) -->
         <div class="mp-form-row">
           <label>Tipo de Perguntas</label>
-          <div class="mp-opts-row" id="mpTiposContainer">
+          <div class="mp-opts-row">
             <button class="mp-opt active" data-mpopt="tipo" data-v="todos">Todos</button>
-            <button class="mp-opt" data-mpopt="tipo" data-v="multipla">Múltipla Escolha</button>
-            <button class="mp-opt" data-mpopt="tipo" data-v="vf">Verdadeiro/Falso</button>
-            <button class="mp-opt" data-mpopt="tipo" data-v="lacunas">Preencher Lacunas</button>
+            <button class="mp-opt" data-mpopt="tipo" data-v="multipla">Múltipla</button>
+            <button class="mp-opt" data-mpopt="tipo" data-v="vf">V/F</button>
           </div>
         </div>
-
-        <!-- Tempo por pergunta (input de texto) -->
         <div class="mp-form-row">
-          <label>Tempo por pergunta (segundos, 0 = livre)</label>
-          <input type="number" id="mpTempoInput" class="mp-input-num" min="0" max="300" placeholder="Ex: 30" value="30" />
+          <label>Tempo por pergunta</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt" data-mpopt="tempo" data-v="0">Livre</button>
+            <button class="mp-opt active" data-mpopt="tempo" data-v="30">30s</button>
+            <button class="mp-opt" data-mpopt="tempo" data-v="60">60s</button>
+          </div>
         </div>
-
-        <!-- Nº de Perguntas (input de texto) -->
         <div class="mp-form-row">
           <label>Nº de Perguntas</label>
-          <input type="number" id="mpQtdInput" class="mp-input-num" min="1" max="100" placeholder="Ex: 10" value="10" />
+          <div class="mp-opts-row">
+            <button class="mp-opt active" data-mpopt="qtd" data-v="10">10</button>
+            <button class="mp-opt" data-mpopt="qtd" data-v="20">20</button>
+            <button class="mp-opt" data-mpopt="qtd" data-v="30">30</button>
+          </div>
         </div>
-
-        <!-- Nº Máx. Jogadores -->
         <div class="mp-form-row">
-          <label>Nº Máx. Jogadores</label>
+          <label>Nº Máx. Jogadores (2-10)</label>
           <div class="mp-opts-row">
             <button class="mp-opt active" data-mpopt="maxplayers" data-v="2">2</button>
             <button class="mp-opt" data-mpopt="maxplayers" data-v="4">4</button>
             <button class="mp-opt" data-mpopt="maxplayers" data-v="6">6</button>
-            <button class="mp-opt" data-mpopt="maxplayers" data-v="8">8</button>
             <button class="mp-opt" data-mpopt="maxplayers" data-v="10">10</button>
           </div>
         </div>
-
         <button class="btn-mp-send" id="btnEnviarDesafio">
           <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           ENVIAR DESAFIO
@@ -1910,7 +1999,6 @@
           <span class="mp-q-num" id="mpQNum">1/10</span>
           <span class="mp-q-turn" id="mpQTurn"></span>
         </div>
-        <div id="mpQImage" style="display:none"></div>
         <p class="mp-q-text" id="mpQText">Carregando pergunta...</p>
         <div class="mp-q-answers" id="mpQAnswers"></div>
       </div>
@@ -1942,5 +2030,14 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script src="app.js"></script>
 <script src="multiplayer.js"></script>
+
+<!-- AUDIO ELEMENTS -->
+<audio id="bgMusic" loop preload="auto">
+  <source src="Aprender_Vencer.mp3" type="audio/mpeg">
+</audio>
+<audio id="sfxCorrect" preload="auto"></audio>
+<audio id="sfxWrong" preload="auto"></audio>
+<audio id="sfxVoiceCorrect" preload="auto"></audio>
+<audio id="sfxVoiceWrong" preload="auto"></audio>
 </body>
 </html>
