@@ -3324,3 +3324,81 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
 .mp-podium-name { font-size: 0.72rem; font-weight: 700; text-align: center; }
 .mp-podium-pts { font-family: var(--font-display); font-size: 1.1rem; font-weight: 800; color: var(--gold); }
 .mp-result-table { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 20px; overflow-x: auto; }
+
+/* ─── MULTIPLAYER EXTRAS v2.0 ─────────────────────────── */
+
+/* Minha linha no resultado */
+.mp-my-row { background: rgba(99,102,241,0.08); font-weight: 700; }
+
+/* Input numérico no formulário de desafio */
+.mp-input-num {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(99,102,241,0.3);
+  background: var(--bg3, #1e2340);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: var(--font-body);
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.mp-input-num:focus {
+  outline: none;
+  border-color: rgba(99,102,241,0.7);
+}
+
+/* Turn indicator melhorado */
+.mp-q-turn.my-turn {
+  background: rgba(34,197,94,0.15);
+  color: #22C55E;
+  animation: pulseTurn 1s ease-in-out infinite alternate;
+}
+@keyframes pulseTurn {
+  from { box-shadow: 0 0 0 0 rgba(34,197,94,0.3); }
+  to   { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+}
+
+/* Lacunas */
+.mp-lacuna-wrap { display: flex; gap: 8px; align-items: center; }
+.mp-lacuna-input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(99,102,241,0.3);
+  background: var(--bg3, #1e2340);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: var(--font-body);
+}
+.mp-lacuna-input:focus { outline: none; border-color: rgba(99,102,241,0.7); }
+.mp-lacuna-btn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--primary, #4F46E5);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+.mp-lacuna-btn:active { opacity: 0.8; }
+
+/* Sala card — modo label */
+.mp-sala-meta { font-size: 0.72rem; color: var(--text2); margin-top: 2px; line-height: 1.4; }
+
+/* Ranking — linhas top */
+.mp-rank-item.top1 { background: linear-gradient(135deg, rgba(255,215,0,0.07), transparent); border-color: rgba(255,215,0,0.25); }
+.mp-rank-item.top2 { border-color: rgba(192,192,192,0.2); }
+.mp-rank-item.top3 { border-color: rgba(205,127,50,0.2); }
+
+/* Opts row scroll */
+.mp-opts-row { flex-wrap: wrap; }
+
+/* Opts para modo de jogo (4 botões) */
+.mp-opts-row .mp-opt[data-mpopt="modoJogo"],
+.mp-opts-row .mp-opt[data-mpopt="tipo"] {
+  font-size: 0.75rem;
+  padding: 7px 10px;
+}
