@@ -2915,6 +2915,17 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
   color: #fff; font-size: 0.75rem; font-weight: 700;
   border: none; cursor: pointer;
   box-shadow: 0 2px 8px rgba(99,102,241,0.35);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 90px; text-align: center;
+}
+.mp-sala-delete {
+  padding: 6px 14px; border-radius: 8px;
+  background: linear-gradient(135deg, #EF4444, #DC2626);
+  color: #fff; font-size: 0.75rem; font-weight: 700;
+  border: none; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(239,68,68,0.35);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 90px; text-align: center;
 }
 
 .mp-empty-state {
@@ -3067,7 +3078,7 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
 .mp-rank-item.top2 { border-color: rgba(192,192,192,0.3); }
 .mp-rank-item.top3 { border-color: rgba(205,127,50,0.3); }
 .mp-rank-pos {
-  width: 28px; text-align: center;
+  width: 36px; min-width: 36px; text-align: center; display:flex; align-items:center; justify-content:center;
   font-family: var(--font-display);
   font-size: 1rem; font-weight: 800;
   color: var(--text2);
