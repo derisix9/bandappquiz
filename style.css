@@ -3365,128 +3365,6 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
 }
 
 /* ════════════════════════════════════════════════════════
-   OFFLINE SCREEN
-   ════════════════════════════════════════════════════════ */
-#screen-offline {
-  background: var(--bg, #0B0F1A);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.offline-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-.offline-waves {
-  position: absolute;
-  bottom: -60px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 400px;
-  height: 400px;
-}
-.offline-wave {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 2px solid rgba(99,102,241,0.15);
-  animation: offlineWavePulse 3s ease-out infinite;
-}
-.offline-wave:nth-child(2) { animation-delay: 1s; }
-.offline-wave:nth-child(3) { animation-delay: 2s; }
-@keyframes offlineWavePulse {
-  0%   { transform: scale(0.5); opacity: 0.5; }
-  100% { transform: scale(2);   opacity: 0; }
-}
-
-.offline-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 32px 24px;
-  text-align: center;
-  max-width: 340px;
-}
-
-.offline-icon-wrap {
-  position: relative;
-  width: 96px;
-  height: 96px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 28px;
-}
-.offline-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 2px solid rgba(239,68,68,0.3);
-  animation: offlineRingPulse 2s ease-out infinite;
-}
-.offline-ring2 { animation-delay: 0.7s; border-color: rgba(239,68,68,0.15); }
-@keyframes offlineRingPulse {
-  0%   { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.7); opacity: 0; }
-}
-.offline-icon {
-  width: 52px;
-  height: 52px;
-  fill: #EF4444;
-  filter: drop-shadow(0 0 16px rgba(239,68,68,0.5));
-}
-
-.offline-title {
-  font-family: var(--font-display, 'Rajdhani', sans-serif);
-  font-size: 2rem;
-  font-weight: 800;
-  color: var(--text, #F0F4FF);
-  margin: 0 0 12px;
-}
-.offline-msg {
-  font-size: 0.88rem;
-  color: var(--text2, rgba(240,244,255,0.6));
-  line-height: 1.6;
-  margin: 0 0 24px;
-}
-.offline-tips {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 32px;
-  width: 100%;
-}
-.offline-tip {
-  background: rgba(99,102,241,0.08);
-  border: 1px solid rgba(99,102,241,0.15);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 0.82rem;
-  color: var(--text2, rgba(240,244,255,0.65));
-  text-align: left;
-}
-
-.offline-retry {
-  width: 100%;
-  gap: 8px;
-}
-.offline-retry.shake {
-  animation: shakeBtn 0.5s ease;
-}
-@keyframes shakeBtn {
-  0%,100% { transform: translateX(0); }
-  20%      { transform: translateX(-8px); }
-  40%      { transform: translateX(8px); }
-  60%      { transform: translateX(-6px); }
-  80%      { transform: translateX(6px); }
-}
-
-/* ════════════════════════════════════════════════════════
    SOUND SETTINGS
    ════════════════════════════════════════════════════════ */
 .settings-sound-row {
@@ -3569,3 +3447,156 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
   box-shadow: 0 2px 8px rgba(99,102,241,0.4);
 }
 .music-choice-btn:active { transform: scale(0.92); }
+
+/* ════════════════════════════════════════════════════════
+   NOVOS CAMPOS — Inputs numéricos e Modo do Jogo
+   ════════════════════════════════════════════════════════ */
+
+/* Input numérico (Tempo, Nº de Perguntas) */
+.mp-input-num {
+  width: 100%;
+  background: var(--card);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  -webkit-appearance: none;
+  appearance: none;
+  -moz-appearance: textfield;
+}
+.mp-input-num::-webkit-inner-spin-button,
+.mp-input-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.mp-input-num:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-dim);
+}
+.mp-input-num::placeholder { color: var(--text3); font-weight: 400; }
+
+/* ════════════════════════════════════════════════════════
+   PERGUNTAS DE LACUNAS — Campo de texto inline
+   ════════════════════════════════════════════════════════ */
+
+.mp-lacuna-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  margin-top: 10px;
+}
+
+.mp-lacuna-input {
+  flex: 1;
+  background: var(--bg3);
+  border: 1.5px solid rgba(99,102,241,0.35);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  -webkit-appearance: none;
+}
+.mp-lacuna-input:focus {
+  border-color: rgba(99,102,241,0.7);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+.mp-lacuna-input::placeholder { color: var(--text3); font-weight: 400; }
+.mp-lacuna-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mp-lacuna-btn {
+  flex-shrink: 0;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 10px rgba(99,102,241,0.35);
+  white-space: nowrap;
+}
+.mp-lacuna-btn:active {
+  transform: scale(0.96);
+  box-shadow: 0 1px 4px rgba(99,102,241,0.2);
+}
+.mp-lacuna-btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ════════════════════════════════════════════════════════
+   TURNO DO JOGADOR — Animação pulsante verde
+   ════════════════════════════════════════════════════════ */
+
+.mp-q-turn.my-turn {
+  background: rgba(34,197,94,0.18);
+  color: #22C55E;
+  border: 1px solid rgba(34,197,94,0.4);
+  border-radius: 6px;
+  animation: myTurnPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes myTurnPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(34,197,94,0);
+    background: rgba(34,197,94,0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(34,197,94,0.12);
+    background: rgba(34,197,94,0.28);
+  }
+}
+
+/* ════════════════════════════════════════════════════════
+   TABELA DE RESULTADOS — Destaque da própria linha
+   ════════════════════════════════════════════════════════ */
+
+.mp-my-row td {
+  background: rgba(255,215,0,0.06);
+  color: var(--gold);
+}
+.mp-my-row td:first-child {
+  border-left: 3px solid var(--gold);
+  border-radius: 4px 0 0 4px;
+}
+.mp-my-row .mp-hist-score {
+  color: var(--gold);
+  text-shadow: 0 0 8px rgba(255,215,0,0.4);
+}
+
+/* ════════════════════════════════════════════════════════
+   IMAGEM DA PERGUNTA — Modo Imagem (#mpQImage)
+   ════════════════════════════════════════════════════════ */
+
+#mpQImage {
+  display: none;
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid rgba(99,102,241,0.2);
+  background: var(--bg3);
+  margin-bottom: 12px;
+}
+#mpQImage.visible {
+  display: block;
+  animation: imgFadeIn 0.3s ease;
+}
+@keyframes imgFadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
