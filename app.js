@@ -339,13 +339,20 @@ function populateCountries() {
 }
 
 // ─── FIREBASE AUTH ────────────────────────────────────────
+// Flag: o utilizador já saiu do splash (clicou em ENTRAR)
+let _splashDismissed = false;
+
 auth.onAuthStateChanged(user => {
   if (user) {
     State.user = user;
+    // Se ainda estiver no splash, guarda o perfil em background mas não navega
+    if (!_splashDismissed) return;
     loadUserProfile(user.uid);
   } else {
     State.user = null;
     State.profile = null;
+    // Só navega para login se o utilizador já tiver saído do splash
+    if (!_splashDismissed) return;
     showScreen('screen-login');
   }
 });
@@ -1001,8 +1008,10 @@ $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
 
 // ─── SPLASH ───────────────────────────────────────────────
 $('splashEnterBtn').onclick = () => {
+  _splashDismissed = true;
   if (State.user) {
-    showScreen('screen-mainmenu');
+    // Utilizador já autenticado — carregar perfil
+    loadUserProfile(State.user.uid);
   } else {
     showScreen('screen-login');
   }
