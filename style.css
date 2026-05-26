@@ -3453,30 +3453,41 @@ body.light-mode .theme-switch::after { background: var(--gold); transform: trans
    ════════════════════════════════════════════════════════ */
 
 /* Input numérico (Tempo, Nº de Perguntas) */
+input[type="number"].mp-input-num,
 .mp-input-num {
   width: 100%;
-  background: var(--card);
-  border: 1.5px solid var(--border2);
-  border-radius: var(--radius-sm);
+  background: #161D30 !important;
+  background-color: #161D30 !important;
+  border: 1.5px solid rgba(99,102,241,0.35) !important;
+  border-radius: 10px;
   padding: 12px 14px;
-  color: var(--text);
-  font-family: var(--font-display);
+  color: #F1F5F9 !important;
+  font-family: 'Rajdhani', sans-serif;
   font-size: 1.05rem;
   font-weight: 700;
-  text-align: center;
+  text-align: left;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
   -webkit-appearance: none;
-  appearance: none;
   -moz-appearance: textfield;
+  appearance: none;
+  color-scheme: dark;
+  box-shadow: none;
 }
+input[type="number"].mp-input-num::-webkit-inner-spin-button,
+input[type="number"].mp-input-num::-webkit-outer-spin-button,
 .mp-input-num::-webkit-inner-spin-button,
-.mp-input-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-.mp-input-num:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px var(--gold-dim);
+.mp-input-num::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
-.mp-input-num::placeholder { color: var(--text3); font-weight: 400; }
+input[type="number"].mp-input-num:focus,
+.mp-input-num:focus {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 3px rgba(255,215,0,0.15) !important;
+}
+input[type="number"].mp-input-num::placeholder,
+.mp-input-num::placeholder { color: #64748B; font-weight: 400; }
 
 /* ════════════════════════════════════════════════════════
    PERGUNTAS DE LACUNAS — Campo de texto inline
