@@ -1828,6 +1828,7 @@
         Enviar Desafio
       </div>
       <div class="mp-challenge-form">
+        <!-- Jogador alvo -->
         <div class="mp-form-row">
           <label>Jogador alvo</label>
           <div class="mp-search-box">
@@ -1838,21 +1839,39 @@
           </div>
           <div id="mpSearchResults" class="mp-search-results"></div>
         </div>
+
+        <!-- Modo do Jogo (novo) -->
         <div class="mp-form-row">
-          <label>Modo</label>
+          <label>Modo do Jogo</label>
           <div class="mp-opts-row">
-            <button class="mp-opt active" data-mpopt="modo" data-v="realtime">⚡ Tempo Real</button>
-            <button class="mp-opt" data-mpopt="modo" data-v="async">⏳ Assíncrono</button>
+            <button class="mp-opt active" data-mpopt="modoJogo" data-v="aprendizado">📚 Aprendizado</button>
+            <button class="mp-opt" data-mpopt="modoJogo" data-v="concurso">🏆 Concurso</button>
+            <button class="mp-opt" data-mpopt="modoJogo" data-v="prova">📝 Prova</button>
+            <button class="mp-opt" data-mpopt="modoJogo" data-v="imagem">🖼️ Imagem</button>
           </div>
         </div>
+
+        <!-- Modo de Pergunta (renomeado de "Modo") -->
+        <div class="mp-form-row">
+          <label>Modo de Pergunta</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt active" data-mpopt="modoPerg" data-v="realtime">⚡ Tempo Real</button>
+            <button class="mp-opt" data-mpopt="modoPerg" data-v="async">⏳ Assíncrono</button>
+          </div>
+        </div>
+
+        <!-- Nível (com opção "Todos") -->
         <div class="mp-form-row">
           <label>Nível</label>
           <div class="mp-opts-row">
-            <button class="mp-opt active" data-mpopt="nivel" data-v="fácil">Fácil</button>
+            <button class="mp-opt active" data-mpopt="nivel" data-v="todos">Todos</button>
+            <button class="mp-opt" data-mpopt="nivel" data-v="fácil">Fácil</button>
             <button class="mp-opt" data-mpopt="nivel" data-v="médio">Médio</button>
             <button class="mp-opt" data-mpopt="nivel" data-v="difícil">Difícil</button>
           </div>
         </div>
+
+        <!-- Disciplina e Categoria (da BD) -->
         <div class="mp-form-row">
           <label>Disciplina</label>
           <select id="mpDesafioDisciplina" class="mp-select"></select>
@@ -1861,39 +1880,43 @@
           <label>Categoria</label>
           <select id="mpDesafioCategoria" class="mp-select"></select>
         </div>
+
+        <!-- Tipos de Perguntas dinâmicos — actualizados por mpUpdateTiposUI() -->
         <div class="mp-form-row">
           <label>Tipo de Perguntas</label>
-          <div class="mp-opts-row">
+          <div id="mpTiposContainer" class="mp-opts-row">
+            <!-- Preenchido dinamicamente pelo JS conforme o Modo do Jogo -->
             <button class="mp-opt active" data-mpopt="tipo" data-v="todos">Todos</button>
             <button class="mp-opt" data-mpopt="tipo" data-v="multipla">Múltipla</button>
             <button class="mp-opt" data-mpopt="tipo" data-v="vf">V/F</button>
+            <button class="mp-opt" data-mpopt="tipo" data-v="lacunas">Lacunas</button>
           </div>
         </div>
+
+        <!-- Tempo por pergunta — input numérico livre -->
         <div class="mp-form-row">
-          <label>Tempo por pergunta</label>
-          <div class="mp-opts-row">
-            <button class="mp-opt" data-mpopt="tempo" data-v="0">Livre</button>
-            <button class="mp-opt active" data-mpopt="tempo" data-v="30">30s</button>
-            <button class="mp-opt" data-mpopt="tempo" data-v="60">60s</button>
-          </div>
+          <label>Tempo por pergunta (seg, 0 = livre)</label>
+          <input type="number" id="mpTempoInput" class="mp-input-num" min="0" max="300" value="30" placeholder="30" />
         </div>
+
+        <!-- Nº de Perguntas — input numérico livre -->
         <div class="mp-form-row">
           <label>Nº de Perguntas</label>
-          <div class="mp-opts-row">
-            <button class="mp-opt active" data-mpopt="qtd" data-v="10">10</button>
-            <button class="mp-opt" data-mpopt="qtd" data-v="20">20</button>
-            <button class="mp-opt" data-mpopt="qtd" data-v="30">30</button>
-          </div>
+          <input type="number" id="mpQtdInput" class="mp-input-num" min="1" max="100" value="10" placeholder="10" />
         </div>
+
+        <!-- Jogadores máx. — opções 2, 4, 6, 8, 10 -->
         <div class="mp-form-row">
-          <label>Nº Máx. Jogadores (2-10)</label>
+          <label>Nº Máx. Jogadores</label>
           <div class="mp-opts-row">
             <button class="mp-opt active" data-mpopt="maxplayers" data-v="2">2</button>
             <button class="mp-opt" data-mpopt="maxplayers" data-v="4">4</button>
             <button class="mp-opt" data-mpopt="maxplayers" data-v="6">6</button>
+            <button class="mp-opt" data-mpopt="maxplayers" data-v="8">8</button>
             <button class="mp-opt" data-mpopt="maxplayers" data-v="10">10</button>
           </div>
         </div>
+
         <button class="btn-mp-send" id="btnEnviarDesafio">
           <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           ENVIAR DESAFIO
