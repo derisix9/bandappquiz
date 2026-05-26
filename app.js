@@ -905,16 +905,98 @@ $('forgotPassBtn').onclick = async () => {
 };
 
 // ─── MAIN MENU NAVIGATION ────────────────────────────────
-$('btnJogar').onclick   = () => showScreen('screen-modeselect');
-$('btnRanking').onclick = async () => { loadRankingScreen('all'); showScreen('screen-ranking'); };
+$('btnJogar').onclick   = () => { setActiveNav('jogar'); showScreen('screen-modeselect'); };
+$('btnRanking').onclick = async () => { setActiveNav('ranking'); loadRankingScreen('all'); showScreen('screen-ranking'); };
 $('btnCriar').onclick = async () => {
+  setActiveNav('criar');
   await loadLocalDB();
   updateCreateCounter();
   populateCreateDisc();
   showScreen('screen-create');
 };
-$('btnSync').onclick    = () => { loadSyncScreen(); showScreen('screen-sync'); };
-$('btnSobre').onclick   = () => showScreen('screen-sobre');
+$('btnSync').onclick    = () => { setActiveNav('sync'); loadSyncScreen(); showScreen('screen-sync'); };
+$('btnSobre').onclick   = () => { setActiveNav('sobre'); showScreen('screen-sobre'); };
+
+// ── Bottom Nav handlers ───────────────────────────────────
+function setActiveNav(name) {
+  document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.nav === name));
+}
+
+$('navJogar').onclick   = () => { setActiveNav('jogar'); showScreen('screen-modeselect'); };
+$('navRanking').onclick = async () => { setActiveNav('ranking'); loadRankingScreen('all'); showScreen('screen-ranking'); };
+$('navCriar').onclick   = async () => {
+  setActiveNav('criar');
+  await loadLocalDB();
+  updateCreateCounter();
+  populateCreateDisc();
+  showScreen('screen-create');
+};
+$('navLoja').onclick    = () => { setActiveNav('loja'); abrirLoja(); };
+$('navSync').onclick    = () => { setActiveNav('sync'); loadSyncScreen(); showScreen('screen-sync'); };
+$('navSobre').onclick   = () => { setActiveNav('sobre'); showScreen('screen-sobre'); };
+
+// ── Notification Panel ───────────────────────────────────
+const _notifItems = []; // { id, type:'cloud'|'pacote', title, sub, action }
+
+function addNotifItem(item) {
+  if (_notifItems.find(i => i.id === item.id)) return;
+  _notifItems.push(item);
+  renderNotifPanel();
+  $('headerNotifDot').classList.add('show');
+}
+
+function renderNotifPanel() {
+  const list = $('notifPanelList');
+  if (!list) return;
+  if (_notifItems.length === 0) {
+    list.innerHTML = '<div class="notif-panel-empty">Sem notificações de momento.</div>';
+    $('headerNotifDot').classList.remove('show');
+    return;
+  }
+  list.innerHTML = _notifItems.map(item => `
+    <div class="notif-panel-item notif-item-${item.type}" data-notif-id="${item.id}">
+      <div class="notif-panel-item-icon">
+        ${item.type === 'cloud'
+          ? '<svg viewBox="0 0 24 24"><path d="M19.35 10.04A7.49 7.49 0 0012 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>'
+          : '<svg viewBox="0 0 24 24"><path d="M19 6h-2c0-2.76-2.24-5-5-5S7 3.24 7 6H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7-3c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3zm0 10c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>'}
+      </div>
+      <div class="notif-panel-item-text">
+        <span class="notif-panel-item-title">${item.title}</span>
+        <span class="notif-panel-item-sub">${item.sub}</span>
+      </div>
+      <span class="notif-panel-item-action">${item.action}</span>
+    </div>
+  `).join('');
+  list.querySelectorAll('.notif-panel-item').forEach(el => {
+    const id = el.dataset.notifId;
+    const item = _notifItems.find(i => i.id === id);
+    if (item && item.onClick) el.onclick = () => { closeNotifPanel(); item.onClick(); };
+  });
+}
+
+function closeNotifPanel() {
+  const panel = $('notifPanel');
+  if (panel) panel.classList.remove('open');
+}
+
+$('headerNotifBtn').onclick = (e) => {
+  e.stopPropagation();
+  const panel = $('notifPanel');
+  panel.classList.toggle('open');
+};
+
+$('notifPanelClear').onclick = (e) => {
+  e.stopPropagation();
+  _notifItems.length = 0;
+  renderNotifPanel();
+};
+
+document.addEventListener('click', (e) => {
+  const panel = $('notifPanel');
+  if (panel && panel.classList.contains('open') && !panel.contains(e.target) && e.target !== $('headerNotifBtn')) {
+    closeNotifPanel();
+  }
+});
 $('sobreBackBtn').onclick = () => showScreen('screen-mainmenu');
 
 // ─── SPLASH ───────────────────────────────────────────────
@@ -3106,6 +3188,14 @@ function showUpdateBanner(newCount) {
   const banner = $('notifBanner');
   banner.querySelector('.notif-banner-text strong').textContent = `${newCount} novas perguntas disponíveis!`;
   banner.classList.add('show');
+  addNotifItem({
+    id: 'cloud-update-' + Date.now(),
+    type: 'cloud',
+    title: `${newCount} novas perguntas disponíveis!`,
+    sub: 'Toque para transferir para o dispositivo.',
+    action: 'BAIXAR',
+    onClick: () => { $('notifBanner').classList.remove('show'); loadSyncScreen(); showScreen('screen-sync'); setTimeout(downloadFromCloud, 400); }
+  });
 }
 
 $('notifDownloadBtn').onclick = () => {
@@ -3365,7 +3455,7 @@ $('btnComprarPacote').onclick = async () => { if (pacoteAtual) abrirPagamento(pa
 $('lojaBackBtn').onclick   = () => showScreen('screen-mainmenu');
 $('pacoteBackBtn').onclick = () => abrirLoja();
 $('pagBackBtn').onclick    = () => showScreen('screen-pacote');
-$('btnLoja').onclick       = () => abrirLoja();
+$('btnLoja').onclick       = () => { setActiveNav('loja'); abrirLoja(); };
 
 // ── Notificação de novo pacote ───────────────────────────
 async function verificarNotifNovoPacote() {
@@ -3393,6 +3483,15 @@ function mostrarNotifPacote(pacote) {
     marcarNotifVista(pacote.id);
   };
   setTimeout(() => banner.classList.remove('show'), 8000);
+
+  addNotifItem({
+    id: 'pacote-' + pacote.id,
+    type: 'pacote',
+    title: `Novo pacote: ${pacote.titulo}`,
+    sub: `${Number(pacote.preco).toLocaleString('pt-AO')} AOA · ${pacote.qtd} questões`,
+    action: 'VER',
+    onClick: () => { marcarNotifVista(pacote.id); abrirDetalhe(pacote); }
+  });
 }
 
 function marcarNotifVista(id) {
