@@ -378,35 +378,83 @@ function mpLoadSalas() {
   });
 }
 
+
+// ─── MODAL DE CONFIRMAÇÃO PERSONALIZADO ──────────────────
+function mpConfirm(mensagem, onConfirm) {
+  const existing = document.getElementById('mp-confirm-modal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'mp-confirm-modal';
+  overlay.style.cssText = `
+    position:fixed; inset:0; background:rgba(0,0,0,0.55);
+    z-index:99999; display:flex; align-items:flex-end;
+    justify-content:center; padding-bottom:24px;
+    animation: mpFadeIn 0.2s ease;
+  `;
+  overlay.innerHTML = `
+    <style>
+      @keyframes mpFadeIn { from{opacity:0} to{opacity:1} }
+      @keyframes mpSlideUp2 { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
+    </style>
+    <div style="
+      background:var(--card,#fff); border-radius:20px;
+      padding:24px 20px 12px; width:calc(100% - 32px); max-width:400px;
+      box-shadow:0 -4px 40px rgba(0,0,0,0.18);
+      animation: mpSlideUp2 0.25s ease;
+    ">
+      <div style="text-align:center; margin-bottom:18px">
+        <div style="width:48px;height:48px;border-radius:50%;background:rgba(239,68,68,0.12);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px">
+          <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#EF4444"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </div>
+        <div style="font-weight:700;font-size:1rem;color:var(--text,#111);margin-bottom:6px">Eliminar Sala</div>
+        <div style="font-size:0.85rem;color:var(--text2,#666);line-height:1.5">${mensagem}</div>
+      </div>
+      <button id="mpConfirmOk" style="
+        width:100%;padding:14px;border-radius:12px;
+        background:linear-gradient(135deg,#EF4444,#DC2626);
+        color:#fff;border:none;font-weight:700;font-size:0.95rem;
+        cursor:pointer;margin-bottom:8px;
+      ">Eliminar</button>
+      <button id="mpConfirmCancel" style="
+        width:100%;padding:12px;border-radius:12px;
+        background:transparent;color:var(--text2,#888);
+        border:none;font-size:0.9rem;cursor:pointer;font-weight:600;
+      ">Cancelar</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('mpConfirmOk').onclick = () => {
+    overlay.remove();
+    onConfirm();
+  };
+  document.getElementById('mpConfirmCancel').onclick = () => overlay.remove();
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
 // ─── ELIMINAR SALA (apenas host) ─────────────────────────
 async function mpEliminarSala(salaId) {
   const me = mpGetMyInfoSync();
   if (!me) return;
 
-  // Confirmar
-  if (!confirm('Tens a certeza que queres eliminar esta sala? O desafio será cancelado.')) return;
-
-  // Verificar que é realmente o host antes de eliminar
-  const snap = await db.ref(`mp_salas/${salaId}`).once('value');
-  const sala  = snap.val();
-  if (!sala) return;
-  if (sala.host !== me.uid) {
-    mpShowToast('Só o criador da sala pode eliminá-la.');
-    return;
-  }
-
-  // Cancelar desafios pendentes associados a esta sala
-  const desafiosSnap = await db.ref('mp_desafios')
-    .orderByChild('salaId').equalTo(salaId).once('value');
-  const updates = {};
-  desafiosSnap.forEach(c => { updates[`mp_desafios/${c.key}/status`] = 'cancelled'; });
-  if (Object.keys(updates).length) await db.ref().update(updates);
-
-  // Eliminar a sala
-  await db.ref(`mp_salas/${salaId}`).remove();
-
-  mpShowToast('Sala eliminada.');
-  mpLoadSalas();
+  mpConfirm('Tens a certeza que queres eliminar esta sala? O desafio será cancelado.', async () => {
+    const snap = await db.ref(`mp_salas/${salaId}`).once('value');
+    const sala  = snap.val();
+    if (!sala) return;
+    if (sala.host !== me.uid) {
+      mpShowToast('Só o criador da sala pode eliminá-la.');
+      return;
+    }
+    const desafiosSnap = await db.ref('mp_desafios')
+      .orderByChild('salaId').equalTo(salaId).once('value');
+    const updates = {};
+    desafiosSnap.forEach(c => { updates[`mp_desafios/${c.key}/status`] = 'cancelled'; });
+    if (Object.keys(updates).length) await db.ref().update(updates);
+    await db.ref(`mp_salas/${salaId}`).remove();
+    mpShowToast('Sala eliminada.');
+    mpLoadSalas();
+  });
 }
 
 function mpAbrirCriarSala() { mpCriarSala(null); }
@@ -415,29 +463,25 @@ function mpAbrirCriarSala() { mpCriarSala(null); }
 async function mpEliminarSalaFromRoom(salaId) {
   const me = mpGetMyInfoSync();
   if (!me) return;
-  if (!confirm('Tens a certeza que queres eliminar esta sala? O desafio será cancelado.')) return;
 
-  const snap = await db.ref(`mp_salas/${salaId}`).once('value');
-  const sala  = snap.val();
-  if (!sala || sala.host !== me.uid) {
-    mpShowToast('Só o criador da sala pode eliminá-la.');
-    return;
-  }
-
-  // Cancelar desafios associados
-  const desafiosSnap = await db.ref('mp_desafios')
-    .orderByChild('salaId').equalTo(salaId).once('value');
-  const updates = {};
-  desafiosSnap.forEach(c => { updates[`mp_desafios/${c.key}/status`] = 'cancelled'; });
-  if (Object.keys(updates).length) await db.ref().update(updates);
-
-  // Eliminar sala — o listener 'value' da sala deteta null e expulsa o convidado
-  await db.ref(`mp_salas/${salaId}`).remove();
-
-  mpClearListeners();
-  mpShowToast('Sala eliminada.');
-  mpShowScreen('screen-multiplayer');
-  mpLoadSalas();
+  mpConfirm('Tens a certeza que queres eliminar esta sala? O desafio será cancelado.', async () => {
+    const snap = await db.ref(`mp_salas/${salaId}`).once('value');
+    const sala  = snap.val();
+    if (!sala || sala.host !== me.uid) {
+      mpShowToast('Só o criador da sala pode eliminá-la.');
+      return;
+    }
+    const desafiosSnap = await db.ref('mp_desafios')
+      .orderByChild('salaId').equalTo(salaId).once('value');
+    const updates = {};
+    desafiosSnap.forEach(c => { updates[`mp_desafios/${c.key}/status`] = 'cancelled'; });
+    if (Object.keys(updates).length) await db.ref().update(updates);
+    await db.ref(`mp_salas/${salaId}`).remove();
+    mpClearListeners();
+    mpShowToast('Sala eliminada.');
+    mpShowScreen('screen-multiplayer');
+    mpLoadSalas();
+  });
 }
 
 async function mpCriarSala(targetUid) {
@@ -921,7 +965,7 @@ async function mpShowResults() {
 
   const qtd    = data.qtd || ranked.reduce((acc, p) => acc + Object.keys(p.answers).length, 0) / players.length || 10;
   const perQ   = 20 / qtd;
-  const medals = ['<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#F59E0B;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>','<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#9CA3AF;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>','<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#CD7F32;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>'];
+  const medals = ['1º', '2º', '3º'];
   const me     = mpGetMyInfoSync();
 
   // Dar estrelas com base na posição
@@ -941,7 +985,7 @@ async function mpShowResults() {
   if (podiumEl) {
     podiumEl.innerHTML = ranked.slice(0, 3).map((p, i) => `
       <div class="mp-podium-place p${i+1}">
-        <div class="mp-podium-medal">${medals[i] || '<svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:var(--primary,#6366F1);vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>'}</div>
+        <div class="mp-podium-medal">${medals[i] || (i + 1) + 'º'}</div>
         <div class="mp-podium-name">${p.name}</div>
         <div class="mp-podium-pts">${(p.total * perQ / 10).toFixed(1)} val.</div>
       </div>`).join('');
@@ -1304,10 +1348,9 @@ function mpLoadRanking() {
       return;
     }
 
-    const medals = ['<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#F59E0B;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>','<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#9CA3AF;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>','<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#CD7F32;vertical-align:middle"><path d="M12 1L9.5 7H4l4.5 3.27-1.72 5.3L12 12.34l5.22 3.23-1.72-5.3L20 7h-5.5L12 1z"/></svg>'];
     el.innerHTML = top.map((p, i) => {
       const rank    = i + 1;
-      const pos     = rank <= 3 ? medals[rank-1] : rank;
+      const pos     = rank + 'º';
       const topCls  = rank <= 3 ? `top${rank}` : '';
       const nome    = ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || p.nome || p.email || 'Jogador';
       const contact = p.email || p.phone || p.telefone || '';
