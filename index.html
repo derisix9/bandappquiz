@@ -1962,8 +1962,13 @@
       <div class="mp-sala-num" id="mpSalaNumDisplay">Sala #0000</div>
       <div class="mp-sala-mode" id="mpSalaModeDisplay">Tempo Real</div>
     </div>
-    <div class="mp-sala-timer-wrap">
-      <div class="mp-sala-timer" id="mpSalaTimer">--</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="icon-btn" id="mpSalaDeleteBtn" style="display:none;color:#EF4444" title="Eliminar Sala">
+        <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:#EF4444"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+      </button>
+      <div class="mp-sala-timer-wrap">
+        <div class="mp-sala-timer" id="mpSalaTimer">--</div>
+      </div>
     </div>
   </div>
 

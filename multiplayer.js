@@ -304,12 +304,20 @@ function mpLoadSalas() {
   salasRef.once('value', snap => {
     const list = mpEl('mpSalasList');
     if (!list) return;
+    const me = mpGetMyInfoSync();
+    const myUid = me?.uid || MP.myUid;
+
     const salas = [];
     snap.forEach(child => {
       const s = child.val(); s._key = child.key; salas.push(s);
     });
 
-    if (salas.length === 0) {
+    // Filtrar: mostrar apenas salas onde o utilizador é host ou convidado
+    const minhasSalas = salas.filter(s =>
+      s.host === myUid || s.invitedUid === myUid
+    );
+
+    if (minhasSalas.length === 0) {
       list.innerHTML = `
         <div class="mp-empty-state">
           <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
@@ -321,33 +329,110 @@ function mpLoadSalas() {
       return;
     }
 
-    list.innerHTML = salas.map(s => {
-      const players = s.players ? Object.values(s.players) : [];
+    list.innerHTML = minhasSalas.map(s => {
+      const players   = s.players ? Object.values(s.players) : [];
+      const isHost    = s.host === myUid;
       const modoLabel = s.modoJogo ? ({ aprendizado:'📚 Aprendizado', concurso:'🏆 Concurso', prova:'📝 Prova', imagem:'🖼️ Imagem' }[s.modoJogo] || s.modoJogo) : '';
       const dots = Array.from({length: s.maxplayers || 2}, (_, i) =>
         `<span class="mp-sala-player-dot ${players[i] ? 'active' : ''}"></span>`
       ).join('');
+
+      const hostBadge = isHost
+        ? `<span style="font-size:0.65rem;background:var(--primary,#6366F1);color:#fff;border-radius:6px;padding:2px 7px;margin-left:6px">Host</span>`
+        : `<span style="font-size:0.65rem;background:#22C55E;color:#fff;border-radius:6px;padding:2px 7px;margin-left:6px">Convidado</span>`;
+
+      const actionBtn = isHost
+        ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+             <button class="mp-sala-join" data-salaid="${s._key}">▶ Entrar</button>
+             <button class="mp-sala-delete" data-salaid="${s._key}" style="background:transparent;border:1.5px solid #EF4444;color:#EF4444;border-radius:10px;padding:5px 12px;font-size:0.75rem;font-weight:700;cursor:pointer">🗑 Eliminar</button>
+           </div>`
+        : `<button class="mp-sala-join" data-salaid="${s._key}">▶ Entrar</button>`;
+
       return `
         <div class="mp-sala-card">
           <div class="mp-sala-badge"><span>SALA</span><strong>#${s.roomNum || '?'}</strong></div>
           <div class="mp-sala-info">
-            <div class="mp-sala-name">${s.disciplina || 'Geral'} — ${s.nivel || 'Todos'}</div>
+            <div class="mp-sala-name">${s.disciplina || 'Geral'} — ${s.nivel || 'Todos'} ${hostBadge}</div>
             <div class="mp-sala-meta">${modoLabel} · ${players.length}/${s.maxplayers || 2} jogadores · ${s.modoPerg === 'realtime' ? '⚡ Tempo Real' : '⏳ Assíncrono'}</div>
             <div class="mp-sala-players" style="margin-top:4px">${dots}</div>
           </div>
-          <button class="mp-sala-join" data-salaid="${s._key}">Entrar</button>
+          ${actionBtn}
         </div>`;
     }).join('') + `<div style="text-align:center;margin-top:10px"><button class="btn-mp-action" id="btnCriarSala">+ Criar Nova Sala</button></div>`;
 
     const b = mpEl('btnCriarSala');
     if (b) b.addEventListener('click', mpAbrirCriarSala);
+
     list.querySelectorAll('.mp-sala-join').forEach(btn =>
       btn.addEventListener('click', () => mpEntrarSala(btn.dataset.salaid))
+    );
+    list.querySelectorAll('.mp-sala-delete').forEach(btn =>
+      btn.addEventListener('click', () => mpEliminarSala(btn.dataset.salaid))
     );
   });
 }
 
+// ─── ELIMINAR SALA (apenas host) ─────────────────────────
+async function mpEliminarSala(salaId) {
+  const me = mpGetMyInfoSync();
+  if (!me) return;
+
+  // Confirmar
+  if (!confirm('Tens a certeza que queres eliminar esta sala? O desafio será cancelado.')) return;
+
+  // Verificar que é realmente o host antes de eliminar
+  const snap = await db.ref(`mp_salas/${salaId}`).once('value');
+  const sala  = snap.val();
+  if (!sala) return;
+  if (sala.host !== me.uid) {
+    mpShowToast('Só o criador da sala pode eliminá-la.');
+    return;
+  }
+
+  // Cancelar desafios pendentes associados a esta sala
+  const desafiosSnap = await db.ref('mp_desafios')
+    .orderByChild('salaId').equalTo(salaId).once('value');
+  const updates = {};
+  desafiosSnap.forEach(c => { updates[`mp_desafios/${c.key}/status`] = 'cancelled'; });
+  if (Object.keys(updates).length) await db.ref().update(updates);
+
+  // Eliminar a sala
+  await db.ref(`mp_salas/${salaId}`).remove();
+
+  mpShowToast('Sala eliminada.');
+  mpLoadSalas();
+}
+
 function mpAbrirCriarSala() { mpCriarSala(null); }
+
+// ─── ELIMINAR SALA A PARTIR DE DENTRO DA SALA ────────────
+async function mpEliminarSalaFromRoom(salaId) {
+  const me = mpGetMyInfoSync();
+  if (!me) return;
+  if (!confirm('Tens a certeza que queres eliminar esta sala? O desafio será cancelado.')) return;
+
+  const snap = await db.ref(`mp_salas/${salaId}`).once('value');
+  const sala  = snap.val();
+  if (!sala || sala.host !== me.uid) {
+    mpShowToast('Só o criador da sala pode eliminá-la.');
+    return;
+  }
+
+  // Cancelar desafios associados
+  const desafiosSnap = await db.ref('mp_desafios')
+    .orderByChild('salaId').equalTo(salaId).once('value');
+  const updates = {};
+  desafiosSnap.forEach(c => { updates[`mp_desafios/${c.key}/status`] = 'cancelled'; });
+  if (Object.keys(updates).length) await db.ref().update(updates);
+
+  // Eliminar sala — o listener 'value' da sala deteta null e expulsa o convidado
+  await db.ref(`mp_salas/${salaId}`).remove();
+
+  mpClearListeners();
+  mpShowToast('Sala eliminada.');
+  mpShowScreen('screen-multiplayer');
+  mpLoadSalas();
+}
 
 async function mpCriarSala(targetUid) {
   const me = mpGetMyInfoSync();
@@ -382,6 +467,7 @@ async function mpCriarSala(targetUid) {
   await mpEntrarSala(ref.key);
 }
 
+
 async function mpEntrarSala(salaId) {
   // Use async version to ensure name/stars are fully loaded before registering
   const me = await mpGetMyInfoAsync();
@@ -410,11 +496,20 @@ function mpShowSalaScreen(salaRef) {
   mpEl('mpSalaGame').style.display    = 'none';
   mpEl('mpSalaResult').style.display  = 'none';
 
+  const deleteBtn = mpEl('mpSalaDeleteBtn');
+
   salaRef.once('value', snap => {
     const s = snap.val();
     if (!s) return;
     mpEl('mpSalaNumDisplay').textContent  = `Sala #${s.roomNum || '?'}`;
     mpEl('mpSalaModeDisplay').textContent = s.modoPerg === 'realtime' ? '⚡ Tempo Real' : '⏳ Assíncrono';
+
+    // Mostrar botão eliminar apenas ao host, só na fase de espera
+    const myUid = MP.myUid;
+    if (deleteBtn) {
+      deleteBtn.style.display = (s.host === myUid && s.status === 'waiting') ? 'flex' : 'none';
+      deleteBtn.onclick = () => mpEliminarSalaFromRoom(salaRef.key);
+    }
   });
 
   mpAddListener(salaRef.child('players'), 'value', snap => {
@@ -436,10 +531,24 @@ function mpShowSalaScreen(salaRef) {
     });
   });
 
+  // Detectar se a sala foi eliminada (value = null) para expulsar o convidado
+  mpAddListener(salaRef, 'value', snap => {
+    if (snap.val() === null) {
+      mpClearListeners();
+      mpShowToast('A sala foi eliminada pelo criador.');
+      mpShowScreen('screen-multiplayer');
+      mpLoadSalas();
+    }
+  });
+
   mpAddListener(salaRef.child('status'), 'value', snap => {
     const status = snap.val();
     if (status === 'playing')  mpStartGame();
     if (status === 'finished') mpShowResults();
+    // Esconder botão eliminar quando o jogo começa
+    if (deleteBtn && (status === 'playing' || status === 'finished')) {
+      deleteBtn.style.display = 'none';
+    }
   });
 
   mpAddListener(salaRef.child('currentRound'), 'value', snap => {
