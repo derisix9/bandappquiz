@@ -548,13 +548,24 @@ function mpShowSalaScreen(salaRef) {
 
   const deleteBtn = mpEl('mpSalaDeleteBtn');
 
+  // Guardar dados da sala em variáveis locais para uso nos listeners
+  // sem precisar de fazer .once() aninhados (que causam race conditions)
+  let _salaHost     = null;
+  let _salaMaxP     = 2;
+  let _salaStatus   = 'waiting';
+
   salaRef.once('value', snap => {
     const s = snap.val();
     if (!s) return;
+
+    // Guardar em variáveis locais acessíveis pelos listeners
+    _salaHost   = s.host;
+    _salaMaxP   = s.maxplayers || 2;
+    _salaStatus = s.status || 'waiting';
+
     mpEl('mpSalaNumDisplay').textContent  = `Sala #${s.roomNum || '?'}`;
     mpEl('mpSalaModeDisplay').innerHTML = s.modoPerg === 'realtime' ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real' : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono';
 
-    // Mostrar botão eliminar apenas ao host, só na fase de espera
     const myUid = MP.myUid;
     if (deleteBtn) {
       deleteBtn.style.display = (s.host === myUid && s.status === 'waiting') ? 'flex' : 'none';
@@ -566,19 +577,34 @@ function mpShowSalaScreen(salaRef) {
     const players = [];
     snap.forEach(c => players.push(c.val()));
 
-    salaRef.once('value', s => {
-      const data    = s.val();
-      const maxP    = (data && data.maxplayers) || 2;
-      const me      = mpGetMyInfoSync();
-      const btn     = mpEl('btnIniciarDesafio');
+    // Usar variáveis locais já carregadas — sem .once() aninhado
+    // Se _salaHost ainda não carregou (raro), fazer fallback ao MP.myUid
+    const myUid = MP.myUid;
+    const btn   = mpEl('btnIniciarDesafio');
 
-      mpRenderPlayersGrid(players, maxP);
-      mpRenderScoreboard(players);
+    mpRenderPlayersGrid(players, _salaMaxP);
+    mpRenderScoreboard(players);
 
-      if (!btn) return;
-      btn.style.display = (data && data.host === (me?.uid || MP.myUid) && players.length >= 2 && data.status === 'waiting')
-        ? 'inline-flex' : 'none';
-    });
+    if (!btn) return;
+
+    // Mostrar botão INICIAR: só ao host, só com ≥2 jogadores, só em waiting
+    if (_salaHost === null) {
+      // Host ainda não carregou — fazer fetch e re-renderizar quando chegar
+      salaRef.once('value', s => {
+        const d = s.val();
+        if (!d) return;
+        _salaHost   = d.host;
+        _salaMaxP   = d.maxplayers || 2;
+        _salaStatus = d.status || 'waiting';
+        const canStartDelayed = (_salaHost === myUid) && players.length >= 2 && _salaStatus === 'waiting';
+        if (btn) btn.style.display = canStartDelayed ? 'inline-flex' : 'none';
+        mpRenderPlayersGrid(players, _salaMaxP);
+      });
+      return;
+    }
+    const isHost   = _salaHost === myUid;
+    const canStart = isHost && players.length >= 2 && _salaStatus === 'waiting';
+    btn.style.display = canStart ? 'inline-flex' : 'none';
   });
 
   // Detectar se a sala foi eliminada (value = null) para expulsar o convidado
@@ -593,9 +619,10 @@ function mpShowSalaScreen(salaRef) {
 
   mpAddListener(salaRef.child('status'), 'value', snap => {
     const status = snap.val();
+    if (!status) return;
+    _salaStatus = status; // Manter variável local sincronizada
     if (status === 'playing')  mpStartGame();
     if (status === 'finished') mpShowResults();
-    // Esconder botão eliminar quando o jogo começa
     if (deleteBtn && (status === 'playing' || status === 'finished')) {
       deleteBtn.style.display = 'none';
     }
