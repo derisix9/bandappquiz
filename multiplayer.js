@@ -350,7 +350,7 @@ function mpLoadSalas() {
       const actionBtn = isHost
         ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
              <button class="mp-sala-join" data-salaid="${s._key}">▶ Entrar</button>
-             <button class="mp-sala-delete" data-salaid="${s._key}" style="background:#EF4444;border:none;color:#fff;border-radius:10px;padding:5px 12px;font-size:0.75rem;font-weight:700;cursor:pointer"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Eliminar</button>
+             <button class="mp-sala-delete" data-salaid="${s._key}" style="background:linear-gradient(135deg,#EF4444,#DC2626);border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:0.75rem;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(239,68,68,0.35)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Eliminar</button>
            </div>`
         : `<button class="mp-sala-join" data-salaid="${s._key}">▶ Entrar</button>`;
 
