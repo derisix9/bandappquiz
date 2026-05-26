@@ -378,21 +378,27 @@ async function mpCriarSala(targetUid) {
   };
 
   const ref = await db.ref('mp_salas').push(salaData);
-  mpEntrarSala(ref.key);
+  await mpEntrarSala(ref.key);
 }
 
-function mpEntrarSala(salaId) {
-  const me = mpGetMyInfoSync();
+async function mpEntrarSala(salaId) {
+  // Use async version to ensure name/stars are fully loaded before registering
+  const me = await mpGetMyInfoAsync();
   if (!me) return;
 
   const salaRef = db.ref(`mp_salas/${salaId}`);
-  salaRef.child('players').child(me.uid).set({
+
+  // Await the player registration so the players node is updated
+  // before we start listening to it in mpShowSalaScreen
+  await salaRef.child('players').child(me.uid).set({
     uid: me.uid, name: me.name, email: me.email || me.phone,
     stars: me.stars, score: 0, joined: true,
   });
 
-  MP.salaId = salaId;
-  MP.sala   = salaRef;
+  MP.salaId    = salaId;
+  MP.sala      = salaRef;
+  MP.myUid     = me.uid;
+  MP.myProfile = me;
   mpShowSalaScreen(salaRef);
 }
 
@@ -413,15 +419,18 @@ function mpShowSalaScreen(salaRef) {
   mpAddListener(salaRef.child('players'), 'value', snap => {
     const players = [];
     snap.forEach(c => players.push(c.val()));
-    mpRenderPlayersGrid(players);
-    mpRenderScoreboard(players);
 
     salaRef.once('value', s => {
-      const data = s.val();
-      const me   = mpGetMyInfoSync();
-      const btn  = mpEl('btnIniciarDesafio');
+      const data    = s.val();
+      const maxP    = (data && data.maxplayers) || 2;
+      const me      = mpGetMyInfoSync();
+      const btn     = mpEl('btnIniciarDesafio');
+
+      mpRenderPlayersGrid(players, maxP);
+      mpRenderScoreboard(players);
+
       if (!btn) return;
-      btn.style.display = (data && data.host === me?.uid && players.length >= 2 && data.status === 'waiting')
+      btn.style.display = (data && data.host === (me?.uid || MP.myUid) && players.length >= 2 && data.status === 'waiting')
         ? 'inline-flex' : 'none';
     });
   });
@@ -464,31 +473,29 @@ function mpStartGame() {
   mpEl('mpSalaGame').style.display    = 'block';
 }
 
-function mpRenderPlayersGrid(players) {
-  const grid    = mpEl('mpPlayersGrid');
-  const salaRef = MP.sala;
-  const me      = mpGetMyInfoSync();
-  if (!salaRef || !grid) return;
+function mpRenderPlayersGrid(players, maxPlayers) {
+  const grid = mpEl('mpPlayersGrid');
+  const me   = mpGetMyInfoSync();
+  if (!grid) return;
 
-  salaRef.once('value', s => {
-    const maxP = (s.val() && s.val().maxplayers) || players.length || 2;
-    const slots = Array.from({length: maxP}, (_, i) => {
-      const p = players[i];
-      if (p) {
-        const isMe = p.uid === me?.uid;
-        return `<div class="mp-player-slot filled ${isMe ? 'me' : ''}">
-          <div class="mp-player-slot-avatar">${mpAvatarLetter(p.name)}</div>
-          <div class="mp-player-slot-name">${p.name}${isMe ? ' (tu)' : ''}</div>
-          <div style="font-size:0.65rem;opacity:0.7">${mpStarIcon()} ${p.stars || 0}</div>
-        </div>`;
-      }
-      return `<div class="mp-player-slot">
-        <div class="mp-player-slot-avatar" style="background:rgba(99,102,241,0.15);font-size:1.2rem">👤</div>
-        <div class="mp-player-slot-empty">Aguardando...</div>
+  // maxPlayers can be passed directly from the sala snapshot to avoid extra DB call
+  const maxP = maxPlayers || players.length || 2;
+  const slots = Array.from({length: maxP}, (_, i) => {
+    const p = players[i];
+    if (p) {
+      const isMe = p.uid === (me?.uid || MP.myUid);
+      return `<div class="mp-player-slot filled ${isMe ? 'me' : ''}">
+        <div class="mp-player-slot-avatar">${mpAvatarLetter(p.name)}</div>
+        <div class="mp-player-slot-name">${p.name}${isMe ? ' (tu)' : ''}</div>
+        <div style="font-size:0.65rem;opacity:0.7">${mpStarIcon()} ${p.stars || 0}</div>
       </div>`;
-    });
-    grid.innerHTML = slots.join('');
+    }
+    return `<div class="mp-player-slot">
+      <div class="mp-player-slot-avatar" style="background:rgba(99,102,241,0.15);font-size:1.2rem">👤</div>
+      <div class="mp-player-slot-empty">Aguardando...</div>
+    </div>`;
   });
+  grid.innerHTML = slots.join('');
 }
 
 function mpRenderScoreboard(players) {
@@ -898,7 +905,7 @@ function mpLoadDesafiosRecebidos() {
 
 async function mpAceitarDesafio(key, salaId) {
   await db.ref(`mp_desafios/${key}`).update({ status: 'accepted' });
-  mpEntrarSala(salaId);
+  await mpEntrarSala(salaId);
 }
 
 async function mpRecusarDesafio(key) {
@@ -955,7 +962,7 @@ if (enviarBtn) enviarBtn.addEventListener('click', async () => {
   });
 
   mpShowToast(`Desafio enviado para ${MP.config.targetName}! 🎯`);
-  mpEntrarSala(salaRef.key);
+  await mpEntrarSala(salaRef.key);
 });
 
 // ─── PESQUISA DE JOGADORES ────────────────────────────────
