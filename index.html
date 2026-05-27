@@ -279,6 +279,11 @@
         <button class="icon-btn header-notif-btn" id="headerNotifBtn" title="Notificações">
           <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
           <span class="notif-dot" id="headerNotifDot"></span>
+          <span class="notif-badge" id="headerNotifBadge"></span>
+        </button>
+        <button class="icon-btn header-chat-btn" id="headerChatBtn" title="Chat Bandapp">
+          <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
+          <span class="chat-badge" id="headerChatBadge"></span>
         </button>
         <button class="icon-btn" id="profileMenuBtn" title="Configurações do Perfil">
           <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
@@ -2024,6 +2029,149 @@
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════
+     BANDAPP CHAT SYSTEM
+     ══════════════════════════════════════════════════════════ -->
+
+<!-- Image preview overlay -->
+<div class="img-preview-overlay" id="imgPreviewOverlay">
+  <img id="imgPreviewImg" src="" alt="preview">
+</div>
+
+<!-- File input (hidden) -->
+<input type="file" id="chatFileInput" style="display:none" accept="*/*">
+<input type="file" id="chatImgInput" style="display:none" accept="image/*">
+
+<!-- Chat Overlay -->
+<div class="chat-overlay" id="chatOverlay">
+  <div class="chat-panel">
+
+    <!-- Header: tabs + close -->
+    <div class="chat-header">
+      <div class="chat-tabs">
+        <button class="chat-tab active" id="chatTabCommunity" onclick="ChatSystem.switchTab('community')">
+          <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          Comunidade
+          <span class="chat-tab-badge" id="communityTabBadge"></span>
+        </button>
+        <button class="chat-tab" id="chatTabPrivate" onclick="ChatSystem.switchTab('private')">
+          <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          Privado
+          <span class="chat-tab-badge" id="privateTabBadge"></span>
+        </button>
+      </div>
+      <button class="chat-close-btn" onclick="ChatSystem.close()">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="chat-body">
+
+      <!-- ── COMMUNITY VIEW ─────────────────────────────── -->
+      <div class="chat-view active" id="chatViewCommunity">
+        <!-- Messages -->
+        <div class="messages-area" id="communityMessages"></div>
+
+        <!-- Reply bar -->
+        <div class="chat-reply-bar" id="communityReplyBar">
+          <div class="chat-reply-bar-text">
+            <strong id="communityReplyName"></strong>
+            <span id="communityReplyText"></span>
+          </div>
+          <button class="chat-reply-cancel" onclick="ChatSystem.cancelReply('community')">
+            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+        </div>
+
+        <!-- Input -->
+        <div class="chat-input-area" style="position:relative">
+          <div class="attach-menu" id="communityAttachMenu">
+            <div class="attach-menu-item" onclick="ChatSystem.pickImage('community')">
+              <svg viewBox="0 0 24 24" style="fill:#22C55E"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+              Foto / Imagem
+            </div>
+            <div class="attach-menu-item" onclick="ChatSystem.pickFile('community')">
+              <svg viewBox="0 0 24 24" style="fill:#3B82F6"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+              Ficheiro (até 100MB)
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <button class="chat-attach-btn" id="communityAttachBtn" onclick="ChatSystem.toggleAttach('community')">
+              <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+            </button>
+            <textarea class="chat-input-field" id="communityInput" placeholder="Mensagem para a comunidade..." rows="1" oninput="ChatSystem.autoResize(this)"></textarea>
+            <button class="chat-send-btn" onclick="ChatSystem.sendText('community')">
+              <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PRIVATE VIEW: Conversations List ──────────── -->
+      <div class="chat-view" id="chatViewPrivateList">
+        <div class="convos-list" id="convosList">
+          <div class="chat-empty">
+            <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+            <strong>Sem conversas privadas</strong>
+            <p>No chat da comunidade, toque no nome de alguém para iniciar uma conversa privada.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PRIVATE VIEW: Single Conversation ─────────── -->
+      <div class="chat-view" id="chatViewPrivateChat">
+        <!-- Subheader -->
+        <div class="chat-subheader">
+          <button class="chat-back-btn" onclick="ChatSystem.backToConvoList()">
+            <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          </button>
+          <div class="convo-avatar" id="privateChatAvatar" style="width:36px;height:36px;font-size:0.9rem">?</div>
+          <div class="chat-subheader-info" style="margin-left:8px">
+            <div class="chat-subheader-name" id="privateChatName">—</div>
+            <div class="chat-subheader-status" id="privateChatStatus">online</div>
+          </div>
+        </div>
+        <!-- Messages -->
+        <div class="messages-area" id="privateMessages"></div>
+        <!-- Reply bar -->
+        <div class="chat-reply-bar" id="privateReplyBar">
+          <div class="chat-reply-bar-text">
+            <strong id="privateReplyName"></strong>
+            <span id="privateReplyText"></span>
+          </div>
+          <button class="chat-reply-cancel" onclick="ChatSystem.cancelReply('private')">
+            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+        </div>
+        <!-- Input -->
+        <div class="chat-input-area" style="position:relative">
+          <div class="attach-menu" id="privateAttachMenu">
+            <div class="attach-menu-item" onclick="ChatSystem.pickImage('private')">
+              <svg viewBox="0 0 24 24" style="fill:#22C55E"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+              Foto / Imagem
+            </div>
+            <div class="attach-menu-item" onclick="ChatSystem.pickFile('private')">
+              <svg viewBox="0 0 24 24" style="fill:#3B82F6"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.89.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+              Ficheiro (até 100MB)
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <button class="chat-attach-btn" id="privateAttachBtn" onclick="ChatSystem.toggleAttach('private')">
+              <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+            </button>
+            <textarea class="chat-input-field" id="privateInput" placeholder="Mensagem privada..." rows="1" oninput="ChatSystem.autoResize(this)"></textarea>
+            <button class="chat-send-btn" onclick="ChatSystem.sendText('private')">
+              <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /chat-body -->
+  </div><!-- /chat-panel -->
+</div><!-- /chat-overlay -->
+
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -2031,6 +2179,562 @@
 <script src="multiplayer.js"></script>
 
 <!-- AUDIO ELEMENTS -->
+<script>
+/* ══════════════════════════════════════════════════════════
+   BANDAPP CHAT SYSTEM — chat.js (inline)
+   Comunidade + Privado — Firebase RTDB
+   ══════════════════════════════════════════════════════════ */
+'use strict';
+const ChatSystem = (() => {
+
+  // ─── State ─────────────────────────────────────────────
+  let _currentTab     = 'community';   // 'community' | 'private'
+  let _privateConvoId = null;          // uid of the other user
+  let _privateConvoName = '';
+  let _replyTo        = { community: null, private: null };
+  let _listeners      = {};            // firebase listeners
+  let _unreadComm     = 0;
+  let _unreadPriv     = 0;
+  let _unreadPrivMap  = {};            // {uid: count}
+  let _currentAttachCtx = null;        // 'community' | 'private'
+  let _isOpen         = false;
+
+  // Firebase refs
+  const commRef  = () => firebase.database().ref('chat/community');
+  const privRef  = (uid1, uid2) => firebase.database().ref(`chat/private/${_convKey(uid1, uid2)}`);
+  const convKey  = (uid) => _convKey(_myUid(), uid);
+  function _convKey(a, b) { return [a,b].sort().join('_'); }
+
+  // Current user helpers
+  function _myUid()    { return (firebase.auth().currentUser || {}).uid || 'anon'; }
+  function _myName()   { return State.profile?.name || State.profile?.displayName || firebase.auth().currentUser?.displayName || 'Eu'; }
+  function _myAvatar() { return State.profile?.avatar || firebase.auth().currentUser?.photoURL || null; }
+  function _myInitial(){ const n = _myName(); return n ? n[0].toUpperCase() : '?'; }
+
+  // ─── Open / Close ───────────────────────────────────────
+  function open() {
+    document.getElementById('chatOverlay').classList.add('open');
+    _isOpen = true;
+    // Close notif panel if open
+    const notifPanel = document.getElementById('notifPanel');
+    if (notifPanel) notifPanel.classList.remove('open');
+    // Mark as read for current tab
+    if (_currentTab === 'community') { _clearUnreadComm(); }
+    else if (_currentTab === 'private' && _privateConvoId) { _clearUnreadPriv(_privateConvoId); }
+    _startCommunityListener();
+    _startPrivateConvosListener();
+  }
+
+  function close() {
+    document.getElementById('chatOverlay').classList.remove('open');
+    _isOpen = false;
+    document.querySelectorAll('.attach-menu').forEach(m => m.classList.remove('open'));
+  }
+
+  // Close when clicking overlay background
+  document.getElementById('chatOverlay').addEventListener('click', function(e){
+    if (e.target === this) close();
+  });
+
+  // ─── Tabs ───────────────────────────────────────────────
+  function switchTab(tab) {
+    _currentTab = tab;
+    document.getElementById('chatTabCommunity').classList.toggle('active', tab === 'community');
+    document.getElementById('chatTabPrivate').classList.toggle('active', tab === 'private');
+
+    document.getElementById('chatViewCommunity').classList.toggle('active', tab === 'community');
+    document.getElementById('chatViewPrivateList').classList.toggle('active', tab === 'private' && !_privateConvoId);
+    document.getElementById('chatViewPrivateChat').classList.toggle('active', tab === 'private' && !!_privateConvoId);
+
+    if (tab === 'community') { _clearUnreadComm(); _scrollToBottom('communityMessages'); }
+    if (tab === 'private')   { _startPrivateConvosListener(); }
+    document.querySelectorAll('.attach-menu').forEach(m => m.classList.remove('open'));
+  }
+
+  // ─── Send ───────────────────────────────────────────────
+  function sendText(ctx) {
+    const inp = document.getElementById(ctx === 'community' ? 'communityInput' : 'privateInput');
+    const text = inp.value.trim();
+    if (!text) return;
+    inp.value = '';
+    autoResize(inp);
+    const msg = _buildMsg({ type: 'text', text });
+    if (_replyTo[ctx]) {
+      msg.replyTo = _replyTo[ctx];
+      cancelReply(ctx);
+    }
+    _pushMsg(ctx, msg);
+  }
+
+  function _buildMsg(extra) {
+    return {
+      uid:    _myUid(),
+      name:   _myName(),
+      avatar: _myAvatar() || '',
+      ts:     firebase.database.ServerValue.TIMESTAMP,
+      ...extra
+    };
+  }
+
+  function _pushMsg(ctx, msg) {
+    if (ctx === 'community') {
+      commRef().push(msg).catch(e => showToast('Erro ao enviar mensagem'));
+    } else {
+      if (!_privateConvoId) return;
+      const key = _convKey(_myUid(), _privateConvoId);
+      firebase.database().ref(`chat/private/${key}`).push(msg).catch(e => showToast('Erro ao enviar'));
+      // Update convo metadata for both users
+      const convoMeta = { lastMsg: msg.text || (msg.type === 'image' ? '📷 Foto' : '📎 Ficheiro'), lastTs: firebase.database.ServerValue.TIMESTAMP, participants: { [_myUid()]: true, [_privateConvoId]: true } };
+      firebase.database().ref(`chat/convos/${_myUid()}/${_privateConvoId}`).update({ ...convoMeta, otherName: _privateConvoName, otherUid: _privateConvoId });
+      firebase.database().ref(`chat/convos/${_privateConvoId}/${_myUid()}`).update({ ...convoMeta, otherName: _myName(), otherUid: _myUid() });
+    }
+  }
+
+  // ─── File / Image attach ────────────────────────────────
+  function toggleAttach(ctx) {
+    const menu = document.getElementById(ctx === 'community' ? 'communityAttachMenu' : 'privateAttachMenu');
+    menu.classList.toggle('open');
+    _currentAttachCtx = ctx;
+    document.querySelectorAll('.attach-menu').forEach(m => { if (m !== menu) m.classList.remove('open'); });
+  }
+
+  function pickImage(ctx) {
+    _currentAttachCtx = ctx;
+    document.querySelectorAll('.attach-menu').forEach(m => m.classList.remove('open'));
+    document.getElementById('chatImgInput').click();
+  }
+
+  function pickFile(ctx) {
+    _currentAttachCtx = ctx;
+    document.querySelectorAll('.attach-menu').forEach(m => m.classList.remove('open'));
+    document.getElementById('chatFileInput').click();
+  }
+
+  document.getElementById('chatImgInput').addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    this.value = '';
+    if (file.size > 100 * 1024 * 1024) { showToast('Ficheiro muito grande (máx 100MB)'); return; }
+    _uploadAndSend(file, 'image', _currentAttachCtx || 'community');
+  });
+
+  document.getElementById('chatFileInput').addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    this.value = '';
+    if (file.size > 100 * 1024 * 1024) { showToast('Ficheiro muito grande (máx 100MB)'); return; }
+    _uploadAndSend(file, 'file', _currentAttachCtx || 'community');
+  });
+
+  function _uploadAndSend(file, msgType, ctx) {
+    // Read as base64 DataURL and store in RTDB (for simplicity)
+    // For large files this is illustrative; in production use Firebase Storage
+    if (file.size > 2 * 1024 * 1024) {
+      // For files > 2MB, store metadata only (no binary in RTDB)
+      const msg = _buildMsg({
+        type: msgType,
+        fileName: file.name,
+        fileSize: _fmtSize(file.size),
+        fileType: file.type,
+        url: '',          // would be Storage URL in production
+        noPreview: true
+      });
+      if (_replyTo[ctx]) { msg.replyTo = _replyTo[ctx]; cancelReply(ctx); }
+      _pushMsg(ctx, msg);
+      showToast('Ficheiro enviado (sem pré-visualização — use Firebase Storage para URLs reais)');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const msg = _buildMsg({ type: msgType, url: e.target.result, fileName: file.name, fileSize: _fmtSize(file.size), fileType: file.type });
+      if (_replyTo[ctx]) { msg.replyTo = _replyTo[ctx]; cancelReply(ctx); }
+      _pushMsg(ctx, msg);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function _fmtSize(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/1024/1024).toFixed(1) + ' MB';
+  }
+
+  // ─── Reply ──────────────────────────────────────────────
+  function setReply(ctx, uid, name, text) {
+    _replyTo[ctx] = { uid, name, text };
+    const bar  = document.getElementById(ctx === 'community' ? 'communityReplyBar' : 'privateReplyBar');
+    const nameEl = document.getElementById(ctx === 'community' ? 'communityReplyName' : 'privateReplyName');
+    const textEl = document.getElementById(ctx === 'community' ? 'communityReplyText' : 'privateReplyText');
+    bar.classList.add('show');
+    nameEl.textContent = name;
+    textEl.textContent = text.substring(0, 60);
+    document.getElementById(ctx === 'community' ? 'communityInput' : 'privateInput').focus();
+  }
+
+  function cancelReply(ctx) {
+    _replyTo[ctx] = null;
+    const bar = document.getElementById(ctx === 'community' ? 'communityReplyBar' : 'privateReplyBar');
+    bar.classList.remove('show');
+  }
+
+  // ─── Pull to Private ────────────────────────────────────
+  function startPrivateWith(uid, name) {
+    _privateConvoId   = uid;
+    _privateConvoName = name;
+    // Update subheader
+    document.getElementById('privateChatName').textContent   = name;
+    document.getElementById('privateChatStatus').textContent = 'online';
+    const initial = name ? name[0].toUpperCase() : '?';
+    document.getElementById('privateChatAvatar').textContent = initial;
+    // Switch views
+    document.getElementById('chatViewPrivateList').classList.remove('active');
+    document.getElementById('chatViewPrivateChat').classList.add('active');
+    // Listeners
+    _startPrivateChatListener();
+    _clearUnreadPriv(uid);
+    // Ensure tab is private
+    if (_currentTab !== 'private') switchTab('private');
+    // Update convo metadata
+    firebase.database().ref(`chat/convos/${_myUid()}/${uid}`).update({ otherName: name, otherUid: uid, lastTs: firebase.database.ServerValue.TIMESTAMP });
+  }
+
+  function backToConvoList() {
+    _privateConvoId = null;
+    // Detach private chat listener
+    if (_listeners.privateChat) { _listeners.privateChat(); _listeners.privateChat = null; }
+    document.getElementById('chatViewPrivateChat').classList.remove('active');
+    document.getElementById('chatViewPrivateList').classList.add('active');
+    cancelReply('private');
+  }
+
+  // ─── Community Listener ─────────────────────────────────
+  function _startCommunityListener() {
+    if (_listeners.community) return;
+    const area = document.getElementById('communityMessages');
+    // Load last 80 messages
+    const q = commRef().limitToLast(80);
+    q.on('value', snap => {
+      const msgs = [];
+      snap.forEach(c => msgs.push({ key: c.key, ...c.val() }));
+      _renderMessages('community', msgs, area);
+      if (_isOpen && _currentTab === 'community') {
+        _clearUnreadComm();
+        _scrollToBottom('communityMessages');
+      }
+    });
+    _listeners.community = () => q.off('value');
+  }
+
+  // ─── Private Conversations Listener ────────────────────
+  function _startPrivateConvosListener() {
+    const uid = _myUid();
+    if (!uid || uid === 'anon') return;
+    if (_listeners.convos) return;
+    const ref = firebase.database().ref(`chat/convos/${uid}`);
+    ref.on('value', snap => {
+      const convos = [];
+      snap.forEach(c => convos.push({ uid: c.key, ...c.val() }));
+      _renderConvosList(convos);
+    });
+    _listeners.convos = () => ref.off('value');
+  }
+
+  // ─── Private Chat Listener ──────────────────────────────
+  function _startPrivateChatListener() {
+    if (_listeners.privateChat) { _listeners.privateChat(); _listeners.privateChat = null; }
+    if (!_privateConvoId) return;
+    const key  = _convKey(_myUid(), _privateConvoId);
+    const area = document.getElementById('privateMessages');
+    const ref  = firebase.database().ref(`chat/private/${key}`).limitToLast(80);
+    ref.on('value', snap => {
+      const msgs = [];
+      snap.forEach(c => msgs.push({ key: c.key, ...c.val() }));
+      _renderMessages('private', msgs, area);
+      if (_isOpen && _currentTab === 'private' && _privateConvoId) {
+        _clearUnreadPriv(_privateConvoId);
+        _scrollToBottom('privateMessages');
+      }
+    });
+    _listeners.privateChat = () => ref.off('value');
+  }
+
+  // ─── Render messages ────────────────────────────────────
+  function _renderMessages(ctx, msgs, container) {
+    const myUid = _myUid();
+    let lastDate = '';
+    let html = '';
+    if (!msgs.length) {
+      container.innerHTML = `<div class="chat-empty"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg><strong>${ctx === 'community' ? 'Chat da Comunidade' : 'Conversa Privada'}</strong><p>${ctx === 'community' ? 'Sê o primeiro a escrever!' : 'Inicia a conversa!'}</p></div>`;
+      return;
+    }
+    msgs.forEach(msg => {
+      const mine = msg.uid === myUid;
+      const ts   = msg.ts ? new Date(msg.ts) : new Date();
+      const dateStr = ts.toLocaleDateString('pt-AO', { day: '2-digit', month: 'short' });
+      if (dateStr !== lastDate) {
+        html += `<div class="msg-date-sep">${dateStr}</div>`;
+        lastDate = dateStr;
+      }
+      const timeStr = ts.toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' });
+      const avatarHtml = mine ? '' : `<div class="msg-avatar-sm">${msg.avatar ? `<img src="${msg.avatar}" onerror="this.parentNode.textContent='${(msg.name||'?')[0].toUpperCase()}'">` : (msg.name||'?')[0].toUpperCase()}</div>`;
+      let replyHtml = '';
+      if (msg.replyTo) {
+        replyHtml = `<div class="msg-reply-quote"><strong>${_esc(msg.replyTo.name)}</strong>${_esc(msg.replyTo.text.substring(0,60))}</div>`;
+      }
+      let contentHtml = '';
+      if (msg.type === 'text') {
+        contentHtml = `<div class="msg-bubble">${replyHtml}${_esc(msg.text)}</div>`;
+      } else if (msg.type === 'image') {
+        if (msg.url && !msg.noPreview) {
+          contentHtml = `<div class="msg-bubble" style="padding:4px">${replyHtml}<img class="msg-img" src="${msg.url}" onclick="ChatSystem._previewImg('${msg.url.substring(0,80)}...','${msg.url}')"></div>`;
+          // Use full url in data attr to avoid truncation
+          contentHtml = `<div class="msg-bubble" style="padding:4px">${replyHtml}<img class="msg-img" src="${msg.url}" data-full="${msg.url}" onclick="ChatSystem.previewImg(this)"></div>`;
+        } else {
+          contentHtml = `<div class="msg-bubble"><div class="msg-file"><svg viewBox="0 0 24 24" style="fill:#22C55E"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg><div class="msg-file-info"><div class="msg-file-name">${_esc(msg.fileName||'imagem')}</div><div class="msg-file-size">${msg.fileSize||''}</div></div></div></div>`;
+        }
+      } else if (msg.type === 'file') {
+        const icon = `<svg viewBox="0 0 24 24" style="fill:#3B82F6"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>`;
+        contentHtml = `<div class="msg-bubble"><div class="msg-file"${msg.url ? ` onclick="window.open('${msg.url}')"` : ''}>${icon}<div class="msg-file-info"><div class="msg-file-name">${_esc(msg.fileName||'ficheiro')}</div><div class="msg-file-size">${msg.fileSize||''}</div></div></div></div>`;
+      }
+      // Mention / pull-to-private button for community, only on others' messages
+      let mentionBtn = '';
+      if (ctx === 'community' && !mine) {
+        mentionBtn = `<button class="msg-mention-btn" onclick="ChatSystem._onMentionTap('${msg.uid}','${_esc(msg.name||'?')}','${_esc(msg.text||'')}')"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>Privado</button>`;
+      }
+      html += `<div class="msg-row ${mine ? 'mine' : 'theirs'}" data-uid="${msg.uid}" data-name="${_esc(msg.name||'?')}" data-text="${_esc(msg.type==='text'?(msg.text||''):('['+msg.type+']'))}" data-ctx="${ctx}">
+        ${avatarHtml}
+        <div class="msg-bubble-wrap">
+          ${!mine ? `<span class="msg-sender-name">${_esc(msg.name||'?')} ${mentionBtn}</span>` : ''}
+          ${contentHtml}
+          <span class="msg-time">${timeStr}</span>
+        </div>
+      </div>`;
+    });
+    container.innerHTML = html;
+    // Add tap-to-reply on bubbles
+    container.querySelectorAll('.msg-row').forEach(row => {
+      row.querySelector('.msg-bubble')?.addEventListener('click', function(e) {
+        if (e.target.closest('.msg-mention-btn') || e.target.closest('.msg-img') || e.target.closest('.msg-file')) return;
+        const uid  = row.dataset.uid;
+        const name = row.dataset.name;
+        const text = row.dataset.text;
+        const c    = row.dataset.ctx;
+        setReply(c, uid, name, text);
+      });
+    });
+  }
+
+  // ─── Render Convos List ─────────────────────────────────
+  function _renderConvosList(convos) {
+    const el = document.getElementById('convosList');
+    if (!convos.length) {
+      el.innerHTML = `<div class="chat-empty"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg><strong>Sem conversas privadas</strong><p>No chat da comunidade, toque em "Privado" ao lado do nome de alguém.</p></div>`;
+      return;
+    }
+    convos.sort((a,b) => (b.lastTs||0) - (a.lastTs||0));
+    el.innerHTML = convos.map(c => {
+      const initial = (c.otherName||'?')[0].toUpperCase();
+      const unread  = _unreadPrivMap[c.uid] || 0;
+      const ts      = c.lastTs ? new Date(c.lastTs).toLocaleTimeString('pt-AO', { hour:'2-digit', minute:'2-digit' }) : '';
+      return `<div class="convo-item" onclick="ChatSystem.startPrivateWith('${c.otherUid||c.uid}','${_esc(c.otherName||'?')}')">
+        <div class="convo-avatar">${initial}</div>
+        <div class="convo-info">
+          <div class="convo-name">${_esc(c.otherName||'?')}</div>
+          <div class="convo-preview">${_esc(c.lastMsg||'')}</div>
+        </div>
+        <div class="convo-meta">
+          <span class="convo-time">${ts}</span>
+          <span class="convo-unread ${unread>0?'show':''}">${unread||''}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ─── Unread counters ────────────────────────────────────
+  function _clearUnreadComm() {
+    _unreadComm = 0;
+    _updateBadges();
+  }
+  function _clearUnreadPriv(uid) {
+    delete _unreadPrivMap[uid];
+    _unreadPriv = Object.values(_unreadPrivMap).reduce((a,b) => a+b, 0);
+    _updateBadges();
+  }
+  function _incUnreadComm() {
+    if (_isOpen && _currentTab === 'community') return;
+    _unreadComm++;
+    _updateBadges();
+  }
+  function _incUnreadPriv(uid) {
+    if (_isOpen && _currentTab === 'private' && _privateConvoId === uid) return;
+    _unreadPrivMap[uid] = (_unreadPrivMap[uid]||0) + 1;
+    _unreadPriv = Object.values(_unreadPrivMap).reduce((a,b) => a+b, 0);
+    _updateBadges();
+  }
+  function _updateBadges() {
+    const total = _unreadComm + _unreadPriv;
+    // Main chat icon badge
+    const chatBadge = document.getElementById('headerChatBadge');
+    if (chatBadge) {
+      chatBadge.textContent = total > 99 ? '99+' : (total || '');
+      chatBadge.classList.toggle('show', total > 0);
+    }
+    // Tab badges
+    const commBadge = document.getElementById('communityTabBadge');
+    if (commBadge) { commBadge.textContent = _unreadComm > 99 ? '99+' : (_unreadComm||''); commBadge.classList.toggle('show', _unreadComm > 0); }
+    const privBadge = document.getElementById('privateTabBadge');
+    if (privBadge) { privBadge.textContent = _unreadPriv > 99 ? '99+' : (_unreadPriv||''); privBadge.classList.toggle('show', _unreadPriv > 0); }
+  }
+
+  // ─── Mention / pull to private ──────────────────────────
+  function _onMentionTap(uid, name, text) {
+    // Show options: reply in community or go private
+    if (confirm(`Queres iniciar uma conversa privada com ${name}?`)) {
+      startPrivateWith(uid, name);
+      if (_isOpen) open();
+      else { open(); }
+    } else {
+      setReply('community', uid, name, text);
+    }
+  }
+
+  // ─── Image preview ──────────────────────────────────────
+  function previewImg(imgEl) {
+    const url = imgEl.dataset.full || imgEl.src;
+    const ov  = document.getElementById('imgPreviewOverlay');
+    document.getElementById('imgPreviewImg').src = url;
+    ov.classList.add('open');
+  }
+  document.getElementById('imgPreviewOverlay').addEventListener('click', function(){ this.classList.remove('open'); });
+
+  // ─── Scroll helpers ─────────────────────────────────────
+  function _scrollToBottom(id) {
+    const el = document.getElementById(id);
+    if (el) setTimeout(() => { el.scrollTop = el.scrollHeight; }, 80);
+  }
+
+  // ─── Input auto-resize ──────────────────────────────────
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+  }
+
+  // ─── Escape helper ──────────────────────────────────────
+  function _esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // ─── Notif Badge for notifications (upgrade dot → badge) ─
+  function updateNotifBadge(count) {
+    const badge = document.getElementById('headerNotifBadge');
+    const dot   = document.getElementById('headerNotifDot');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.classList.add('show');
+      if (dot) dot.classList.remove('show');
+    } else {
+      badge.classList.remove('show');
+    }
+  }
+
+  // ─── Listen for new community messages (for badge when closed) ─
+  function _startBadgeListener() {
+    let first = true;
+    const q = commRef().limitToLast(1);
+    q.on('child_added', snap => {
+      if (first) { first = false; return; } // ignore initial load
+      const msg = snap.val();
+      if (msg && msg.uid !== _myUid()) _incUnreadComm();
+    });
+  }
+
+  // ─── Init ───────────────────────────────────────────────
+  function init() {
+    // Hook up the header chat button
+    const btn = document.getElementById('headerChatBtn');
+    if (btn) btn.onclick = (e) => { e.stopPropagation(); open(); };
+    // Start badge listener after auth
+    firebase.auth().onAuthStateChanged(user => {
+      if (user) {
+        setTimeout(_startBadgeListener, 1500);
+        setTimeout(_startPrivateConvosListenerBadge, 1500);
+      }
+    });
+    // Keyboard send
+    ['communityInput', 'privateInput'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          const ctx = id === 'communityInput' ? 'community' : 'private';
+          sendText(ctx);
+        }
+      });
+    });
+    // Close attach menus on outside click
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.attach-menu') && !e.target.closest('.chat-attach-btn')) {
+        document.querySelectorAll('.attach-menu').forEach(m => m.classList.remove('open'));
+      }
+    });
+  }
+
+  function _startPrivateConvosListenerBadge() {
+    const uid = _myUid();
+    if (!uid || uid === 'anon') return;
+    const ref = firebase.database().ref(`chat/convos/${uid}`);
+    ref.on('child_changed', snap => {
+      const convo = snap.val();
+      if (convo && convo.lastSenderUid !== uid) {
+        _incUnreadPriv(snap.key);
+      }
+    });
+  }
+
+  // ─── Patch existing addNotifItem to show badge ──────────
+  const _origAddNotifItem = window.addNotifItem;
+  // We monkey-patch after init to update badge count
+  function _patchNotifBadge() {
+    let _notifCount = 0;
+    const origRender = window.renderNotifPanel;
+    if (origRender) {
+      window.renderNotifPanel = function() {
+        origRender.call(this);
+        // Count unread notifs
+        _notifCount = (window._notifItems || []).length;
+        updateNotifBadge(_notifCount);
+      };
+    }
+    // Patch clear
+    const clearBtn = document.getElementById('notifPanelClear');
+    if (clearBtn) {
+      const orig = clearBtn.onclick;
+      clearBtn.onclick = function(e) {
+        if (orig) orig.call(this, e);
+        updateNotifBadge(0);
+      };
+    }
+  }
+
+  // ─── Public API ─────────────────────────────────────────
+  return { open, close, switchTab, sendText, toggleAttach, pickImage, pickFile, setReply, cancelReply, startPrivateWith, backToConvoList, previewImg, autoResize, updateNotifBadge, _onMentionTap, init, _patchNotifBadge };
+})();
+
+// Init after DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  ChatSystem.init();
+  // Patch notif badge after a tick to ensure app.js functions are loaded
+  setTimeout(() => { ChatSystem._patchNotifBadge(); }, 500);
+});
+// Also init immediately in case DOMContentLoaded already fired
+if (document.readyState !== 'loading') {
+  ChatSystem.init();
+  setTimeout(() => { ChatSystem._patchNotifBadge(); }, 500);
+}
+</script>
+
 <audio id="bgMusic" loop preload="auto">
   <source src="Aprender_Vencer.mp3" type="audio/mpeg">
 </audio>
