@@ -519,126 +519,88 @@ async function mpCriarSala(targetUid) {
 
 
 async function mpEntrarSala(salaId) {
+  // Use async version to ensure name/stars are fully loaded before registering
   const me = await mpGetMyInfoAsync();
   if (!me) return;
 
   const salaRef = db.ref(`mp_salas/${salaId}`);
 
-  // Definir estado ANTES de mostrar o ecrã
-  MP.salaId    = salaId;
-  MP.sala      = salaRef;
-  MP.myUid     = me.uid;
-  MP.myProfile = me;
-
-  // Limpar listeners de sessões anteriores
-  mpClearListeners();
-
-  // 1. Mostrar ecrã e registar listeners (await = activo antes do .set)
-  await mpShowSalaScreen(salaRef);
-
-  // 2. Registar jogador na sala — o listener de players já está activo
+  // Await the player registration so the players node is updated
+  // before we start listening to it in mpShowSalaScreen
   await salaRef.child('players').child(me.uid).set({
     uid: me.uid, name: me.name, email: me.email || me.phone,
     stars: me.stars, score: 0, joined: true,
   });
+
+  MP.salaId    = salaId;
+  MP.sala      = salaRef;
+  MP.myUid     = me.uid;
+  MP.myProfile = me;
+  mpShowSalaScreen(salaRef);
 }
 
 // ─── SALA DE JOGO ─────────────────────────────────────────
-async function mpShowSalaScreen(salaRef) {
+function mpShowSalaScreen(salaRef) {
   mpShowScreen('screen-mp-sala');
   mpEl('mpSalaWaiting').style.display = 'block';
   mpEl('mpSalaGame').style.display    = 'none';
   mpEl('mpSalaResult').style.display  = 'none';
-  // Garantir id no texto de espera para actualizações dinâmicas
-  const _waitP = document.querySelector('#mpSalaWaiting .mp-waiting-txt');
-  if (_waitP && !_waitP.id) _waitP.id = 'mpWaitingTxt';
 
   const deleteBtn = mpEl('mpSalaDeleteBtn');
-  const initBtn   = mpEl('btnIniciarDesafio');
 
-  // Ler dados da sala UMA vez com await — sem callbacks aninhados
-  const sSnap = await salaRef.once('value');
-  const sData = sSnap.val();
-  if (!sData) return;
+  salaRef.once('value', snap => {
+    const s = snap.val();
+    if (!s) return;
+    mpEl('mpSalaNumDisplay').textContent  = `Sala #${s.roomNum || '?'}`;
+    mpEl('mpSalaModeDisplay').innerHTML = s.modoPerg === 'realtime' ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real' : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono';
 
-  const _host   = sData.host;
-  const _maxP   = sData.maxplayers || 2;
-  const isHost  = _host === MP.myUid;
+    // Mostrar botão eliminar apenas ao host, só na fase de espera
+    const myUid = MP.myUid;
+    if (deleteBtn) {
+      deleteBtn.style.display = (s.host === myUid && s.status === 'waiting') ? 'flex' : 'none';
+      deleteBtn.onclick = () => mpEliminarSalaFromRoom(salaRef.key);
+    }
+  });
 
-  mpEl('mpSalaNumDisplay').textContent = `Sala #${sData.roomNum || '?'}`;
-  mpEl('mpSalaModeDisplay').innerHTML  = sData.modoPerg === 'realtime'
-    ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real'
-    : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono';
-
-  if (deleteBtn) {
-    deleteBtn.style.display = isHost ? 'flex' : 'none';
-    deleteBtn.onclick = () => mpEliminarSalaFromRoom(salaRef.key);
-  }
-
-  // Botão iniciar — só visível ao host, começa desabilitado
-  if (initBtn) {
-    initBtn.style.display = isHost ? 'inline-flex' : 'none';
-    initBtn.disabled = true;
-    initBtn.style.opacity = '0.5';
-    initBtn.textContent = 'A aguardar adversário...';
-    initBtn.onclick = mpIniciarContagem;
-  }
-
-  // ── LISTENER DE PLAYERS ──────────────────────────────────
-  // Dispara sempre que alguém entra/sai da sala
   mpAddListener(salaRef.child('players'), 'value', snap => {
     const players = [];
     snap.forEach(c => players.push(c.val()));
-    mpRenderPlayersGrid(players, _maxP);
-    mpRenderScoreboard(players);
 
-    // Quando o adversário entra (≥2 jogadores), activar botão e notificar host
-    if (isHost && initBtn && players.length >= 2) {
-      initBtn.disabled = false;
-      initBtn.style.opacity = '1';
-      initBtn.style.animation = 'mpPulse 1s ease infinite';
-      // Mostrar nome do adversário
-      const adversario = players.find(p => p.uid !== MP.myUid);
-      const nome = adversario ? adversario.name.split(' ')[0] : 'Adversário';
-      initBtn.innerHTML = `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>${nome} entrou! Iniciar Desafio`;
-      mpShowToast(`${nome} aceitou o desafio! Podes iniciar.`);
-    }
+    salaRef.once('value', s => {
+      const data    = s.val();
+      const maxP    = (data && data.maxplayers) || 2;
+      const me      = mpGetMyInfoSync();
+      const btn     = mpEl('btnIniciarDesafio');
 
-    // Mensagem para o convidado enquanto espera
-    const waitTxt = mpEl('mpWaitingTxt');
-    if (!isHost && waitTxt) {
-      if (players.length >= 2) {
-        waitTxt.textContent = 'Aguarda que o desafiador inicie o jogo...';
-      }
-    }
+      mpRenderPlayersGrid(players, maxP);
+      mpRenderScoreboard(players);
+
+      if (!btn) return;
+      btn.style.display = (data && data.host === (me?.uid || MP.myUid) && players.length >= 2 && data.status === 'waiting')
+        ? 'inline-flex' : 'none';
+    });
   });
 
-  // ── LISTENER DE STATUS ───────────────────────────────────
-  mpAddListener(salaRef.child('status'), 'value', snap => {
-    const status = snap.val();
-    if (!status) return;
-    if (status === 'countdown') mpIniciarContagemLocal();
-    if (status === 'playing')   mpStartGame();
-    if (status === 'finished')  mpShowResults();
-    if (deleteBtn && (status === 'playing' || status === 'finished' || status === 'countdown')) {
-      deleteBtn.style.display = 'none';
-    }
-    if (initBtn && (status === 'playing' || status === 'finished' || status === 'countdown')) {
-      initBtn.style.display = 'none';
-    }
-  });
-
-  // ── SALA ELIMINADA ───────────────────────────────────────
+  // Detectar se a sala foi eliminada (value = null) para expulsar o convidado
   mpAddListener(salaRef, 'value', snap => {
     if (snap.val() === null) {
       mpClearListeners();
-      mpShowToast('A sala foi eliminada.');
+      mpShowToast('A sala foi eliminada pelo criador.');
       mpShowScreen('screen-multiplayer');
       mpLoadSalas();
     }
   });
 
-  // ── LISTENER DE PERGUNTA ─────────────────────────────────
+  mpAddListener(salaRef.child('status'), 'value', snap => {
+    const status = snap.val();
+    if (status === 'playing')  mpStartGame();
+    if (status === 'finished') mpShowResults();
+    // Esconder botão eliminar quando o jogo começa
+    if (deleteBtn && (status === 'playing' || status === 'finished')) {
+      deleteBtn.style.display = 'none';
+    }
+  });
+
   mpAddListener(salaRef.child('currentRound'), 'value', snap => {
     const round = snap.val();
     if (round !== null && mpEl('mpSalaGame').style.display !== 'none') {
@@ -661,66 +623,9 @@ async function mpShowSalaScreen(salaRef) {
       mpRenderScoreboard(players);
     });
   });
-}
 
-// ─── CONTAGEM DECRESCENTE (host dispara, todos recebem) ───
-async function mpIniciarContagem() {
-  const salaRef = MP.sala;
-  if (!salaRef) return;
-  // Apenas o host muda o status para 'countdown'
-  await salaRef.update({ status: 'countdown' });
-}
-
-let _mpCountdownInterval = null;
-function mpIniciarContagemLocal() {
-  // Mostrar overlay de contagem em ambos os dispositivos
-  let existing = document.getElementById('mp-countdown-overlay');
-  if (existing) existing.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'mp-countdown-overlay';
-  overlay.style.cssText = `
-    position:fixed;inset:0;background:rgba(0,0,0,0.82);
-    z-index:99998;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;
-  `;
-  overlay.innerHTML = `
-    <div style="color:#fff;font-size:1rem;font-weight:600;margin-bottom:16px;opacity:0.8">O jogo começa em</div>
-    <div id="mpCountdownNum" style="
-      font-size:7rem;font-weight:900;color:#fff;
-      font-family:var(--font-display,sans-serif);
-      text-shadow:0 0 40px rgba(99,102,241,0.8);
-      line-height:1;
-    ">10</div>
-    <div style="color:rgba(255,255,255,0.5);font-size:0.85rem;margin-top:20px">Prepara-te!</div>
-  `;
-  document.body.appendChild(overlay);
-
-  let count = 10;
-  if (_mpCountdownInterval) clearInterval(_mpCountdownInterval);
-
-  _mpCountdownInterval = setInterval(async () => {
-    count--;
-    const numEl = document.getElementById('mpCountdownNum');
-    if (numEl) {
-      numEl.textContent = count;
-      numEl.style.transform = 'scale(1.3)';
-      setTimeout(() => { if(numEl) numEl.style.transform = 'scale(1)'; }, 200);
-    }
-    if (count <= 0) {
-      clearInterval(_mpCountdownInterval);
-      _mpCountdownInterval = null;
-      overlay.remove();
-      // Só o host muda o status para 'playing' e inicia o jogo
-      if (MP.sala && MP.myUid) {
-        const sSnap = await MP.sala.once('value');
-        const sData = sSnap.val();
-        if (sData && sData.host === MP.myUid) {
-          await mpIniciarJogo();
-        }
-      }
-    }
-  }, 1000);
+  const initBtn = mpEl('btnIniciarDesafio');
+  if (initBtn) initBtn.onclick = mpIniciarJogo;
 }
 
 function mpStartGame() {
@@ -729,16 +634,23 @@ function mpStartGame() {
 }
 
 function mpRenderPlayersGrid(players, maxPlayers) {
-  const grid = mpEl('mpPlayersGrid');
-  const me   = mpGetMyInfoSync();
+  const grid  = mpEl('mpPlayersGrid');
+  const myUid = MP.myUid;
   if (!grid) return;
 
-  // maxPlayers can be passed directly from the sala snapshot to avoid extra DB call
   const maxP = maxPlayers || players.length || 2;
+
+  // Ordenar: o utilizador actual SEMPRE no slot 0 (esquerda),
+  // os outros a seguir — independente da ordem que o Firebase devolve
+  const sorted = [
+    ...players.filter(p => p.uid === myUid),
+    ...players.filter(p => p.uid !== myUid),
+  ];
+
   const slots = Array.from({length: maxP}, (_, i) => {
-    const p = players[i];
+    const p = sorted[i];
     if (p) {
-      const isMe = p.uid === (me?.uid || MP.myUid);
+      const isMe = p.uid === myUid;
       return `<div class="mp-player-slot filled ${isMe ? 'me' : ''}">
         <div class="mp-player-slot-avatar">${mpAvatarLetter(p.name)}</div>
         <div class="mp-player-slot-name">${p.name}${isMe ? ' (tu)' : ''}</div>
@@ -1605,20 +1517,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
-
-// ─── CSS DINÂMICO (contagem + pulse) ─────────────────────
-(function mpInjectCSS() {
-  if (document.getElementById('mp-dynamic-css')) return;
-  const s = document.createElement('style');
-  s.id = 'mp-dynamic-css';
-  s.textContent = `
-    @keyframes mpPulse {
-      0%,100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.6); }
-      50%      { box-shadow: 0 0 0 12px rgba(99,102,241,0); }
-    }
-    #mpCountdownNum { transition: transform 0.15s ease; }
-    #mpWaitingTxt   { font-size:0.85rem; color:var(--text2,#888); text-align:center; margin-top:8px; }
-  `;
-  document.head.appendChild(s);
-})();
-
