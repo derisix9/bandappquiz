@@ -2060,7 +2060,7 @@
 </div>
 
 <!-- File input (hidden) -->
-<input type="file" id="chatFileInput" style="display:none" accept="*/*">
+<input type="file" id="chatFileInput" style="display:none" accept="*/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar">
 <input type="file" id="chatImgInput" style="display:none" accept="image/*">
 
 <!-- Chat Overlay -->
@@ -2107,7 +2107,7 @@
 
         <!-- Input -->
         <div class="chat-input-area" style="position:relative">
-          <div class="chat-edit-label" id="communityEditLabel">✏️ A editar mensagem</div>
+          <div class="chat-edit-label" id="communityEditLabel"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg> A editar mensagem</div>
           <div class="attach-menu" id="communityAttachMenu">
             <div class="attach-menu-item" onclick="ChatSystem.pickImage('community')">
               <svg viewBox="0 0 24 24" style="fill:#22C55E"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
@@ -2115,7 +2115,7 @@
             </div>
             <div class="attach-menu-item" onclick="ChatSystem.pickFile('community')">
               <svg viewBox="0 0 24 24" style="fill:#3B82F6"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
-              Ficheiro (até 100MB)
+              Ficheiro / Audio / Video (até 100MB)
             </div>
           </div>
           <div class="chat-input-row">
@@ -2168,7 +2168,7 @@
         </div>
         <!-- Input -->
         <div class="chat-input-area" style="position:relative">
-          <div class="chat-edit-label" id="privateEditLabel">✏️ A editar mensagem</div>
+          <div class="chat-edit-label" id="privateEditLabel"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg> A editar mensagem</div>
           <div class="attach-menu" id="privateAttachMenu">
             <div class="attach-menu-item" onclick="ChatSystem.pickImage('private')">
               <svg viewBox="0 0 24 24" style="fill:#22C55E"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
@@ -2176,7 +2176,7 @@
             </div>
             <div class="attach-menu-item" onclick="ChatSystem.pickFile('private')">
               <svg viewBox="0 0 24 24" style="fill:#3B82F6"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.89.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
-              Ficheiro (até 100MB)
+              Ficheiro / Audio / Video (até 100MB)
             </div>
           </div>
           <div class="chat-input-row">
