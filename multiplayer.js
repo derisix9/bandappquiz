@@ -519,24 +519,30 @@ async function mpCriarSala(targetUid) {
 
 
 async function mpEntrarSala(salaId) {
-  // Use async version to ensure name/stars are fully loaded before registering
   const me = await mpGetMyInfoAsync();
   if (!me) return;
 
   const salaRef = db.ref(`mp_salas/${salaId}`);
 
-  // Await the player registration so the players node is updated
-  // before we start listening to it in mpShowSalaScreen
-  await salaRef.child('players').child(me.uid).set({
-    uid: me.uid, name: me.name, email: me.email || me.phone,
-    stars: me.stars, score: 0, joined: true,
-  });
-
+  // Definir estado ANTES de mostrar o ecrã para que mpGetMyInfoSync()
+  // dentro dos listeners já devolva o utilizador correcto
   MP.salaId    = salaId;
   MP.sala      = salaRef;
   MP.myUid     = me.uid;
   MP.myProfile = me;
-  mpShowSalaScreen(salaRef);
+
+  // Limpar listeners de sessões anteriores (evita duplicados)
+  mpClearListeners();
+
+  // Mostrar ecrã e registar listeners PRIMEIRO
+  // (o listener de 'players' fica activo antes do .set() chegar)
+  await mpShowSalaScreen(salaRef);
+
+  // Agora registar o jogador — o listener já está activo e vai capturar
+  await salaRef.child('players').child(me.uid).set({
+    uid: me.uid, name: me.name, email: me.email || me.phone,
+    stars: me.stars, score: 0, joined: true,
+  });
 }
 
 // ─── SALA DE JOGO ─────────────────────────────────────────
@@ -548,13 +554,12 @@ async function mpShowSalaScreen(salaRef) {
 
   const deleteBtn = mpEl('mpSalaDeleteBtn');
 
-  // Variáveis locais da sala — carregadas UMA vez antes de qualquer listener
+  // Variáveis locais — preenchidas antes de qualquer listener
   let _salaHost   = null;
   let _salaMaxP   = 2;
   let _salaStatus = 'waiting';
 
-  // Carregar dados da sala com await (Promise) para garantir que
-  // _salaHost está preenchido ANTES de os listeners de players dispararem
+  // Aguardar dados da sala com await para garantir _salaHost preenchido
   await new Promise(resolve => {
     salaRef.once('value', snap => {
       const s = snap.val();
@@ -577,19 +582,17 @@ async function mpShowSalaScreen(salaRef) {
     });
   });
 
-  // Agora _salaHost está garantidamente preenchido — registar listeners
+  // Listener de players: usa variáveis locais — sem .once() aninhado
   mpAddListener(salaRef.child('players'), 'value', snap => {
     const players = [];
     snap.forEach(c => players.push(c.val()));
 
-    const btn    = mpEl('btnIniciarDesafio');
-    const myUid  = MP.myUid;
-
+    const btn   = mpEl('btnIniciarDesafio');
     mpRenderPlayersGrid(players, _salaMaxP);
     mpRenderScoreboard(players);
 
     if (!btn) return;
-    const isHost   = _salaHost === myUid;
+    const isHost   = _salaHost === MP.myUid;
     const canStart = isHost && players.length >= 2 && _salaStatus === 'waiting';
     btn.style.display = canStart ? 'inline-flex' : 'none';
   });
@@ -607,7 +610,7 @@ async function mpShowSalaScreen(salaRef) {
   mpAddListener(salaRef.child('status'), 'value', snap => {
     const status = snap.val();
     if (!status) return;
-    _salaStatus = status; // manter variável local sincronizada
+    _salaStatus = status;
     if (status === 'playing')  mpStartGame();
     if (status === 'finished') mpShowResults();
     if (deleteBtn && (status === 'playing' || status === 'finished')) {
@@ -1160,22 +1163,7 @@ function mpLoadDesafiosRecebidos() {
 }
 
 async function mpAceitarDesafio(key, salaId) {
-  // Marcar desafio como aceite E registar na sala que foi aceite
-  // (o host a ouvir a sala vai detectar o novo player)
   await db.ref(`mp_desafios/${key}`).update({ status: 'accepted' });
-
-  // Verificar se a sala ainda existe e está à espera
-  const salaSnap = await db.ref(`mp_salas/${salaId}`).once('value');
-  const sala = salaSnap.val();
-  if (!sala) {
-    mpShowToast('Esta sala já não existe.');
-    return;
-  }
-  if (sala.status !== 'waiting') {
-    mpShowToast('O jogo já começou ou a sala foi encerrada.');
-    return;
-  }
-
   await mpEntrarSala(salaId);
 }
 
@@ -1198,59 +1186,29 @@ if (enviarBtn) enviarBtn.addEventListener('click', async () => {
   if (tempoInput) MP.config.tempo = parseInt(tempoInput.value) || 30;
   if (qtdInput)   MP.config.qtd   = parseInt(qtdInput.value) || 10;
 
-  // ── VERIFICAR SE JÁ EXISTE UMA SALA 'waiting' deste host ──
-  // Se sim, reutilizá-la em vez de criar uma nova (evita salas órfãs
-  // e garante que o host está na mesma sala que o desafiado)
-  let salaKey = null;
-  const salasExistentes = await db.ref('mp_salas')
-    .orderByChild('host').equalTo(me.uid).once('value');
+  const salaData = {
+    roomNum: mpAutoRoomNumber(), status: 'waiting',
+    modoJogo:   MP.config.modoJogo,
+    modoPerg:   MP.config.modoPerg,
+    nivel:      MP.config.nivel,
+    tipo:       MP.config.tipo,
+    tempo:      MP.config.tempo,
+    qtd:        MP.config.qtd,
+    maxplayers: MP.config.maxplayers,
+    disciplina: MP.config.disciplina,
+    categoria:  MP.config.categoria,
+    host: me.uid, invitedUid: MP.config.targetUid,
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    players: { [me.uid]: { uid: me.uid, name: me.name, email: me.email || me.phone, stars: me.stars, score: 0, joined: true } },
+    scores: {}, history: {}, liveAnswers: {},
+  };
 
-  salasExistentes.forEach(child => {
-    const s = child.val();
-    if (s.status === 'waiting' && !salaKey) {
-      salaKey = child.key;
-      // Actualizar a sala existente com o novo convidado e config
-      db.ref(`mp_salas/${salaKey}`).update({
-        invitedUid: MP.config.targetUid,
-        modoJogo:   MP.config.modoJogo,
-        modoPerg:   MP.config.modoPerg,
-        nivel:      MP.config.nivel,
-        tipo:       MP.config.tipo,
-        tempo:      MP.config.tempo,
-        qtd:        MP.config.qtd,
-        maxplayers: MP.config.maxplayers,
-        disciplina: MP.config.disciplina,
-        categoria:  MP.config.categoria,
-      });
-    }
-  });
-
-  if (!salaKey) {
-    // Criar sala nova apenas se não existir nenhuma
-    const salaData = {
-      roomNum: mpAutoRoomNumber(), status: 'waiting',
-      modoJogo:   MP.config.modoJogo,
-      modoPerg:   MP.config.modoPerg,
-      nivel:      MP.config.nivel,
-      tipo:       MP.config.tipo,
-      tempo:      MP.config.tempo,
-      qtd:        MP.config.qtd,
-      maxplayers: MP.config.maxplayers,
-      disciplina: MP.config.disciplina,
-      categoria:  MP.config.categoria,
-      host: me.uid, invitedUid: MP.config.targetUid,
-      createdAt: firebase.database.ServerValue.TIMESTAMP,
-      players: { [me.uid]: { uid: me.uid, name: me.name, email: me.email || me.phone, stars: me.stars, score: 0, joined: true } },
-      scores: {}, history: {}, liveAnswers: {},
-    };
-    const salaRef = await db.ref('mp_salas').push(salaData);
-    salaKey = salaRef.key;
-  }
+  const salaRef = await db.ref('mp_salas').push(salaData);
 
   await db.ref('mp_desafios').push({
     fromUid: me.uid, fromName: me.name,
     targetUid: MP.config.targetUid, targetName: MP.config.targetName,
-    salaId: salaKey,
+    salaId: salaRef.key,
     modoJogo:   MP.config.modoJogo,
     modoPerg:   MP.config.modoPerg,
     nivel:      MP.config.nivel,
@@ -1263,7 +1221,7 @@ if (enviarBtn) enviarBtn.addEventListener('click', async () => {
   });
 
   mpShowToast(`Desafio enviado para ${MP.config.targetName}!`);
-  await mpEntrarSala(salaKey);
+  await mpEntrarSala(salaRef.key);
 });
 
 // ─── PESQUISA DE JOGADORES ────────────────────────────────
