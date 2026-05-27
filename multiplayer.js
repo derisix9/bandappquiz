@@ -634,23 +634,16 @@ function mpStartGame() {
 }
 
 function mpRenderPlayersGrid(players, maxPlayers) {
-  const grid  = mpEl('mpPlayersGrid');
-  const myUid = MP.myUid;
+  const grid = mpEl('mpPlayersGrid');
+  const me   = mpGetMyInfoSync();
   if (!grid) return;
 
+  // maxPlayers can be passed directly from the sala snapshot to avoid extra DB call
   const maxP = maxPlayers || players.length || 2;
-
-  // Ordenar: o utilizador actual SEMPRE no slot 0 (esquerda),
-  // os outros a seguir — independente da ordem que o Firebase devolve
-  const sorted = [
-    ...players.filter(p => p.uid === myUid),
-    ...players.filter(p => p.uid !== myUid),
-  ];
-
   const slots = Array.from({length: maxP}, (_, i) => {
-    const p = sorted[i];
+    const p = players[i];
     if (p) {
-      const isMe = p.uid === myUid;
+      const isMe = p.uid === (me?.uid || MP.myUid);
       return `<div class="mp-player-slot filled ${isMe ? 'me' : ''}">
         <div class="mp-player-slot-avatar">${mpAvatarLetter(p.name)}</div>
         <div class="mp-player-slot-name">${p.name}${isMe ? ' (tu)' : ''}</div>
@@ -1185,8 +1178,8 @@ if (enviarBtn) enviarBtn.addEventListener('click', async () => {
     tempo:      MP.config.tempo,
     qtd:        MP.config.qtd,
     maxplayers: MP.config.maxplayers,
-    disciplina: MP.config.disciplina,
-    categoria:  MP.config.categoria,
+    disc:       MP.config.disc || MP.config.disciplina || '',
+    cat:        MP.config.cat  || MP.config.categoria  || '',
     host: me.uid, invitedUid: MP.config.targetUid,
     createdAt: firebase.database.ServerValue.TIMESTAMP,
     players: { [me.uid]: { uid: me.uid, name: me.name, email: me.email || me.phone, stars: me.stars, score: 0, joined: true } },
@@ -1383,99 +1376,96 @@ async function mpPreencherDisciplinas() {
   sel.innerHTML = `<option value="">-- Selecciona Disciplina --</option>`;
 
   try {
+    // Perguntas no Firebase usam campo 'disc'
     const snap = await db.ref('questions').once('value');
     const discs = new Set();
     if (snap.val()) {
       Object.values(snap.val()).forEach(q => {
-        // Suporta campo 'disciplina' (Firebase) e 'disc' (local)
-        if (q.disciplina) discs.add(q.disciplina);
-        else if (q.disc)  discs.add(q.disc);
-      });
-    }
-    // Também incluir disciplinas da BD local do app
-    if (typeof State !== 'undefined' && State.localDB) {
-      State.localDB.forEach(q => {
-        if (q.disc)        discs.add(q.disc);
-        if (q.disciplina)  discs.add(q.disciplina);
+        if (q.disc) discs.add(q.disc);
       });
     }
     if (discs.size === 0) {
-      ['Matemática','Português','História','Biologia','Física','Química','Geografia','Inglês']
-        .forEach(d => discs.add(d));
+      sel.insertAdjacentHTML('beforeend', `<option value="" disabled>Sem disciplinas na base de dados</option>`);
+      return;
     }
     [...discs].sort().forEach(d => {
       const opt = document.createElement('option');
       opt.value = d; opt.textContent = d; sel.appendChild(opt);
     });
   } catch(e) {
-    ['Matemática','Português','História','Biologia','Física','Química']
-      .forEach(d => sel.insertAdjacentHTML('beforeend', `<option value="${d}">${d}</option>`));
+    console.error('mpPreencherDisciplinas:', e);
+    sel.insertAdjacentHTML('beforeend', `<option value="" disabled>Erro ao carregar disciplinas</option>`);
   }
 
   sel.addEventListener('change', () => {
-    MP.config.disciplina = sel.value;
+    MP.config.disc = sel.value;
+    MP.config.disciplina = sel.value; // compatibilidade
     mpPreencherCategorias(sel.value);
   });
 }
 
-async function mpPreencherCategorias(disciplina) {
+async function mpPreencherCategorias(disc) {
   const sel = mpEl('mpDesafioCategoria');
   if (!sel) return;
   sel.innerHTML = `<option value="">-- Todas as Categorias --</option>`;
+  MP.config.cat = '';
   MP.config.categoria = '';
-  if (!disciplina) return;
+  if (!disc) return;
 
   try {
+    // Perguntas no Firebase usam campo 'disc' para disciplina e 'cat' para categoria
+    const snap = await db.ref('questions').orderByChild('disc').equalTo(disc).once('value');
     const cats = new Set();
-    // Firebase: campo 'disciplina'
-    const snap = await db.ref('questions').orderByChild('disciplina').equalTo(disciplina).once('value');
-    snap.forEach(c => { const q = c.val(); if (q.categoria) cats.add(q.categoria); else if (q.cat) cats.add(q.cat); });
-    // Fallback: campo 'disc' na BD local
-    if (typeof State !== 'undefined' && State.localDB) {
-      State.localDB.forEach(q => {
-        if ((q.disc === disciplina || q.disciplina === disciplina) && (q.cat || q.categoria))
-          cats.add(q.cat || q.categoria);
-      });
-    }
+    snap.forEach(c => { const q = c.val(); if (q.cat) cats.add(q.cat); });
     if (cats.size > 0) {
       [...cats].sort().forEach(cat => {
         const opt = document.createElement('option');
         opt.value = cat; opt.textContent = cat; sel.appendChild(opt);
       });
     }
-  } catch(e) {}
+  } catch(e) { console.error('mpPreencherCategorias:', e); }
 
-  sel.onchange = () => { MP.config.categoria = sel.value; };
+  sel.onchange = () => {
+    MP.config.cat = sel.value;
+    MP.config.categoria = sel.value; // compatibilidade
+  };
 }
 
 // ─── CARREGAR PERGUNTAS ───────────────────────────────────
 async function mpCarregarPerguntas(salaData) {
-  const { disciplina, categoria, nivel, tipo } = salaData;
-  const snap = await db.ref('questions').once('value');
+  // Campos no Firebase: disc, cat, nivel (ou dificuldade), tipo
+  // Campos guardados na sala: disc, cat, nivel, tipo
+  const disc  = salaData.disc  || salaData.disciplina || '';
+  const cat   = salaData.cat   || salaData.categoria  || '';
+  const nivel = salaData.nivel || '';
+  const tipo  = salaData.tipo  || 'todos';
+
   let perguntas = [];
 
-  if (snap.val()) {
-    Object.values(snap.val()).forEach(q => {
-      const matchDisc = !disciplina || q.disciplina === disciplina;
-      const matchCat  = !categoria  || q.categoria  === categoria;
-      const matchNiv  = !nivel || nivel === 'todos' || nivel === 'all' || q.nivel === nivel || q.dificuldade === nivel;
-      const matchTipo = !tipo || tipo === 'todos' || tipo === 'all'
-        || q.tipo === tipo
-        || (tipo.startsWith('multipla_img') && q.tipo === 'multipla' && q.imageURL);
-      if (matchDisc && matchCat && matchNiv && matchTipo) perguntas.push(q);
-    });
+  try {
+    // Filtrar directamente no Firebase pelo campo disc (índice mais eficiente)
+    let ref;
+    if (disc) {
+      const snap = await db.ref('questions').orderByChild('disc').equalTo(disc).once('value');
+      snap.forEach(c => perguntas.push(c.val()));
+    } else {
+      const snap = await db.ref('questions').once('value');
+      if (snap.val()) perguntas = Object.values(snap.val());
+    }
+  } catch(e) {
+    console.error('mpCarregarPerguntas erro:', e);
   }
 
-  // Fallback local DB do app
-  if (perguntas.length < 3 && typeof State !== 'undefined' && State.localDB) {
-    State.localDB.forEach(q => {
-      const matchDisc = !disciplina || q.disciplina === disciplina;
-      const matchNiv  = !nivel || nivel === 'todos' || q.nivel === nivel || q.dificuldade === nivel;
-      if (matchDisc && matchNiv) perguntas.push(q);
-    });
-  }
-
-  return perguntas;
+  // Aplicar filtros restantes em memória
+  return perguntas.filter(q => {
+    const matchCat  = !cat  || q.cat  === cat  || q.categoria === cat;
+    const matchNiv  = !nivel || nivel === 'todos' || nivel === 'all'
+                    || q.nivel === nivel || q.dificuldade === nivel;
+    const matchTipo = !tipo || tipo === 'todos' || tipo === 'all'
+                    || q.tipo === tipo
+                    || (tipo.startsWith('multipla_img') && (q.tipo === 'multipla' || q.tipo === 'multipla_img') && (q.imageURL || q.questionImg));
+    return matchCat && matchNiv && matchTipo;
+  });
 }
 
 // ─── BOTÃO PRINCIPAL + BOTÕES VOLTAR ─────────────────────
