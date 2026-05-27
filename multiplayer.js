@@ -524,21 +524,19 @@ async function mpEntrarSala(salaId) {
 
   const salaRef = db.ref(`mp_salas/${salaId}`);
 
-  // Definir estado ANTES de mostrar o ecrã para que mpGetMyInfoSync()
-  // dentro dos listeners já devolva o utilizador correcto
+  // Definir estado MP antes de tudo
   MP.salaId    = salaId;
   MP.sala      = salaRef;
   MP.myUid     = me.uid;
   MP.myProfile = me;
 
-  // Limpar listeners de sessões anteriores (evita duplicados)
+  // Limpar listeners anteriores para evitar duplicados
   mpClearListeners();
 
-  // Mostrar ecrã e registar listeners PRIMEIRO
-  // (o listener de 'players' fica activo antes do .set() chegar)
+  // 1. Mostrar ecrã e registar listeners (await = fica activo antes do .set abaixo)
   await mpShowSalaScreen(salaRef);
 
-  // Agora registar o jogador — o listener já está activo e vai capturar
+  // 2. Só AGORA escrever o jogador — o listener já está activo e vai capturar
   await salaRef.child('players').child(me.uid).set({
     uid: me.uid, name: me.name, email: me.email || me.phone,
     stars: me.stars, score: 0, joined: true,
@@ -554,47 +552,35 @@ async function mpShowSalaScreen(salaRef) {
 
   const deleteBtn = mpEl('mpSalaDeleteBtn');
 
-  // Variáveis locais — preenchidas antes de qualquer listener
-  let _salaHost   = null;
-  let _salaMaxP   = 2;
-  let _salaStatus = 'waiting';
+  // Ler dados da sala UMA vez com await — sem callbacks aninhados
+  let _host = null, _maxP = 2, _status = 'waiting';
+  const sSnap = await salaRef.once('value');
+  const sData = sSnap.val();
+  if (sData) {
+    _host   = sData.host;
+    _maxP   = sData.maxplayers || 2;
+    _status = sData.status || 'waiting';
+    mpEl('mpSalaNumDisplay').textContent = `Sala #${sData.roomNum || '?'}`;
+    mpEl('mpSalaModeDisplay').innerHTML  = sData.modoPerg === 'realtime'
+      ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real'
+      : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono';
+    if (deleteBtn) {
+      deleteBtn.style.display = (_host === MP.myUid && _status === 'waiting') ? 'flex' : 'none';
+      deleteBtn.onclick = () => mpEliminarSalaFromRoom(salaRef.key);
+    }
+  }
 
-  // Aguardar dados da sala com await para garantir _salaHost preenchido
-  await new Promise(resolve => {
-    salaRef.once('value', snap => {
-      const s = snap.val();
-      if (!s) { resolve(); return; }
-
-      _salaHost   = s.host;
-      _salaMaxP   = s.maxplayers || 2;
-      _salaStatus = s.status || 'waiting';
-
-      mpEl('mpSalaNumDisplay').textContent = `Sala #${s.roomNum || '?'}`;
-      mpEl('mpSalaModeDisplay').innerHTML  = s.modoPerg === 'realtime'
-        ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real'
-        : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono';
-
-      if (deleteBtn) {
-        deleteBtn.style.display = (s.host === MP.myUid && s.status === 'waiting') ? 'flex' : 'none';
-        deleteBtn.onclick = () => mpEliminarSalaFromRoom(salaRef.key);
-      }
-      resolve();
-    });
-  });
-
-  // Listener de players: usa variáveis locais — sem .once() aninhado
+  // Listener de players: usa variáveis locais já carregadas — zero .once() aninhados
   mpAddListener(salaRef.child('players'), 'value', snap => {
     const players = [];
     snap.forEach(c => players.push(c.val()));
-
-    const btn   = mpEl('btnIniciarDesafio');
-    mpRenderPlayersGrid(players, _salaMaxP);
+    const btn = mpEl('btnIniciarDesafio');
+    mpRenderPlayersGrid(players, _maxP);
     mpRenderScoreboard(players);
-
-    if (!btn) return;
-    const isHost   = _salaHost === MP.myUid;
-    const canStart = isHost && players.length >= 2 && _salaStatus === 'waiting';
-    btn.style.display = canStart ? 'inline-flex' : 'none';
+    if (btn) {
+      btn.style.display = (_host === MP.myUid && players.length >= 2 && _status === 'waiting')
+        ? 'inline-flex' : 'none';
+    }
   });
 
   // Detectar se a sala foi eliminada (value = null) para expulsar o convidado
@@ -610,7 +596,7 @@ async function mpShowSalaScreen(salaRef) {
   mpAddListener(salaRef.child('status'), 'value', snap => {
     const status = snap.val();
     if (!status) return;
-    _salaStatus = status;
+    _status = status;
     if (status === 'playing')  mpStartGame();
     if (status === 'finished') mpShowResults();
     if (deleteBtn && (status === 'playing' || status === 'finished')) {
