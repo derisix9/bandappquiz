@@ -519,93 +519,129 @@ async function mpCriarSala(targetUid) {
 
 
 async function mpEntrarSala(salaId) {
-  // Use async version to ensure name/stars are fully loaded before registering
   const me = await mpGetMyInfoAsync();
   if (!me) return;
 
   const salaRef = db.ref(`mp_salas/${salaId}`);
 
-  // Await the player registration so the players node is updated
-  // before we start listening to it in mpShowSalaScreen
-  await salaRef.child('players').child(me.uid).set({
-    uid: me.uid, name: me.name, email: me.email || me.phone,
-    stars: me.stars, score: 0, joined: true,
-  });
-
   MP.salaId    = salaId;
   MP.sala      = salaRef;
   MP.myUid     = me.uid;
   MP.myProfile = me;
-  mpShowSalaScreen(salaRef);
+
+  mpClearListeners();
+
+  // 1. Registar listeners PRIMEIRO (await garante que estão activos)
+  await mpShowSalaScreen(salaRef);
+
+  // 2. Só depois escrever o jogador — listener já activo capta o evento
+  await salaRef.child('players').child(me.uid).set({
+    uid: me.uid, name: me.name, email: me.email || me.phone,
+    stars: me.stars, score: 0, joined: true,
+  });
 }
 
 // ─── SALA DE JOGO ─────────────────────────────────────────
-function mpShowSalaScreen(salaRef) {
+async function mpShowSalaScreen(salaRef) {
   mpShowScreen('screen-mp-sala');
   mpEl('mpSalaWaiting').style.display = 'block';
   mpEl('mpSalaGame').style.display    = 'none';
   mpEl('mpSalaResult').style.display  = 'none';
 
   const deleteBtn = mpEl('mpSalaDeleteBtn');
+  const initBtn   = mpEl('btnIniciarDesafio');
 
-  salaRef.once('value', snap => {
-    const s = snap.val();
-    if (!s) return;
-    mpEl('mpSalaNumDisplay').textContent  = `Sala #${s.roomNum || '?'}`;
-    mpEl('mpSalaModeDisplay').innerHTML = s.modoPerg === 'realtime' ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real' : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono';
+  // Ler dados da sala UMA vez com await — evita callbacks aninhados
+  const sSnap = await salaRef.once('value');
+  const sData = sSnap.val();
+  if (!sData) return;
 
-    // Mostrar botão eliminar apenas ao host, só na fase de espera
-    const myUid = MP.myUid;
-    if (deleteBtn) {
-      deleteBtn.style.display = (s.host === myUid && s.status === 'waiting') ? 'flex' : 'none';
-      deleteBtn.onclick = () => mpEliminarSalaFromRoom(salaRef.key);
+  const _host  = sData.host;
+  const _maxP  = sData.maxplayers || 2;
+  const isHost = _host === MP.myUid;
+  let _status  = sData.status || 'waiting';
+
+  mpEl('mpSalaNumDisplay').textContent = `Sala #${sData.roomNum || '?'}`;
+  mpEl('mpSalaModeDisplay').innerHTML  = sData.modoPerg === 'realtime'
+    ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real'
+    : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono';
+
+  if (deleteBtn) {
+    deleteBtn.style.display = isHost ? 'flex' : 'none';
+    deleteBtn.onclick = () => mpEliminarSalaFromRoom(salaRef.key);
+  }
+
+  // Botão iniciar — só visível ao host, desabilitado até adversário entrar
+  if (initBtn) {
+    if (isHost) {
+      initBtn.style.display   = 'inline-flex';
+      initBtn.disabled        = true;
+      initBtn.style.opacity   = '0.5';
+      initBtn.style.cursor    = 'not-allowed';
+      initBtn.innerHTML       = '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>A aguardar adversário...';
+    } else {
+      initBtn.style.display = 'none';
     }
-  });
+    initBtn.onclick = async () => {
+      if (initBtn.disabled) return;
+      initBtn.disabled = true;
+      initBtn.style.opacity = '0.6';
+      await salaRef.update({ status: 'countdown' });
+    };
+  }
 
+  // ── LISTENER PLAYERS ────────────────────────────────────────
   mpAddListener(salaRef.child('players'), 'value', snap => {
     const players = [];
     snap.forEach(c => players.push(c.val()));
 
-    salaRef.once('value', s => {
-      const data    = s.val();
-      const maxP    = (data && data.maxplayers) || 2;
-      const me      = mpGetMyInfoSync();
-      const btn     = mpEl('btnIniciarDesafio');
+    // Eu sempre primeiro, adversário depois
+    const myUid  = MP.myUid;
+    const sorted = [
+      ...players.filter(p => p.uid === myUid),
+      ...players.filter(p => p.uid !== myUid),
+    ];
+    mpRenderPlayersGrid(sorted, _maxP);
+    mpRenderScoreboard(sorted);
 
-      mpRenderPlayersGrid(players, maxP);
-      mpRenderScoreboard(players);
-
-      if (!btn) return;
-      btn.style.display = (data && data.host === (me?.uid || MP.myUid) && players.length >= 2 && data.status === 'waiting')
-        ? 'inline-flex' : 'none';
-    });
+    // Host: activar botão quando adversário entrar
+    if (isHost && initBtn && players.length >= 2 && _status === 'waiting') {
+      const adv  = players.find(p => p.uid !== myUid);
+      const nome = adv ? adv.name.split(' ')[0] : 'Adversário';
+      initBtn.disabled      = false;
+      initBtn.style.opacity = '1';
+      initBtn.style.cursor  = 'pointer';
+      initBtn.innerHTML     = `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>${nome} entrou! Iniciar`;
+      mpShowToast(`${nome} aceitou! Clica em Iniciar para começar.`);
+    }
   });
 
-  // Detectar se a sala foi eliminada (value = null) para expulsar o convidado
+  // ── LISTENER STATUS ──────────────────────────────────────────
+  mpAddListener(salaRef.child('status'), 'value', snap => {
+    const status = snap.val();
+    if (!status) return;
+    _status = status;
+    if (status === 'countdown') mpMostrarContagem(salaRef);
+    if (status === 'playing')   mpStartGame();
+    if (status === 'finished')  mpShowResults();
+    if (deleteBtn && status !== 'waiting') deleteBtn.style.display = 'none';
+    if (initBtn   && status !== 'waiting') initBtn.style.display   = 'none';
+  });
+
+  // ── SALA ELIMINADA ────────────────────────────────────────────
   mpAddListener(salaRef, 'value', snap => {
     if (snap.val() === null) {
       mpClearListeners();
-      mpShowToast('A sala foi eliminada pelo criador.');
+      mpShowToast('A sala foi eliminada.');
       mpShowScreen('screen-multiplayer');
       mpLoadSalas();
     }
   });
 
-  mpAddListener(salaRef.child('status'), 'value', snap => {
-    const status = snap.val();
-    if (status === 'playing')  mpStartGame();
-    if (status === 'finished') mpShowResults();
-    // Esconder botão eliminar quando o jogo começa
-    if (deleteBtn && (status === 'playing' || status === 'finished')) {
-      deleteBtn.style.display = 'none';
-    }
-  });
-
+  // ── LISTENER PERGUNTA ────────────────────────────────────────
   mpAddListener(salaRef.child('currentRound'), 'value', snap => {
     const round = snap.val();
-    if (round !== null && mpEl('mpSalaGame').style.display !== 'none') {
-      mpRenderQuestion(round);
-    }
+    if (round !== null && mpEl('mpSalaGame').style.display !== 'none') mpRenderQuestion(round);
   });
 
   mpAddListener(salaRef.child('liveAnswers'), 'value', snap => {
@@ -623,9 +659,42 @@ function mpShowSalaScreen(salaRef) {
       mpRenderScoreboard(players);
     });
   });
+}
 
-  const initBtn = mpEl('btnIniciarDesafio');
-  if (initBtn) initBtn.onclick = mpIniciarJogo;
+// ─── CONTAGEM REGRESSIVA (ambos os dispositivos) ──────────
+let _mpCountdownTimer = null;
+function mpMostrarContagem(salaRef) {
+  // Remover overlay anterior se existir
+  const old = document.getElementById('mp-countdown-overlay');
+  if (old) old.remove();
+  if (_mpCountdownTimer) { clearInterval(_mpCountdownTimer); _mpCountdownTimer = null; }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'mp-countdown-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="color:rgba(255,255,255,0.7);font-size:1rem;font-weight:600;margin-bottom:12px;">O jogo começa em</div>
+    <div id="mpCountNum" style="font-size:6rem;font-weight:900;color:#fff;font-family:var(--font-display,sans-serif);line-height:1;transition:transform 0.15s;text-shadow:0 0 40px rgba(99,102,241,0.9);">10</div>
+    <div style="color:rgba(255,255,255,0.4);font-size:0.85rem;margin-top:16px;">Prepara-te!</div>
+  `;
+  document.body.appendChild(overlay);
+
+  let count = 10;
+  _mpCountdownTimer = setInterval(async () => {
+    count--;
+    const el = document.getElementById('mpCountNum');
+    if (el) { el.textContent = count; el.style.transform = 'scale(1.4)'; setTimeout(() => { if(el) el.style.transform = 'scale(1)'; }, 150); }
+    if (count <= 0) {
+      clearInterval(_mpCountdownTimer); _mpCountdownTimer = null;
+      overlay.remove();
+      // Só o host dispara o início real do jogo
+      if (salaRef && MP.myUid) {
+        const snap = await salaRef.once('value');
+        const d = snap.val();
+        if (d && d.host === MP.myUid) await mpIniciarJogo();
+      }
+    }
+  }, 1000);
 }
 
 function mpStartGame() {
@@ -634,16 +703,22 @@ function mpStartGame() {
 }
 
 function mpRenderPlayersGrid(players, maxPlayers) {
-  const grid = mpEl('mpPlayersGrid');
-  const me   = mpGetMyInfoSync();
+  const grid  = mpEl('mpPlayersGrid');
+  const myUid = MP.myUid;
   if (!grid) return;
 
-  // maxPlayers can be passed directly from the sala snapshot to avoid extra DB call
   const maxP = maxPlayers || players.length || 2;
+
+  // Utilizador actual sempre no slot 0 — independente da ordem do Firebase
+  const sorted = [
+    ...players.filter(p => p.uid === myUid),
+    ...players.filter(p => p.uid !== myUid),
+  ];
+
   const slots = Array.from({length: maxP}, (_, i) => {
-    const p = players[i];
+    const p = sorted[i];
     if (p) {
-      const isMe = p.uid === (me?.uid || MP.myUid);
+      const isMe = p.uid === myUid;
       return `<div class="mp-player-slot filled ${isMe ? 'me' : ''}">
         <div class="mp-player-slot-avatar">${mpAvatarLetter(p.name)}</div>
         <div class="mp-player-slot-name">${p.name}${isMe ? ' (tu)' : ''}</div>
@@ -1374,32 +1449,19 @@ async function mpPreencherDisciplinas() {
   const sel = mpEl('mpDesafioDisciplina');
   if (!sel) return;
   sel.innerHTML = `<option value="">-- Selecciona Disciplina --</option>`;
-
   try {
-    // Perguntas no Firebase usam campo 'disc'
     const snap = await db.ref('questions').once('value');
     const discs = new Set();
-    if (snap.val()) {
-      Object.values(snap.val()).forEach(q => {
-        if (q.disc) discs.add(q.disc);
-      });
-    }
-    if (discs.size === 0) {
-      sel.insertAdjacentHTML('beforeend', `<option value="" disabled>Sem disciplinas na base de dados</option>`);
-      return;
-    }
+    if (snap.val()) Object.values(snap.val()).forEach(q => { if (q.disc) discs.add(q.disc); });
     [...discs].sort().forEach(d => {
       const opt = document.createElement('option');
       opt.value = d; opt.textContent = d; sel.appendChild(opt);
     });
-  } catch(e) {
-    console.error('mpPreencherDisciplinas:', e);
-    sel.insertAdjacentHTML('beforeend', `<option value="" disabled>Erro ao carregar disciplinas</option>`);
-  }
+  } catch(e) { console.error('mpPreencherDisciplinas:', e); }
 
   sel.addEventListener('change', () => {
     MP.config.disc = sel.value;
-    MP.config.disciplina = sel.value; // compatibilidade
+    MP.config.disciplina = sel.value;
     mpPreencherCategorias(sel.value);
   });
 }
@@ -1408,43 +1470,30 @@ async function mpPreencherCategorias(disc) {
   const sel = mpEl('mpDesafioCategoria');
   if (!sel) return;
   sel.innerHTML = `<option value="">-- Todas as Categorias --</option>`;
-  MP.config.cat = '';
-  MP.config.categoria = '';
+  MP.config.cat = ''; MP.config.categoria = '';
   if (!disc) return;
-
   try {
-    // Perguntas no Firebase usam campo 'disc' para disciplina e 'cat' para categoria
     const snap = await db.ref('questions').orderByChild('disc').equalTo(disc).once('value');
     const cats = new Set();
     snap.forEach(c => { const q = c.val(); if (q.cat) cats.add(q.cat); });
-    if (cats.size > 0) {
-      [...cats].sort().forEach(cat => {
-        const opt = document.createElement('option');
-        opt.value = cat; opt.textContent = cat; sel.appendChild(opt);
-      });
-    }
+    [...cats].sort().forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat; opt.textContent = cat; sel.appendChild(opt);
+    });
   } catch(e) { console.error('mpPreencherCategorias:', e); }
-
-  sel.onchange = () => {
-    MP.config.cat = sel.value;
-    MP.config.categoria = sel.value; // compatibilidade
-  };
+  sel.onchange = () => { MP.config.cat = sel.value; MP.config.categoria = sel.value; };
 }
 
 // ─── CARREGAR PERGUNTAS ───────────────────────────────────
 async function mpCarregarPerguntas(salaData) {
-  // Campos no Firebase: disc, cat, nivel (ou dificuldade), tipo
-  // Campos guardados na sala: disc, cat, nivel, tipo
+  // Perguntas no Firebase usam 'disc' e 'cat' (não 'disciplina'/'categoria')
   const disc  = salaData.disc  || salaData.disciplina || '';
   const cat   = salaData.cat   || salaData.categoria  || '';
   const nivel = salaData.nivel || '';
   const tipo  = salaData.tipo  || 'todos';
 
   let perguntas = [];
-
   try {
-    // Filtrar directamente no Firebase pelo campo disc (índice mais eficiente)
-    let ref;
     if (disc) {
       const snap = await db.ref('questions').orderByChild('disc').equalTo(disc).once('value');
       snap.forEach(c => perguntas.push(c.val()));
@@ -1453,14 +1502,12 @@ async function mpCarregarPerguntas(salaData) {
       if (snap.val()) perguntas = Object.values(snap.val());
     }
   } catch(e) {
-    console.error('mpCarregarPerguntas erro:', e);
+    console.error('mpCarregarPerguntas:', e);
   }
 
-  // Aplicar filtros restantes em memória
   return perguntas.filter(q => {
-    const matchCat  = !cat  || q.cat  === cat  || q.categoria === cat;
-    const matchNiv  = !nivel || nivel === 'todos' || nivel === 'all'
-                    || q.nivel === nivel || q.dificuldade === nivel;
+    const matchCat  = !cat  || q.cat === cat;
+    const matchNiv  = !nivel || nivel === 'todos' || nivel === 'all' || q.nivel === nivel || q.dificuldade === nivel;
     const matchTipo = !tipo || tipo === 'todos' || tipo === 'all'
                     || q.tipo === tipo
                     || (tipo.startsWith('multipla_img') && (q.tipo === 'multipla' || q.tipo === 'multipla_img') && (q.imageURL || q.questionImg));
