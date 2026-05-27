@@ -1013,6 +1013,14 @@ function addNotifItem(item) {
   _notifItems.push(item);
   renderNotifPanel();
   $('headerNotifDot').classList.add('show');
+  // Update badge counter
+  const badge = $('headerNotifBadge');
+  if (badge) {
+    const count = _notifItems.length;
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.classList.add('show');
+    $('headerNotifDot').classList.remove('show');
+  }
 }
 
 function renderNotifPanel() {
@@ -1021,6 +1029,8 @@ function renderNotifPanel() {
   if (_notifItems.length === 0) {
     list.innerHTML = '<div class="notif-panel-empty">Sem notificações de momento.</div>';
     $('headerNotifDot').classList.remove('show');
+    const badge = $('headerNotifBadge');
+    if (badge) badge.classList.remove('show');
     return;
   }
   list.innerHTML = _notifItems.map(item => `
