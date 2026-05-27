@@ -805,24 +805,61 @@ async function mpEmitirPergunta(index, questions, turnOrder, modoPerg) {
   const q = questions[index];
   const playerTurn = turnOrder[index % turnOrder.length];
 
-  // Preparar respostas conforme tipo
-  let answers = [];
-  const correta = q.correta || q.resposta_certa || q.answer || '';
-  const erradas = q.erradas || q.respostas_erradas || q.wrongAnswers || [];
+  // ── Determinar o tipo usando o campo padrão da app (answerType) ──
+  const answerType = q.answerType || q.tipo || q.type || 'multipla';
 
-  if (q.tipo === 'vf') {
-    answers = mpShuffleArray(['Verdadeiro', 'Falso']);
+  // ── Determinar texto da resposta correcta e texto da pergunta ──
+  let correctText = '';
+  let questionText = q.pergunta || q.question || q.enunciado || '';
+
+  if (answerType === 'lacunas') {
+    // Para lacunas: resposta é o texto a preencher na lacuna
+    correctText = q.lacunaResposta || q.lacunaAnswer || q.correta || q.resposta_certa || q.a || '';
+    questionText = q.lacunaFrase || q.question || q.enunciado || '';
+  } else if (answerType === 'flashcard') {
+    // Para flashcard: resposta é o verso do cartão
+    correctText = q.flashBack || q.a || q.correta || q.resposta_certa || '';
+    questionText = q.flashFront || q.question || q.enunciado || '';
   } else {
-    answers = mpShuffleArray([correta, ...erradas.slice(0, 3)].filter(Boolean));
+    // Múltipla escolha / V/F / multipla2
+    // No formato padrão da app, q.answer é uma letra (A/B/C/D) — converter para texto
+    const answerLetter = (q.answer || '').trim();
+    if (answerLetter.length === 1 && q[answerLetter.toLowerCase()]) {
+      correctText = q[answerLetter.toLowerCase()];
+    } else {
+      // Fallback para campos directos (formato alternativo)
+      correctText = q.correta || q.resposta_certa || answerLetter;
+    }
+  }
+
+  // ── Preparar opções de resposta conforme tipo ──
+  let answers = [];
+
+  if (answerType === 'vf') {
+    answers = mpShuffleArray(['Verdadeiro', 'Falso']);
+  } else if (answerType === 'lacunas' || answerType === 'flashcard') {
+    answers = []; // estes tipos usam campo de texto — sem botões de opção
+  } else {
+    // Múltipla escolha: primeiro tentar q.erradas (formato alternativo),
+    // depois construir a partir de q.a / q.b / q.c / q.d (formato padrão da app)
+    const erradas = q.erradas || q.respostas_erradas || q.wrongAnswers || null;
+    if (erradas && erradas.length > 0) {
+      answers = mpShuffleArray([correctText, ...erradas.slice(0, 3)].filter(Boolean));
+    } else {
+      // Formato padrão: as opções estão em q.a, q.b, q.c, q.d
+      const opcoes = [q.a, q.b, q.c, q.d].filter(Boolean);
+      answers = mpShuffleArray(opcoes);
+    }
   }
 
   const roundData = {
     index,
-    question: q.pergunta || q.question || q.enunciado || '',
+    question: questionText,
     answers,
-    correct: correta,
-    tipo: q.tipo || 'multipla',
-    imageURL: q.imageURL || q.imagem || '',
+    correct: correctText,
+    tipo: answerType,       // mantido para compatibilidade
+    answerType: answerType, // campo padrão
+    imageURL: q.imageURL || q.imagem || q.questionImg || q.imgQuestion || '',
     total: questions.length,
     playerTurn: modoPerg === 'realtime' ? null : playerTurn,
     startedAt: firebase.database.ServerValue.TIMESTAMP,
@@ -887,6 +924,29 @@ function mpRenderQuestion(round) {
       if (lInput) lInput.addEventListener('keydown', e => {
         if (e.key === 'Enter') mpEl('mpLacunaBtn').click();
       });
+    } else if (round.tipo === 'flashcard' || round.answerType === 'flashcard') {
+      // Flashcard em multiplayer: mostrar frente e campo de texto para responder
+      answersEl.innerHTML = `
+        <div style="background:rgba(99,102,241,0.08);border-radius:12px;padding:14px 16px;margin-bottom:10px;text-align:center;font-style:italic;color:var(--text2,#888);font-size:0.85rem">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+          Escreve a resposta do cartão
+        </div>
+        <div class="mp-lacuna-wrap">
+          <input type="text" id="mpLacunaInput" class="mp-lacuna-input" placeholder="A tua resposta..." autocomplete="off"/>
+          <button class="mp-lacuna-btn" id="mpLacunaBtn">Confirmar</button>
+        </div>`;
+      const lBtn = mpEl('mpLacunaBtn');
+      if (lBtn) lBtn.addEventListener('click', () => {
+        const val = (mpEl('mpLacunaInput').value || '').trim();
+        if (val) mpResponder(encodeURIComponent(val), round, lBtn);
+      });
+      const lInput = mpEl('mpLacunaInput');
+      if (lInput) {
+        lInput.addEventListener('keydown', e => {
+          if (e.key === 'Enter') mpEl('mpLacunaBtn').click();
+        });
+        setTimeout(() => lInput.focus(), 100);
+      }
     } else {
       answersEl.innerHTML = round.answers.map((a, i) => `
         <button class="mp-q-answer" data-idx="${i}" data-val="${encodeURIComponent(a)}">${a}</button>
@@ -943,7 +1003,10 @@ async function mpResponder(encodedVal, round, btnEl) {
 
   const me      = mpGetMyInfoSync();
   const val     = decodeURIComponent(encodedVal);
-  const correct = val.toLowerCase().trim() === (round.correct || '').toLowerCase().trim();
+
+  // Normalização para lacunas/flashcard: ignorar acentos e maiúsculas
+  const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const correct = norm(val) === norm(round.correct || '');
   const points  = correct ? 10 : 0;
 
   mpClearTimer();
