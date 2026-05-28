@@ -1007,20 +1007,30 @@ $('navSobre').onclick   = () => { setActiveNav('sobre'); showScreen('screen-sobr
 
 // ── Notification Panel ───────────────────────────────────
 const _notifItems = []; // { id, type:'cloud'|'pacote', title, sub, action }
+window._notifItems = _notifItems; // expor globalmente para chat.js poder ler
+
+// Sincroniza o badge numérico de notificações
+function _syncNotifBadge() {
+  const badge = $('headerNotifBadge');
+  const dot   = $('headerNotifDot');
+  const count = _notifItems.length;
+  if (badge) {
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.classList.add('show');
+    } else {
+      badge.classList.remove('show');
+    }
+  }
+  // ocultar o dot quando o badge com número já está visível
+  if (dot) dot.classList.toggle('show', false);
+}
 
 function addNotifItem(item) {
   if (_notifItems.find(i => i.id === item.id)) return;
   _notifItems.push(item);
   renderNotifPanel();
-  $('headerNotifDot').classList.add('show');
-  // Update badge counter
-  const badge = $('headerNotifBadge');
-  if (badge) {
-    const count = _notifItems.length;
-    badge.textContent = count > 99 ? '99+' : count;
-    badge.classList.add('show');
-    $('headerNotifDot').classList.remove('show');
-  }
+  _syncNotifBadge();
 }
 
 function renderNotifPanel() {
@@ -1029,8 +1039,7 @@ function renderNotifPanel() {
   if (_notifItems.length === 0) {
     list.innerHTML = '<div class="notif-panel-empty">Sem notificações de momento.</div>';
     $('headerNotifDot').classList.remove('show');
-    const badge = $('headerNotifBadge');
-    if (badge) badge.classList.remove('show');
+    _syncNotifBadge();
     return;
   }
   list.innerHTML = _notifItems.map(item => `
@@ -1052,6 +1061,7 @@ function renderNotifPanel() {
     const item = _notifItems.find(i => i.id === id);
     if (item && item.onClick) el.onclick = () => { closeNotifPanel(); item.onClick(); };
   });
+  _syncNotifBadge();
 }
 
 function closeNotifPanel() {

@@ -539,21 +539,25 @@ const ChatSystem = (() => {
         content = `<div class="msg-bubble" style="${pendingStyle}">${replyHtml}${_linkify(_esc(msg.text||''))}${editedTag}</div>`;
       } else if (msg.type === 'image') {
         if (msg.url && !msg.noPreview) {
-          content = `<div class="msg-bubble msg-bubble-media" style="${pendingStyle}">${replyHtml}<img class="msg-img" src="${msg.url}" onclick="ChatSystem._previewImgEl(this)" alt="${_esc(msg.fileName||'foto')}">${editedTag}</div>`;
+          const dlBtn = `<a class="msg-download-btn" href="${msg.url}" download="${_esc(msg.fileName||'imagem.jpg')}" title="Baixar imagem"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Baixar</a>`;
+          content = `<div class="msg-bubble msg-bubble-media" style="${pendingStyle}">${replyHtml}<img class="msg-img" src="${msg.url}" onclick="ChatSystem._previewImgEl(this)" data-full="${msg.url}" alt="${_esc(msg.fileName||'foto')}">${dlBtn}${editedTag}</div>`;
         } else {
           content = `<div class="msg-bubble" style="${pendingStyle}"><div class="msg-file"><svg viewBox="0 0 24 24" class="msg-file-icon" style="fill:#22C55E"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg><div class="msg-file-info"><div class="msg-file-name">${_esc(msg.fileName||'imagem')}</div><div class="msg-file-size">${msg.fileSize||''}</div></div></div></div>`;
         }
       } else if (msg.type === 'audio') {
+        const dlBtnAudio = msg.url && !msg.noPreview ? `<a class="msg-download-btn" href="${msg.url}" download="${_esc(msg.fileName||'audio.mp3')}" title="Baixar áudio"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Baixar</a>` : '';
         content = msg.url && !msg.noPreview
-          ? `<div class="msg-bubble msg-bubble-media" style="${pendingStyle}">${replyHtml}<div class="msg-audio"><svg viewBox="0 0 24 24" class="msg-audio-icon"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><audio controls src="${msg.url}" style="max-width:190px;height:36px"></audio></div>${editedTag}</div>`
+          ? `<div class="msg-bubble msg-bubble-media" style="${pendingStyle}">${replyHtml}<div class="msg-audio"><svg viewBox="0 0 24 24" class="msg-audio-icon"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><audio controls src="${msg.url}" style="max-width:190px;height:36px"></audio></div>${dlBtnAudio}${editedTag}</div>`
           : `<div class="msg-bubble" style="${pendingStyle}"><div class="msg-file"><svg viewBox="0 0 24 24" class="msg-file-icon" style="fill:#8B5CF6"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><div class="msg-file-info"><div class="msg-file-name">${_esc(msg.fileName||'áudio')}</div><div class="msg-file-size">${msg.fileSize||''}</div></div></div></div>`;
       } else if (msg.type === 'video') {
+        const dlBtnVideo = msg.url && !msg.noPreview ? `<a class="msg-download-btn" href="${msg.url}" download="${_esc(msg.fileName||'video.mp4')}" title="Baixar vídeo"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Baixar</a>` : '';
         content = msg.url && !msg.noPreview
-          ? `<div class="msg-bubble msg-bubble-media" style="${pendingStyle}">${replyHtml}<video controls class="msg-video" src="${msg.url}"></video>${editedTag}</div>`
+          ? `<div class="msg-bubble msg-bubble-media" style="${pendingStyle}">${replyHtml}<video controls class="msg-video" src="${msg.url}"></video>${dlBtnVideo}${editedTag}</div>`
           : `<div class="msg-bubble" style="${pendingStyle}"><div class="msg-file"><svg viewBox="0 0 24 24" class="msg-file-icon" style="fill:#EF4444"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg><div class="msg-file-info"><div class="msg-file-name">${_esc(msg.fileName||'vídeo')}</div><div class="msg-file-size">${msg.fileSize||''}</div></div></div></div>`;
       } else {
-        const dl = msg.url ? `onclick="window.open('${msg.url}')" style="cursor:pointer"` : '';
-        content = `<div class="msg-bubble" style="${pendingStyle}"><div class="msg-file" ${dl}><svg viewBox="0 0 24 24" class="msg-file-icon" style="fill:#3B82F6"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><div class="msg-file-info"><div class="msg-file-name">${_esc(msg.fileName||'ficheiro')}</div><div class="msg-file-size">${msg.fileSize||''}</div></div></div></div>`;
+        const dlBtnFile = msg.url ? `<a class="msg-download-btn" href="${msg.url}" download="${_esc(msg.fileName||'ficheiro')}" title="Baixar ficheiro" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Baixar</a>` : '';
+        const fileClick = msg.url ? `style="cursor:pointer" onclick="window.open('${msg.url}')"` : '';
+        content = `<div class="msg-bubble" style="${pendingStyle}"><div class="msg-file" ${fileClick}><svg viewBox="0 0 24 24" class="msg-file-icon" style="fill:#3B82F6"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><div class="msg-file-info"><div class="msg-file-name">${_esc(msg.fileName||'ficheiro')}</div><div class="msg-file-size">${msg.fileSize||''}</div></div></div>${dlBtnFile}</div>`;
       }
 
       /* Mention btn */

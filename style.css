@@ -4462,6 +4462,36 @@ body.light-mode .attach-menu { background: #fff; box-shadow: 0 8px 32px rgba(0,0
   opacity: 0.65;
 }
 
+/* ── Download button ───────────────────────────────────── */
+.msg-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.13);
+  color: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-decoration: none;
+  opacity: 0.82;
+  transition: opacity 0.15s, background 0.15s;
+  letter-spacing: 0.02em;
+}
+.msg-download-btn svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+.msg-download-btn:hover,
+.msg-download-btn:active { opacity: 1; background: rgba(255,255,255,0.22); }
+.msg-row.theirs .msg-download-btn { background: rgba(0,0,0,0.07); }
+.msg-row.theirs .msg-download-btn:hover { background: rgba(0,0,0,0.14); }
+body.light-mode .msg-row.mine .msg-download-btn { background: rgba(255,255,255,0.25); }
+body.light-mode .msg-row.theirs .msg-download-btn { background: rgba(0,0,0,0.06); color: #1a2340; }
+
 /* ── Mention / Private button ──────────────────────────── */
 .msg-mention-btn {
   display: inline-flex;
