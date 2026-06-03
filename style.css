@@ -336,7 +336,7 @@ select.field-input       { cursor: pointer; }
 /* Notification Banner */
 .notif-banner {
   position: fixed;
-  top: -80px;
+  top: -120px;
   left: 0;
   right: 0;
   background: linear-gradient(135deg, #1C2540, #0D1224);
@@ -345,11 +345,13 @@ select.field-input       { cursor: pointer; }
   display: flex;
   align-items: center;
   gap: 10px;
-  z-index: 8000;
+  z-index: 9;
   transition: top 0.35s cubic-bezier(.17, .67, .35, 1.1);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 }
-.notif-banner.show { top: 0; }
+.notif-banner.show {
+  top: calc(var(--safe-top) + 57px);
+}
 
 .notif-banner-icon {
   flex-shrink: 0;
