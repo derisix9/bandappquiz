@@ -349,9 +349,7 @@ select.field-input       { cursor: pointer; }
   transition: top 0.35s cubic-bezier(.17, .67, .35, 1.1);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 }
-.notif-banner.show {
-  top: calc(var(--safe-top) + 57px);
-}
+.notif-banner.show { top: calc(var(--safe-top) + 57px); }
 
 .notif-banner-icon {
   flex-shrink: 0;
@@ -2073,22 +2071,30 @@ body.light-mode .notif-dot { border-color: #EFF4FB; }
 /* New package notification */
 .notif-pacote-banner {
   position: fixed;
-  top: calc(var(--safe-top) + 8px);
+  top: calc(var(--safe-top) + 65px);
   left: 12px;
   right: 12px;
-  z-index: 9999;
+  z-index: 8;
   background: linear-gradient(135deg, #1C2540, #12192E);
   border: 1px solid var(--gold);
   border-radius: var(--radius);
   padding: 12px 14px;
-  display: none;
+  display: flex;
   align-items: center;
   gap: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-20px);
+  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.notif-pacote-banner.show { display: flex; animation: slideDown 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.notif-pacote-banner.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
 @keyframes slideDown {
-  from { transform: translateY(-110%); opacity: 0; }
+  from { transform: translateY(-30px); opacity: 0; }
   to   { transform: translateY(0);     opacity: 1; }
 }
 
