@@ -398,9 +398,70 @@ const ChatSystem = (() => {
   }
 
   function _onMentionTap(uid, name, text) {
-    if (confirm(`Iniciar conversa privada com ${name}?`)) {
-      startPrivateWith(uid, name); if (!_isOpen) open();
-    } else { setReply('community', uid, name, text); }
+    // Modal personalizado em vez do confirm() nativo do browser
+    const existing = document.getElementById('chat-private-confirm-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'chat-private-confirm-modal';
+    overlay.style.cssText = `
+      position:fixed; inset:0; background:rgba(0,0,0,0.65);
+      z-index:99999; display:flex; align-items:flex-end;
+      padding:0; backdrop-filter:blur(4px);
+    `;
+    overlay.innerHTML = `
+      <div style="
+        background:var(--card,#161D30); border-radius:20px 20px 0 0;
+        padding:28px 20px 32px; width:100%; max-width:480px; margin:0 auto;
+        border-top:1px solid var(--border,rgba(255,215,0,0.12));
+        box-shadow:0 -8px 40px rgba(0,0,0,0.5);
+        animation:slideUpModal 0.28s cubic-bezier(0.34,1.56,0.64,1);
+      ">
+        <style>@keyframes slideUpModal{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}</style>
+        <div style="text-align:center;margin-bottom:18px">
+          <div style="width:52px;height:52px;border-radius:50%;background:rgba(99,102,241,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+            <svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:var(--purple,#8B5CF6)"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+          </div>
+          <div style="font-family:var(--font-display,sans-serif);font-size:1.1rem;font-weight:700;color:var(--text,#F1F5F9);margin-bottom:6px">Conversa Privada</div>
+          <div style="font-size:0.88rem;color:var(--text2,#94A3B8);line-height:1.5">
+            Iniciar conversa privada com<br><strong style="color:var(--text,#F1F5F9)">${name}</strong>?
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button id="chatPrivConfirmOk" style="
+            width:100%;padding:14px;border-radius:14px;
+            background:linear-gradient(135deg,var(--purple,#8B5CF6),#6366F1);
+            color:#fff;border:none;font-family:var(--font-display,sans-serif);
+            font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:0.04em;
+          ">Iniciar Conversa</button>
+          <button id="chatPrivConfirmReply" style="
+            width:100%;padding:13px;border-radius:14px;
+            background:var(--card2,#1C2540);color:var(--text,#F1F5F9);
+            border:1px solid var(--border2,rgba(255,255,255,0.07));
+            font-family:var(--font-display,sans-serif);font-size:0.95rem;
+            font-weight:600;cursor:pointer;
+          ">Responder na comunidade</button>
+          <button id="chatPrivConfirmCancel" style="
+            width:100%;padding:12px;border-radius:14px;
+            background:transparent;color:var(--text3,#64748B);
+            border:none;font-size:0.9rem;cursor:pointer;font-weight:600;
+          ">Cancelar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('chatPrivConfirmOk').onclick = () => {
+      overlay.remove();
+      startPrivateWith(uid, name);
+      if (!_isOpen) open();
+    };
+    document.getElementById('chatPrivConfirmReply').onclick = () => {
+      overlay.remove();
+      setReply('community', uid, name, text);
+    };
+    document.getElementById('chatPrivConfirmCancel').onclick = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
 
   /* ═══════════════════════════════════════════════════
