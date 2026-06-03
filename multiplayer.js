@@ -531,14 +531,15 @@ async function mpEntrarSala(salaId) {
 
   mpClearListeners();
 
-  // 1. Registar listeners PRIMEIRO (await garante que estão activos)
-  await mpShowSalaScreen(salaRef);
-
-  // 2. Só depois escrever o jogador — listener já activo capta o evento
+  // 1. Escrever o jogador PRIMEIRO no Firebase antes de activar os listeners.
+  //    Assim o host ja recebe o snapshot com o segundo jogador incluido.
   await salaRef.child('players').child(me.uid).set({
     uid: me.uid, name: me.name, email: me.email || me.phone,
     stars: me.stars, score: 0, joined: true,
   });
+
+  // 2. Montar o ecra e os listeners (ja ve os 2 jogadores no primeiro snapshot)
+  await mpShowSalaScreen(salaRef);
 }
 
 // ─── SALA DE JOGO ─────────────────────────────────────────
@@ -566,6 +567,16 @@ async function mpShowSalaScreen(salaRef) {
     ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real'
     : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono';
 
+  // Renderizar imediatamente os jogadores já presentes na sala
+  const initialPlayers = sData.players ? Object.values(sData.players) : [];
+  const myUidInit = MP.myUid;
+  const sortedInit = [
+    ...initialPlayers.filter(p => p.uid === myUidInit),
+    ...initialPlayers.filter(p => p.uid !== myUidInit),
+  ];
+  mpRenderPlayersGrid(sortedInit, _maxP);
+  mpRenderScoreboard(sortedInit);
+
   if (deleteBtn) {
     deleteBtn.style.display = isHost ? 'flex' : 'none';
     deleteBtn.onclick = () => mpEliminarSalaFromRoom(salaRef.key);
@@ -591,7 +602,7 @@ async function mpShowSalaScreen(salaRef) {
   }
 
   // ── LISTENER PLAYERS ────────────────────────────────────────
-  mpAddListener(salaRef.child('players'), 'value', snap => {
+  mpAddListener(salaRef.child('players'), 'value', async snap => {
     const players = [];
     snap.forEach(c => players.push(c.val()));
 
@@ -605,14 +616,19 @@ async function mpShowSalaScreen(salaRef) {
     mpRenderScoreboard(sorted);
 
     // Host: activar botão quando adversário entrar
-    if (isHost && initBtn && players.length >= 2 && _status === 'waiting') {
-      const adv  = players.find(p => p.uid !== myUid);
-      const nome = adv ? adv.name.split(' ')[0] : 'Adversário';
-      initBtn.disabled      = false;
-      initBtn.style.opacity = '1';
-      initBtn.style.cursor  = 'pointer';
-      initBtn.innerHTML     = `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>${nome} entrou! Iniciar`;
-      mpShowToast(`${nome} aceitou! Clica em Iniciar para começar.`);
+    // Ler o status actual do Firebase para garantir que está actualizado
+    if (isHost && initBtn && players.length >= 2) {
+      const statusSnap = await salaRef.child('status').once('value');
+      const currentStatus = statusSnap.val() || 'waiting';
+      if (currentStatus === 'waiting') {
+        const adv  = players.find(p => p.uid !== myUid);
+        const nome = adv ? adv.name.split(' ')[0] : 'Adversário';
+        initBtn.disabled      = false;
+        initBtn.style.opacity = '1';
+        initBtn.style.cursor  = 'pointer';
+        initBtn.innerHTML     = `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>${nome} entrou! Iniciar`;
+        mpShowToast(`${nome} aceitou! Clica em Iniciar para começar.`);
+      }
     }
   });
 
