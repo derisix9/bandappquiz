@@ -531,8 +531,10 @@ async function mpEntrarSala(salaId) {
 
   mpClearListeners();
 
-  // Escrever jogador ANTES de montar o ecrã — assim o sData lido
-  // em mpShowSalaScreen já contém os 2 jogadores desde o início
+  // CORRECÇÃO DEFINITIVA: escrever jogador no Firebase ANTES de chamar
+  // mpShowSalaScreen. Assim o salaRef.once('value') dentro dessa função
+  // já devolve um snapshot com os 2 jogadores, e o grid mostra ambos
+  // imediatamente sem depender do listener assíncrono.
   await salaRef.child('players').child(me.uid).set({
     uid: me.uid, name: me.name, email: me.email || me.phone,
     stars: me.stars, score: 0, joined: true,
@@ -551,7 +553,8 @@ async function mpShowSalaScreen(salaRef) {
   const deleteBtn = mpEl('mpSalaDeleteBtn');
   const initBtn   = mpEl('btnIniciarDesafio');
 
-  // Ler dados da sala UMA vez com await — evita callbacks aninhados
+  // Ler dados actuais da sala — neste ponto já tem os 2 jogadores
+  // porque mpEntrarSala escreveu o jogador antes de chamar esta função
   const sSnap = await salaRef.once('value');
   const sData = sSnap.val();
   if (!sData) return;
@@ -571,7 +574,7 @@ async function mpShowSalaScreen(salaRef) {
     deleteBtn.onclick = () => mpEliminarSalaFromRoom(salaRef.key);
   }
 
-  // Botão iniciar — só visível ao host, desabilitado até adversário entrar
+  // Botão iniciar — só para o host
   if (initBtn) {
     if (isHost) {
       initBtn.style.display   = 'inline-flex';
@@ -590,41 +593,46 @@ async function mpShowSalaScreen(salaRef) {
     };
   }
 
-  // ── LISTENER PLAYERS ────────────────────────────────────────
-  // Renderizar imediatamente com dados já no sData (sem esperar listener)
-  // — garante que ambos os jogadores aparecem logo ao abrir a sala
-  {
-    const nowPlayers = sData.players ? Object.values(sData.players) : [];
-    const meNow = MP.myUid;
-    mpRenderPlayersGrid([
-      ...nowPlayers.filter(p => p.uid === meNow),
-      ...nowPlayers.filter(p => p.uid !== meNow),
-    ], _maxP);
-    mpRenderScoreboard(nowPlayers);
-  }
-
-  let _btnToastDone = false;
-  mpAddListener(salaRef.child('players'), 'value', snap => {
-    const players = [];
-    snap.forEach(c => players.push(c.val()));
+  // ── RENDER IMEDIATO dos jogadores já presentes ──────────────
+  // Não espera pelo listener — usa os dados já lidos em sData
+  const renderPlayers = (playersList) => {
     const myUid  = MP.myUid;
     const sorted = [
-      ...players.filter(p => p.uid === myUid),
-      ...players.filter(p => p.uid !== myUid),
+      ...playersList.filter(p => p.uid === myUid),
+      ...playersList.filter(p => p.uid !== myUid),
     ];
     mpRenderPlayersGrid(sorted, _maxP);
     mpRenderScoreboard(sorted);
+  };
 
-    // Host: activar botão quando há 2+ jogadores
-    // Sem verificar _status — o listener de status esconde o botão se necessário
+  const initialPlayers = sData.players ? Object.values(sData.players) : [];
+  renderPlayers(initialPlayers);
+
+  // Se já há 2 jogadores no snapshot inicial, activar botão imediatamente
+  if (isHost && initBtn && initialPlayers.length >= 2) {
+    const adv  = initialPlayers.find(p => p.uid !== MP.myUid);
+    const nome = adv ? adv.name.split(' ')[0] : 'Adversário';
+    initBtn.disabled      = false;
+    initBtn.style.opacity = '1';
+    initBtn.style.cursor  = 'pointer';
+    initBtn.innerHTML     = `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>${nome} entrou! Iniciar`;
+  }
+
+  // ── LISTENER PLAYERS ────────────────────────────────────────
+  let _toastDone = false;
+  mpAddListener(salaRef.child('players'), 'value', snap => {
+    const players = [];
+    snap.forEach(c => players.push(c.val()));
+    renderPlayers(players);
+
     if (isHost && initBtn && players.length >= 2 && initBtn.disabled) {
-      const adv  = players.find(p => p.uid !== myUid);
+      const adv  = players.find(p => p.uid !== MP.myUid);
       const nome = adv ? adv.name.split(' ')[0] : 'Adversário';
       initBtn.disabled      = false;
       initBtn.style.opacity = '1';
       initBtn.style.cursor  = 'pointer';
       initBtn.innerHTML     = `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>${nome} entrou! Iniciar`;
-      if (!_btnToastDone) { _btnToastDone = true; mpShowToast(`${nome} aceitou! Clica em Iniciar para começar.`); }
+      if (!_toastDone) { _toastDone = true; mpShowToast(`${nome} aceitou! Clica em Iniciar para começar.`); }
     }
   });
 
@@ -636,8 +644,10 @@ async function mpShowSalaScreen(salaRef) {
     if (status === 'countdown') mpMostrarContagem(salaRef);
     if (status === 'playing')   mpStartGame();
     if (status === 'finished')  mpShowResults();
-    if (deleteBtn && status !== 'waiting') deleteBtn.style.display = 'none';
-    if (initBtn   && status !== 'waiting') initBtn.style.display   = 'none';
+    if (status !== 'waiting') {
+      if (deleteBtn) deleteBtn.style.display = 'none';
+      if (initBtn)   initBtn.style.display   = 'none';
+    }
   });
 
   // ── SALA ELIMINADA ────────────────────────────────────────────
