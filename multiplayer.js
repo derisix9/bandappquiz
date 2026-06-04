@@ -531,8 +531,8 @@ async function mpEntrarSala(salaId) {
 
   mpClearListeners();
 
-  // Escrever jogador no Firebase PRIMEIRO — garante que o sData lido
-  // em mpShowSalaScreen já tem os 2 jogadores, sem depender do listener
+  // Escrever jogador ANTES de montar o ecrã — assim o sData lido
+  // em mpShowSalaScreen já contém os 2 jogadores desde o início
   await salaRef.child('players').child(me.uid).set({
     uid: me.uid, name: me.name, email: me.email || me.phone,
     stars: me.stars, score: 0, joined: true,
@@ -591,18 +591,19 @@ async function mpShowSalaScreen(salaRef) {
   }
 
   // ── LISTENER PLAYERS ────────────────────────────────────────
-  // Renderizar imediatamente com dados já presentes (evita flash de "Aguardando")
+  // Renderizar imediatamente com dados já no sData (sem esperar listener)
+  // — garante que ambos os jogadores aparecem logo ao abrir a sala
   {
     const nowPlayers = sData.players ? Object.values(sData.players) : [];
-    const myUidNow   = MP.myUid;
+    const meNow = MP.myUid;
     mpRenderPlayersGrid([
-      ...nowPlayers.filter(p => p.uid === myUidNow),
-      ...nowPlayers.filter(p => p.uid !== myUidNow),
+      ...nowPlayers.filter(p => p.uid === meNow),
+      ...nowPlayers.filter(p => p.uid !== meNow),
     ], _maxP);
     mpRenderScoreboard(nowPlayers);
   }
 
-  let _toastShown = false; // evitar toast repetido
+  let _btnToastDone = false;
   mpAddListener(salaRef.child('players'), 'value', snap => {
     const players = [];
     snap.forEach(c => players.push(c.val()));
@@ -614,22 +615,16 @@ async function mpShowSalaScreen(salaRef) {
     mpRenderPlayersGrid(sorted, _maxP);
     mpRenderScoreboard(sorted);
 
-    // Host: activar botão assim que haja 2 jogadores, independente de _status
-    // (o listener de status trata de esconder o botão se o jogo já começou)
-    if (isHost && initBtn && players.length >= 2) {
-      // Só activar se o botão ainda estiver desabilitado (evita reset ao re-disparar)
-      if (initBtn.disabled) {
-        const adv  = players.find(p => p.uid !== myUid);
-        const nome = adv ? adv.name.split(' ')[0] : 'Adversário';
-        initBtn.disabled      = false;
-        initBtn.style.opacity = '1';
-        initBtn.style.cursor  = 'pointer';
-        initBtn.innerHTML     = `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>${nome} entrou! Iniciar`;
-        if (!_toastShown) {
-          _toastShown = true;
-          mpShowToast(`${nome} aceitou! Clica em Iniciar para começar.`);
-        }
-      }
+    // Host: activar botão quando há 2+ jogadores
+    // Sem verificar _status — o listener de status esconde o botão se necessário
+    if (isHost && initBtn && players.length >= 2 && initBtn.disabled) {
+      const adv  = players.find(p => p.uid !== myUid);
+      const nome = adv ? adv.name.split(' ')[0] : 'Adversário';
+      initBtn.disabled      = false;
+      initBtn.style.opacity = '1';
+      initBtn.style.cursor  = 'pointer';
+      initBtn.innerHTML     = `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>${nome} entrou! Iniciar`;
+      if (!_btnToastDone) { _btnToastDone = true; mpShowToast(`${nome} aceitou! Clica em Iniciar para começar.`); }
     }
   });
 
@@ -641,11 +636,8 @@ async function mpShowSalaScreen(salaRef) {
     if (status === 'countdown') mpMostrarContagem(salaRef);
     if (status === 'playing')   mpStartGame();
     if (status === 'finished')  mpShowResults();
-    // Esconder botões de controlo quando o jogo já não está em espera
-    if (status !== 'waiting') {
-      if (deleteBtn) deleteBtn.style.display = 'none';
-      if (initBtn)   initBtn.style.display   = 'none';
-    }
+    if (deleteBtn && status !== 'waiting') deleteBtn.style.display = 'none';
+    if (initBtn   && status !== 'waiting') initBtn.style.display   = 'none';
   });
 
   // ── SALA ELIMINADA ────────────────────────────────────────────
