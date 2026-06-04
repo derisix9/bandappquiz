@@ -353,6 +353,16 @@ async function saveLocalDB(qs) {
   }
 }
 
+// Guarda quais IDs de perguntas da nuvem o utilizador eliminou manualmente
+function getDeletedCloudIds() {
+  return LS.get('eq_deleted_cloud_ids') || [];
+}
+function addDeletedCloudIds(ids) {
+  const existing = new Set(getDeletedCloudIds());
+  ids.forEach(id => existing.add(id));
+  LS.set('eq_deleted_cloud_ids', [...existing]);
+}
+
 async function addQuestionLocalDB(q) {
   State.localDB.push(q);
   try {
@@ -3199,9 +3209,13 @@ async function downloadFromCloud() {
     await loadLocalDB();
     const userLocalQs = State.localDB.filter(q => q.id && q.id.startsWith('local_'));
 
-    // Mesclar: nuvem + locais do utilizador (sem duplicar IDs)
-    const cloudIds = new Set(cloudQs.map(q => q.id));
-    const merged = [...cloudQs, ...userLocalQs.filter(q => !cloudIds.has(q.id))];
+    // Respeitar perguntas que o utilizador eliminou manualmente — não as restaurar
+    const deletedByUser = new Set(getDeletedCloudIds());
+    const filteredCloudQs = cloudQs.filter(q => !deletedByUser.has(q.id));
+
+    // Mesclar: nuvem (sem as eliminadas) + locais do utilizador (sem duplicar IDs)
+    const cloudIds = new Set(filteredCloudQs.map(q => q.id));
+    const merged = [...filteredCloudQs, ...userLocalQs.filter(q => !cloudIds.has(q.id))];
 
     await saveLocalDB(merged);
     LS.set('eq_last_sync', Date.now());
@@ -3306,6 +3320,9 @@ document.getElementById('localElimVisBtn').onclick = async () => {
       { label: 'CANCELAR', cls: 'btn-outline' },
       { label: 'ELIMINAR', cls: 'btn-danger', action: async () => {
         const filteredIds = new Set(filtered.map(q => q.id));
+        // Guardar IDs eliminados para que o sync da nuvem não os restaure
+        const cloudDeletedIds = filtered.filter(q => q.id && !q.id.startsWith('local_')).map(q => q.id);
+        if (cloudDeletedIds.length) addDeletedCloudIds(cloudDeletedIds);
         const remaining = State.localDB.filter(q => !filteredIds.has(q.id));
         await saveLocalDB(remaining);
         State.localDB = remaining;
