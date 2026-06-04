@@ -1,66 +1,60 @@
-/* ══════════════════════════════════════════════════════════
-   BANDAQUIZ — multiplayer.js  v2.0
-   Correcções: estrelas users/uid/stats.stars, modos de jogo,
-   tipos de pergunta, campos editáveis, categorias, nível "Todos"
-   ══════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   BANDAQUIZ — multiplayer.js  v4.0
+   Arquitectura limpa. Mapeada para os IDs existentes no HTML.
+   Sem emojis. Apenas SVG icons. Sem logica redundante.
+   ═══════════════════════════════════════════════════════════════ */
 
 'use strict';
 
-// ─── ESTADO MULTIPLAYER ────────────────────────────────────
+// ─── ESTADO GLOBAL ────────────────────────────────────────────
 const MP = {
-  config: {
-    modoJogo:   'aprendizado', // aprendizado | concurso | prova | imagem
-    modoPerg:   'realtime',    // realtime | async
-    nivel:      'todos',
-    tipo:       'todos',       // depende do modoJogo
-    tempo:      30,
-    qtd:        10,
-    maxplayers: 2,
-    disciplina: '',
-    categoria:  '',
-    targetUid:  null,
-    targetName: '',
-  },
-  sala:        null,
-  salaId:      null,
-  listeners:   [],
-  myUid:       null,
-  myProfile:   null,
-  myStars:     0,
-  questionTimer: null,
-  currentQ:    null,
-  answered:    false,
+  me:        null,   // { uid, name, email, phone, stars }
+  sala:      null,   // referencia Firebase da sala activa
+  salaId:    null,
+  salaData:  null,
+  isHost:    false,
+  listeners: [],
+  gameTimer: null,
+  answered:  false,
 };
 
-// ─── HELPERS ───────────────────────────────────────────────
-function mpEl(id)  { return document.getElementById(id); }
+// ─── SVG ICONS ────────────────────────────────────────────────
+const SVG = {
+  star:     `<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:var(--gold,#F59E0B);vertical-align:middle"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+  play:     `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:5px"><path d="M8 5v14l11-7z"/></svg>`,
+  check:    `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>`,
+  close:    `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`,
+  trophy:   `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.86 10.4 5 9.3 5 8zm14 0c0 1.3-.86 2.4-2 2.82V7h2v1z"/></svg>`,
+  people:   `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>`,
+  back:     `<svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;vertical-align:middle"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>`,
+  settings: `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.22-.07.47.12.61l2.03 1.58C4.84 11.36 4.8 11.69 4.8 12s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>`,
+  lock:     `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>`,
+  delete:   `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`,
+  clock:    `<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>`,
+  bolt:     `<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>`,
+};
 
-function mpShowScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  const el = document.getElementById(id);
-  if (el) el.classList.add('active');
-  window.scrollTo(0, 0);
+// ─── HELPERS ──────────────────────────────────────────────────
+const mpEl  = id  => document.getElementById(id);
+const mpQ   = sel => document.querySelector(sel);
+const mpQA  = sel => document.querySelectorAll(sel);
+
+function mpScreen(id) {
+  mpQA('.screen').forEach(s => s.classList.remove('active'));
+  const el = mpEl(id);
+  if (el) { el.classList.add('active'); window.scrollTo(0, 0); }
 }
 
-function mpAvatarLetter(name) {
-  return (name || '?').charAt(0).toUpperCase();
+function mpToast(msg) {
+  if (typeof showToast === 'function') showToast(msg);
+  else { console.log('[MP]', msg); }
 }
 
-function mpStarIcon() {
-  return `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:var(--gold,#F59E0B);vertical-align:middle"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
+function mpAvatar(name) {
+  return (name || '?')[0].toUpperCase();
 }
 
-function mpAddListener(ref, event, fn) {
-  ref.on(event, fn);
-  MP.listeners.push({ ref, event, fn });
-}
-
-function mpClearListeners() {
-  MP.listeners.forEach(({ ref, event, fn }) => ref.off(event, fn));
-  MP.listeners = [];
-}
-
-function mpShuffleArray(arr) {
+function mpShuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -69,1585 +63,1502 @@ function mpShuffleArray(arr) {
   return a;
 }
 
-function mpAutoRoomNumber() {
-  return Math.floor(1000 + Math.random() * 9000);
+// ─── FIREBASE LISTENERS ───────────────────────────────────────
+function mpListen(ref, ev, fn) {
+  ref.on(ev, fn);
+  MP.listeners.push({ ref, ev, fn });
 }
 
-function mpShowToast(msg) {
-  if (typeof showToast === 'function') showToast(msg);
+function mpUnlisten() {
+  MP.listeners.forEach(({ ref, ev, fn }) => ref.off(ev, fn));
+  MP.listeners = [];
+  clearInterval(MP.gameTimer);
+  MP.gameTimer = null;
 }
 
-// ─── LER ESTRELAS (users/uid/stats.stars + localStorage) ──
-async function mpGetStars(uid) {
-  if (!uid) return 0;
-  // 1. Tentar Firebase
-  try {
-    const snap = await db.ref(`users/${uid}/stats`).once('value');
-    const stats = snap.val();
-    if (stats && typeof stats.stars === 'number') return stats.stars;
-  } catch(e) {}
-  // 2. Fallback localStorage
-  const ls = (typeof LS !== 'undefined' && LS.get) ? LS.get(`eq_stats_${uid}`) : null;
-  return (ls && ls.stars) || 0;
-}
-
-// ─── GUARDAR ESTRELAS GANHAS NO DESAFIO ───────────────────
-async function mpAddStars(uid, amount) {
-  if (!uid || amount <= 0) return;
-  // Firebase
-  const statsRef = db.ref(`users/${uid}/stats`);
-  statsRef.transaction(stats => {
-    if (!stats) stats = { games: 0, best: 0, stars: 0 };
-    stats.stars = (stats.stars || 0) + amount;
-    return stats;
-  }).catch(() => {});
-  // localStorage
-  if (typeof LS !== 'undefined' && LS.get) {
-    const k  = `eq_stats_${uid}`;
-    const ls = LS.get(k) || { games: 0, best: 0, stars: 0 };
-    ls.stars = (ls.stars || 0) + amount;
-    LS.set(k, ls);
-  }
-}
-
-// ─── OBTER INFO DO UTILIZADOR ACTUAL ──────────────────────
-async function mpGetMyInfoAsync() {
-  // Se já temos cache válido, usar
-  if (MP.myProfile && MP.myProfile.uid) return MP.myProfile;
-
+// ═══════════════════════════════════════════════════════════════
+// PERFIL DO UTILIZADOR
+// ═══════════════════════════════════════════════════════════════
+async function mpGetMe() {
+  if (MP.me?.uid) return MP.me;
   const user = firebase.auth().currentUser;
   if (!user) return null;
 
-  const uid   = user.uid;
-  const email = user.email || '';
-  const phone = user.phoneNumber || '';
-  let name    = user.displayName || '';
-
-  // Tentar nome do State.profile (app.js carrega isto)
+  let name = user.displayName || '';
   if (!name && typeof State !== 'undefined' && State.profile) {
     name = ((State.profile.firstName || '') + ' ' + (State.profile.lastName || '')).trim();
   }
-
-  // Ir sempre ao Firebase buscar o perfil completo (inclui utilizadores de telefone/anónimos)
   if (!name) {
     try {
-      const snap = await db.ref(`users/${uid}`).once('value');
-      const data = snap.val();
-      if (data) {
-        name = ((data.firstName || '') + ' ' + (data.lastName || '')).trim()
-               || data.nome || data.displayName || '';
-      }
+      const snap = await db.ref(`users/${user.uid}`).once('value');
+      const d = snap.val() || {};
+      name = ((d.firstName || '') + ' ' + (d.lastName || '')).trim() || d.nome || '';
     } catch(e) {}
   }
-  name = name || email || phone || 'Jogador';
+  name = name || user.email || user.phoneNumber || 'Jogador';
 
-  const stars = await mpGetStars(uid);
-  MP.myStars = stars;
-
-  // Guardar em cache — mpGetMyInfoSync vai usar este
-  const profile = { uid, name, email, phone, stars };
-  MP.myProfile = profile;
-  MP.myUid     = uid;
-  return profile;
-}
-
-// Versão síncrona rápida — usa o cache de MP.myProfile carregado em mpInit
-function mpGetMyInfoSync() {
-  // 1. Usar cache definido por mpInit (sempre preferir este)
-  if (MP.myProfile && MP.myProfile.uid) return MP.myProfile;
-
-  // 2. Fallback: tentar construir a partir do firebase.auth()
-  const user = firebase.auth().currentUser;
-  let uid, name, email, phone;
-  if (user) {
-    uid   = user.uid;
-    email = user.email || '';
-    phone = user.phoneNumber || '';
-    name  = user.displayName || '';
-  } else {
-    return null;
-  }
-  // Tentar nome do State.profile
-  if (!name && typeof State !== 'undefined' && State.profile) {
-    name = ((State.profile.firstName || '') + ' ' + (State.profile.lastName || '')).trim();
-  }
-  name = name || email || phone || 'Jogador';
-  const ls = (typeof LS !== 'undefined' && LS.get) ? LS.get(`eq_stats_${uid}`) : null;
-  const stars = (ls && ls.stars) || MP.myStars || 0;
-  return { uid, name, email, phone, stars };
-}
-
-// ─── INICIALIZAÇÃO DO HUB ─────────────────────────────────
-async function mpInit() {
-  // Forçar re-fetch do perfil (limpar cache para obter nome/estrelas actualizados)
-  MP.myProfile = null;
-  const me = await mpGetMyInfoAsync();
-  if (!me) {
-    mpShowToast('Inicia sessão para aceder ao Multiplayer.');
-    return;
-  }
-  MP.myUid     = me.uid;
-  MP.myProfile = me;
-  MP.myStars   = me.stars;
-
-  // Mostrar estrelas no header
-  const starsEl = mpEl('mpUserStars');
-  if (starsEl) starsEl.textContent = me.stars;
-
-  mpLoadSalas();
-  mpLoadDesafiosRecebidos();
-  mpLoadRanking();
-  mpPreencherDisciplinas();
-  mpUpdateTiposUI();
-
-  mpShowScreen('screen-multiplayer');
-}
-
-// ─── TABS ─────────────────────────────────────────────────
-document.querySelectorAll('.mp-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.mp-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.mp-tab-content').forEach(c => c.classList.remove('active'));
-    tab.classList.add('active');
-    const target = tab.dataset.tab;
-    const key = 'mpTab' + target.charAt(0).toUpperCase() + target.slice(1);
-    const el = mpEl(key);
-    if (el) el.classList.add('active');
-    if (target === 'ranking') mpLoadRanking();
-    if (target === 'salas')   mpLoadSalas();
-  });
-});
-
-// ─── OPÇÕES DATA-MPOPT (botões) ───────────────────────────
-document.querySelectorAll('[data-mpopt]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const key = btn.dataset.mpopt;
-    document.querySelectorAll(`[data-mpopt="${key}"]`).forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const val = btn.dataset.v;
-    MP.config[key] = (key === 'maxplayers') ? parseInt(val) : val;
-    // Actualizar tipos quando modoJogo muda
-    if (key === 'modoJogo') mpUpdateTiposUI();
-  });
-});
-
-// ─── ATUALIZAR TIPOS DE PERGUNTAS CONFORME MODO DO JOGO ──
-function mpUpdateTiposUI() {
-  const container = mpEl('mpTiposContainer');
-  if (!container) return;
-  const modo = MP.config.modoJogo;
-
-  let opcoes = [];
-  if (modo === 'aprendizado') {
-    opcoes = [
-      { v: 'todos',    label: 'Todos' },
-      { v: 'multipla', label: 'Múltipla Escolha' },
-      { v: 'vf',       label: 'Verdadeiro/Falso' },
-      { v: 'lacunas',  label: 'Preencher Lacunas' },
-    ];
-  } else if (modo === 'concurso' || modo === 'prova') {
-    opcoes = [
-      { v: 'todos',    label: 'Todos' },
-      { v: 'multipla', label: 'Múltipla Escolha' },
-      { v: 'vf',       label: 'Verdadeiro/Falso' },
-      { v: 'lacunas',  label: 'Preencher Lacunas' },
-    ];
-  } else if (modo === 'imagem') {
-    opcoes = [
-      { v: 'multipla_img1', label: 'Múltipla — Opção 1' },
-      { v: 'multipla_img2', label: 'Múltipla — Opção 2' },
-    ];
-  }
-
-  // Repor tipo ao primeiro
-  MP.config.tipo = opcoes[0].v;
-
-  container.innerHTML = opcoes.map((o, i) =>
-    `<button class="mp-opt${i === 0 ? ' active' : ''}" data-mpopt="tipo" data-v="${o.v}">${o.label}</button>`
-  ).join('');
-
-  // Re-registar eventos
-  container.querySelectorAll('[data-mpopt]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      container.querySelectorAll('[data-mpopt]').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      MP.config.tipo = btn.dataset.v;
-    });
-  });
-}
-
-// ─── CAMPOS DE TEXTO: TEMPO E NÚMERO DE PERGUNTAS ─────────
-(function setupInputFields() {
-  // Estes campos são <input type="number"> no HTML
-  const tempoInput = mpEl('mpTempoInput');
-  const qtdInput   = mpEl('mpQtdInput');
-
-  if (tempoInput) {
-    tempoInput.value = MP.config.tempo;
-    tempoInput.addEventListener('input', () => {
-      const v = parseInt(tempoInput.value);
-      if (!isNaN(v) && v >= 0) MP.config.tempo = v;
-    });
-  }
-  if (qtdInput) {
-    qtdInput.value = MP.config.qtd;
-    qtdInput.addEventListener('input', () => {
-      const v = parseInt(qtdInput.value);
-      if (!isNaN(v) && v > 0) MP.config.qtd = v;
-    });
-  }
-})();
-
-// ─── SALAS ACTIVAS ────────────────────────────────────────
-function mpLoadSalas() {
-  const salasRef = db.ref('mp_salas').orderByChild('status').equalTo('waiting');
-  salasRef.once('value', snap => {
-    const list = mpEl('mpSalasList');
-    if (!list) return;
-    const me = mpGetMyInfoSync();
-    const myUid = me?.uid || MP.myUid;
-
-    const salas = [];
-    snap.forEach(child => {
-      const s = child.val(); s._key = child.key; salas.push(s);
-    });
-
-    // Filtrar: mostrar apenas salas onde o utilizador é host ou convidado
-    const minhasSalas = salas.filter(s =>
-      s.host === myUid || s.invitedUid === myUid
-    );
-
-    if (minhasSalas.length === 0) {
-      list.innerHTML = `
-        <div class="mp-empty-state">
-          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
-          <p>Nenhuma sala activa de momento</p>
-          <button class="btn-mp-action" id="btnCriarSala">Criar Sala</button>
-        </div>`;
-      const b = mpEl('btnCriarSala');
-      if (b) b.addEventListener('click', mpAbrirCriarSala);
-      return;
-    }
-
-    list.innerHTML = minhasSalas.map(s => {
-      const players   = s.players ? Object.values(s.players) : [];
-      const isHost    = s.host === myUid;
-      const modoIcons = {
-        aprendizado: `<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>`,
-        concurso:    `<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.86 10.4 5 9.3 5 8zm14 0c0 1.3-.86 2.4-2 2.82V7h2v1z"/></svg>`,
-        prova:       `<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`,
-        imagem:      `<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>`,
-      };
-      const modoLabel = s.modoJogo ? ((modoIcons[s.modoJogo] || '') + ({ aprendizado:'Aprendizado', concurso:'Concurso', prova:'Prova', imagem:'Imagem' }[s.modoJogo] || s.modoJogo)) : '';
-      const dots = Array.from({length: s.maxplayers || 2}, (_, i) =>
-        `<span class="mp-sala-player-dot ${players[i] ? 'active' : ''}"></span>`
-      ).join('');
-
-      const hostBadge = isHost
-        ? `<span style="font-size:0.65rem;background:var(--primary,#6366F1);color:#fff;border-radius:6px;padding:2px 7px;margin-left:6px">Host</span>`
-        : `<span style="font-size:0.65rem;background:#22C55E;color:#fff;border-radius:6px;padding:2px 7px;margin-left:6px">Convidado</span>`;
-
-      const actionBtn = isHost
-        ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-             <button class="mp-sala-join" data-salaid="${s._key}">▶ Entrar</button>
-             <button class="mp-sala-delete" data-salaid="${s._key}"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Eliminar</button>
-           </div>`
-        : `<button class="mp-sala-join" data-salaid="${s._key}">▶ Entrar</button>`;
-
-      return `
-        <div class="mp-sala-card">
-          <div class="mp-sala-badge"><span>SALA</span><strong>#${s.roomNum || '?'}</strong></div>
-          <div class="mp-sala-info">
-            <div class="mp-sala-name">${s.disciplina || 'Geral'} — ${s.nivel || 'Todos'} ${hostBadge}</div>
-            <div class="mp-sala-meta">${modoLabel} · ${players.length}/${s.maxplayers || 2} jogadores · ${s.modoPerg === 'realtime' ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real' : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono'}</div>
-            <div class="mp-sala-players" style="margin-top:4px">${dots}</div>
-          </div>
-          ${actionBtn}
-        </div>`;
-    }).join('') + `<div style="text-align:center;margin-top:10px"><button class="btn-mp-action" id="btnCriarSala">+ Criar Nova Sala</button></div>`;
-
-    const b = mpEl('btnCriarSala');
-    if (b) b.addEventListener('click', mpAbrirCriarSala);
-
-    list.querySelectorAll('.mp-sala-join').forEach(btn =>
-      btn.addEventListener('click', () => mpEntrarSala(btn.dataset.salaid))
-    );
-    list.querySelectorAll('.mp-sala-delete').forEach(btn =>
-      btn.addEventListener('click', () => mpEliminarSala(btn.dataset.salaid))
-    );
-  });
-}
-
-
-// ─── MODAL DE CONFIRMAÇÃO PERSONALIZADO ──────────────────
-function mpConfirm(mensagem, onConfirm) {
-  const existing = document.getElementById('mp-confirm-modal');
-  if (existing) existing.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'mp-confirm-modal';
-  overlay.style.cssText = `
-    position:fixed; inset:0; background:rgba(0,0,0,0.55);
-    z-index:99999; display:flex; align-items:flex-end;
-    justify-content:center; padding-bottom:24px;
-    animation: mpFadeIn 0.2s ease;
-  `;
-  overlay.innerHTML = `
-    <style>
-      @keyframes mpFadeIn { from{opacity:0} to{opacity:1} }
-      @keyframes mpSlideUp2 { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
-    </style>
-    <div style="
-      background:var(--card,#fff); border-radius:20px;
-      padding:24px 20px 12px; width:calc(100% - 32px); max-width:400px;
-      box-shadow:0 -4px 40px rgba(0,0,0,0.18);
-      animation: mpSlideUp2 0.25s ease;
-    ">
-      <div style="text-align:center; margin-bottom:18px">
-        <div style="width:48px;height:48px;border-radius:50%;background:rgba(239,68,68,0.12);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px">
-          <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#EF4444"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        </div>
-        <div style="font-weight:700;font-size:1rem;color:var(--text,#111);margin-bottom:6px">Eliminar Sala</div>
-        <div style="font-size:0.85rem;color:var(--text2,#666);line-height:1.5">${mensagem}</div>
-      </div>
-      <button id="mpConfirmOk" style="
-        width:100%;padding:14px;border-radius:12px;
-        background:linear-gradient(135deg,#EF4444,#DC2626);
-        color:#fff;border:none;font-weight:700;font-size:0.95rem;
-        cursor:pointer;margin-bottom:8px;
-      ">Eliminar</button>
-      <button id="mpConfirmCancel" style="
-        width:100%;padding:12px;border-radius:12px;
-        background:transparent;color:var(--text2,#888);
-        border:none;font-size:0.9rem;cursor:pointer;font-weight:600;
-      ">Cancelar</button>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  document.getElementById('mpConfirmOk').onclick = () => {
-    overlay.remove();
-    onConfirm();
-  };
-  document.getElementById('mpConfirmCancel').onclick = () => overlay.remove();
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-}
-
-// ─── ELIMINAR SALA (apenas host) ─────────────────────────
-async function mpEliminarSala(salaId) {
-  const me = mpGetMyInfoSync();
-  if (!me) return;
-
-  mpConfirm('Tens a certeza que queres eliminar esta sala? O desafio será cancelado.', async () => {
-    const snap = await db.ref(`mp_salas/${salaId}`).once('value');
-    const sala  = snap.val();
-    if (!sala) return;
-    if (sala.host !== me.uid) {
-      mpShowToast('Só o criador da sala pode eliminá-la.');
-      return;
-    }
-    const desafiosSnap = await db.ref('mp_desafios')
-      .orderByChild('salaId').equalTo(salaId).once('value');
-    const updates = {};
-    desafiosSnap.forEach(c => { updates[`mp_desafios/${c.key}/status`] = 'cancelled'; });
-    if (Object.keys(updates).length) await db.ref().update(updates);
-    await db.ref(`mp_salas/${salaId}`).remove();
-    mpShowToast('Sala eliminada.');
-    mpLoadSalas();
-  });
-}
-
-function mpAbrirCriarSala() { mpCriarSala(null); }
-
-// ─── ELIMINAR SALA A PARTIR DE DENTRO DA SALA ────────────
-async function mpEliminarSalaFromRoom(salaId) {
-  const me = mpGetMyInfoSync();
-  if (!me) return;
-
-  mpConfirm('Tens a certeza que queres eliminar esta sala? O desafio será cancelado.', async () => {
-    const snap = await db.ref(`mp_salas/${salaId}`).once('value');
-    const sala  = snap.val();
-    if (!sala || sala.host !== me.uid) {
-      mpShowToast('Só o criador da sala pode eliminá-la.');
-      return;
-    }
-    const desafiosSnap = await db.ref('mp_desafios')
-      .orderByChild('salaId').equalTo(salaId).once('value');
-    const updates = {};
-    desafiosSnap.forEach(c => { updates[`mp_desafios/${c.key}/status`] = 'cancelled'; });
-    if (Object.keys(updates).length) await db.ref().update(updates);
-    await db.ref(`mp_salas/${salaId}`).remove();
-    mpClearListeners();
-    mpShowToast('Sala eliminada.');
-    mpShowScreen('screen-multiplayer');
-    mpLoadSalas();
-  });
-}
-
-async function mpCriarSala(targetUid) {
-  const me = mpGetMyInfoSync();
-  if (!me) { mpShowToast('Sessão necessária'); return; }
-
-  // Ler tempo e qtd dos inputs se existirem
-  const tempoInput = mpEl('mpTempoInput');
-  const qtdInput   = mpEl('mpQtdInput');
-  if (tempoInput) MP.config.tempo = parseInt(tempoInput.value) || 30;
-  if (qtdInput)   MP.config.qtd   = parseInt(qtdInput.value) || 10;
-
-  const salaData = {
-    roomNum: mpAutoRoomNumber(),
-    status: 'waiting',
-    modoJogo:   MP.config.modoJogo,
-    modoPerg:   MP.config.modoPerg,
-    nivel:      MP.config.nivel,
-    tipo:       MP.config.tipo,
-    tempo:      MP.config.tempo,
-    qtd:        MP.config.qtd,
-    maxplayers: MP.config.maxplayers,
-    disciplina: MP.config.disciplina,
-    categoria:  MP.config.categoria,
-    host: me.uid,
-    createdAt: firebase.database.ServerValue.TIMESTAMP,
-    players: { [me.uid]: { uid: me.uid, name: me.name, email: me.email || me.phone, stars: me.stars, score: 0, joined: true } },
-    scores: {}, history: {}, liveAnswers: {},
-    invitedUid: targetUid || null,
-  };
-
-  const ref = await db.ref('mp_salas').push(salaData);
-  await mpEntrarSala(ref.key);
-}
-
-
-async function mpEntrarSala(salaId) {
-  const me = await mpGetMyInfoAsync();
-  if (!me) return;
-
-  const salaRef = db.ref(`mp_salas/${salaId}`);
-
-  MP.salaId    = salaId;
-  MP.sala      = salaRef;
-  MP.myUid     = me.uid;
-  MP.myProfile = me;
-
-  mpClearListeners();
-
-  // FIX: escrever jogador ANTES de ler o snapshot da sala —
-  // garante que salaRef.once('value') já devolve 2 jogadores
-  await salaRef.child('players').child(me.uid).set({
-    uid: me.uid, name: me.name, email: me.email || me.phone,
-    stars: me.stars, score: 0, joined: true,
-  });
-
-  await mpShowSalaScreen(salaRef);
-}
-
-// ─── SALA DE JOGO ─────────────────────────────────────────
-async function mpShowSalaScreen(salaRef) {
-  mpShowScreen('screen-mp-sala');
-  mpEl('mpSalaWaiting').style.display = 'block';
-  mpEl('mpSalaGame').style.display    = 'none';
-  mpEl('mpSalaResult').style.display  = 'none';
-
-  const deleteBtn = mpEl('mpSalaDeleteBtn');
-  const initBtn   = mpEl('btnIniciarDesafio');
-
-  // Ler dados da sala UMA vez com await — evita callbacks aninhados
-  const sSnap = await salaRef.once('value');
-  const sData = sSnap.val();
-  if (!sData) return;
-
-  const _host  = sData.host;
-  const _maxP  = sData.maxplayers || 2;
-  const isHost = _host === MP.myUid;
-  let _status  = sData.status || 'waiting';
-
-  mpEl('mpSalaNumDisplay').textContent = `Sala #${sData.roomNum || '?'}`;
-  mpEl('mpSalaModeDisplay').innerHTML  = sData.modoPerg === 'realtime'
-    ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real'
-    : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono';
-
-  if (deleteBtn) {
-    deleteBtn.style.display = isHost ? 'flex' : 'none';
-    deleteBtn.onclick = () => mpEliminarSalaFromRoom(salaRef.key);
-  }
-
-  // Botão iniciar — só visível ao host, desabilitado até adversário entrar
-  if (initBtn) {
-    if (isHost) {
-      initBtn.style.display   = 'inline-flex';
-      initBtn.disabled        = true;
-      initBtn.style.opacity   = '0.5';
-      initBtn.style.cursor    = 'not-allowed';
-      initBtn.innerHTML       = '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>A aguardar adversário...';
-    } else {
-      initBtn.style.display = 'none';
-    }
-    initBtn.onclick = async () => {
-      if (initBtn.disabled) return;
-      initBtn.disabled = true;
-      initBtn.style.opacity = '0.6';
-      await salaRef.update({ status: 'countdown' });
-    };
-  }
-
-  // ── RENDER IMEDIATO — usa sData já lido (não espera listener) ──
-  const _renderGrid = (playersList) => {
-    const myUid  = MP.myUid;
-    const sorted = [
-      ...playersList.filter(p => p.uid === myUid),
-      ...playersList.filter(p => p.uid !== myUid),
-    ];
-    mpRenderPlayersGrid(sorted, _maxP);
-    mpRenderScoreboard(sorted);
-  };
-  const _activateInitBtn = (playersList) => {
-    if (!isHost || !initBtn) return;
-    const adv  = playersList.find(p => p.uid !== MP.myUid);
-    if (!adv) return;
-    const nome = adv.name.split(' ')[0];
-    initBtn.disabled      = false;
-    initBtn.style.opacity = '1';
-    initBtn.style.cursor  = 'pointer';
-    initBtn.innerHTML     = `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>${nome} entrou! Iniciar`;
-    return nome;
-  };
-
-  // Renderizar imediatamente com os dados do snapshot inicial
-  const initialPlayers = Object.values(sData.players || {});
-  _renderGrid(initialPlayers);
-  // Se já há 2 jogadores no snapshot E status é waiting → activar botão já
-  if (initialPlayers.length >= 2 && _status === 'waiting') {
-    _activateInitBtn(initialPlayers);
-  }
-
-  // ── LISTENER PLAYERS ────────────────────────────────────────
-  let _toastDone = false;
-  mpAddListener(salaRef.child('players'), 'value', snap => {
-    const players = [];
-    snap.forEach(c => players.push(c.val()));
-    _renderGrid(players);
-
-    // Activar botão se: sou host, há 2+ jogadores, status ainda é waiting,
-    // e o botão ainda está desabilitado (evita re-activar após re-entrar)
-    if (isHost && initBtn && players.length >= 2 && _status === 'waiting' && initBtn.disabled) {
-      const nome = _activateInitBtn(players);
-      if (nome && !_toastDone) {
-        _toastDone = true;
-        mpShowToast(`${nome} aceitou! Clica em Iniciar para começar.`);
-      }
-    }
-  });
-
-  // ── LISTENER STATUS ──────────────────────────────────────────
-  mpAddListener(salaRef.child('status'), 'value', snap => {
-    const status = snap.val();
-    if (!status) return;
-    _status = status;
-    if (status === 'countdown') mpMostrarContagem(salaRef);
-    if (status === 'playing')   mpStartGame();
-    if (status === 'finished')  mpShowResults();
-    if (deleteBtn && status !== 'waiting') deleteBtn.style.display = 'none';
-    if (initBtn   && status !== 'waiting') initBtn.style.display   = 'none';
-  });
-
-  // ── SALA ELIMINADA ────────────────────────────────────────────
-  mpAddListener(salaRef, 'value', snap => {
-    if (snap.val() === null) {
-      mpClearListeners();
-      mpShowToast('A sala foi eliminada.');
-      mpShowScreen('screen-multiplayer');
-      mpLoadSalas();
-    }
-  });
-
-  // ── LISTENER PERGUNTA ────────────────────────────────────────
-  mpAddListener(salaRef.child('currentRound'), 'value', snap => {
-    const round = snap.val();
-    if (round !== null && mpEl('mpSalaGame').style.display !== 'none') mpRenderQuestion(round);
-  });
-
-  mpAddListener(salaRef.child('liveAnswers'), 'value', snap => {
-    if (!snap.val()) return;
-    mpRenderLiveFeed(snap.val());
-    mpUpdateScoreChips(snap.val());
-  });
-
-  mpAddListener(salaRef.child('scores'), 'value', snap => {
-    if (!snap.val()) return;
-    const scores = snap.val();
-    salaRef.child('players').once('value', ps => {
-      const players = [];
-      ps.forEach(c => { const p = c.val(); p.score = (scores[p.uid] || {}).total || 0; players.push(p); });
-      mpRenderScoreboard(players);
-    });
-  });
-}
-
-// ─── CONTAGEM REGRESSIVA (ambos os dispositivos) ──────────
-let _mpCountdownTimer = null;
-function mpMostrarContagem(salaRef) {
-  // Remover overlay anterior se existir
-  const old = document.getElementById('mp-countdown-overlay');
-  if (old) old.remove();
-  if (_mpCountdownTimer) { clearInterval(_mpCountdownTimer); _mpCountdownTimer = null; }
-
-  const overlay = document.createElement('div');
-  overlay.id = 'mp-countdown-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
-  overlay.innerHTML = `
-    <div style="color:rgba(255,255,255,0.7);font-size:1rem;font-weight:600;margin-bottom:12px;">O jogo começa em</div>
-    <div id="mpCountNum" style="font-size:6rem;font-weight:900;color:#fff;font-family:var(--font-display,sans-serif);line-height:1;transition:transform 0.15s;text-shadow:0 0 40px rgba(99,102,241,0.9);">10</div>
-    <div style="color:rgba(255,255,255,0.4);font-size:0.85rem;margin-top:16px;">Prepara-te!</div>
-  `;
-  document.body.appendChild(overlay);
-
-  let count = 10;
-  _mpCountdownTimer = setInterval(async () => {
-    count--;
-    const el = document.getElementById('mpCountNum');
-    if (el) { el.textContent = count; el.style.transform = 'scale(1.4)'; setTimeout(() => { if(el) el.style.transform = 'scale(1)'; }, 150); }
-    if (count <= 0) {
-      clearInterval(_mpCountdownTimer); _mpCountdownTimer = null;
-      overlay.remove();
-      // Só o host dispara o início real do jogo
-      if (salaRef && MP.myUid) {
-        const snap = await salaRef.once('value');
-        const d = snap.val();
-        if (d && d.host === MP.myUid) await mpIniciarJogo();
-      }
-    }
-  }, 1000);
-}
-
-function mpStartGame() {
-  mpEl('mpSalaWaiting').style.display = 'none';
-  mpEl('mpSalaGame').style.display    = 'block';
-}
-
-function mpRenderPlayersGrid(players, maxPlayers) {
-  const grid  = mpEl('mpPlayersGrid');
-  const myUid = MP.myUid;
-  if (!grid) return;
-
-  const maxP = maxPlayers || players.length || 2;
-
-  // Utilizador actual sempre no slot 0 — independente da ordem do Firebase
-  const sorted = [
-    ...players.filter(p => p.uid === myUid),
-    ...players.filter(p => p.uid !== myUid),
-  ];
-
-  const slots = Array.from({length: maxP}, (_, i) => {
-    const p = sorted[i];
-    if (p) {
-      const isMe = p.uid === myUid;
-      return `<div class="mp-player-slot filled ${isMe ? 'me' : ''}">
-        <div class="mp-player-slot-avatar">${mpAvatarLetter(p.name)}</div>
-        <div class="mp-player-slot-name">${p.name}${isMe ? ' (tu)' : ''}</div>
-        <div style="font-size:0.65rem;opacity:0.7">${mpStarIcon()} ${p.stars || 0}</div>
-      </div>`;
-    }
-    return `<div class="mp-player-slot">
-      <div class="mp-player-slot-avatar" style="background:rgba(99,102,241,0.15);font-size:1.2rem"><svg viewBox="0 0 24 24" style="width:1.2rem;height:1.2rem;fill:var(--primary,#6366F1);vertical-align:middle"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
-      <div class="mp-player-slot-empty">Aguardando...</div>
-    </div>`;
-  });
-  grid.innerHTML = slots.join('');
-}
-
-function mpRenderScoreboard(players) {
-  const sb = mpEl('mpScoreboard');
-  if (!sb) return;
-  sb.innerHTML = players.map(p => `
-    <div class="mp-score-chip" data-uid="${p.uid}">
-      <div class="mp-score-name">${p.name.split(' ')[0]}</div>
-      <div class="mp-score-pts">${p.score || 0}</div>
-      <div class="mp-score-indicator"></div>
-    </div>`).join('');
-}
-
-function mpUpdateScoreChips(answers) {
-  document.querySelectorAll('.mp-score-chip').forEach(chip => {
-    chip.classList.remove('answered-right', 'answered-wrong', 'is-turn');
-  });
-  if (!answers) return;
-  Object.entries(answers).forEach(([uid, data]) => {
-    const chip = document.querySelector(`.mp-score-chip[data-uid="${uid}"]`);
-    if (chip) {
-      chip.classList.add(data.correct ? 'answered-right' : 'answered-wrong');
-      const ind = chip.querySelector('.mp-score-indicator');
-      if (ind) ind.innerHTML = data.correct ? '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>' : '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
-    }
-  });
-}
-
-// ─── INICIAR JOGO (host) ──────────────────────────────────
-async function mpIniciarJogo() {
-  const salaRef = MP.sala;
-  if (!salaRef) return;
-
-  const snap     = await salaRef.once('value');
-  const salaData = snap.val();
-  let perguntas  = [];
-
+  let stars = 0;
   try {
-    perguntas = await mpCarregarPerguntas(salaData);
-  } catch(e) {
-    mpShowToast('Erro ao carregar perguntas.');
-    return;
-  }
+    const s = await db.ref(`users/${user.uid}/stats`).once('value');
+    stars = (s.val() || {}).stars || 0;
+  } catch(e) {}
 
-  const qtd = salaData.qtd || 10;
-  if (perguntas.length < 1) {
-    mpShowToast('Sem perguntas disponíveis para esta configuração.');
-    return;
-  }
-
-  const selected = mpShuffleArray(perguntas).slice(0, Math.min(qtd, perguntas.length));
-  const players  = Object.values(salaData.players || {});
-  const turnOrder = mpShuffleArray(players.map(p => p.uid));
-
-  await salaRef.update({
-    status: 'playing',
-    questions: selected,
-    turnOrder,
-    currentQIndex: 0,
-    scores: Object.fromEntries(players.map(p => [p.uid, { total: 0, answers: {} }])),
-    liveAnswers: {},
-    startedAt: firebase.database.ServerValue.TIMESTAMP,
-  });
-
-  // FIX: status listener já chama mpStartGame() para todos os jogadores.
-  // O host agora emite a 1ª pergunta com um pequeno delay para garantir
-  // que o ecrã de jogo já está visível antes do round chegar.
-  setTimeout(() => mpEmitirPergunta(0, selected, turnOrder, salaData.modoPerg), 500);
+  MP.me = { uid: user.uid, name, email: user.email || '', phone: user.phoneNumber || '', stars };
+  return MP.me;
 }
 
-async function mpEmitirPergunta(index, questions, turnOrder, modoPerg) {
-  const salaRef = MP.sala;
-  if (!salaRef || !questions[index]) return;
-
-  const q = questions[index];
-  const playerTurn = turnOrder[index % turnOrder.length];
-
-  // ── Determinar o tipo usando o campo padrão da app (answerType) ──
-  const answerType = q.answerType || q.tipo || q.type || 'multipla';
-
-  // ── Determinar texto da resposta correcta e texto da pergunta ──
-  let correctText = '';
-  let questionText = q.pergunta || q.question || q.enunciado || '';
-
-  if (answerType === 'lacunas') {
-    // Para lacunas: resposta é o texto a preencher na lacuna
-    correctText = q.lacunaResposta || q.lacunaAnswer || q.correta || q.resposta_certa || q.a || '';
-    questionText = q.lacunaFrase || q.question || q.enunciado || '';
-  } else if (answerType === 'flashcard') {
-    // Para flashcard: resposta é o verso do cartão
-    correctText = q.flashBack || q.a || q.correta || q.resposta_certa || '';
-    questionText = q.flashFront || q.question || q.enunciado || '';
-  } else {
-    // Múltipla escolha / V/F / multipla2
-    // No formato padrão da app, q.answer é uma letra (A/B/C/D) — converter para texto
-    const answerLetter = (q.answer || '').trim();
-    if (answerLetter.length === 1 && q[answerLetter.toLowerCase()]) {
-      correctText = q[answerLetter.toLowerCase()];
-    } else {
-      // Fallback para campos directos (formato alternativo)
-      correctText = q.correta || q.resposta_certa || answerLetter;
-    }
-  }
-
-  // ── Preparar opções de resposta conforme tipo ──
-  let answers = [];
-
-  if (answerType === 'vf') {
-    answers = mpShuffleArray(['Verdadeiro', 'Falso']);
-  } else if (answerType === 'lacunas' || answerType === 'flashcard') {
-    answers = []; // estes tipos usam campo de texto — sem botões de opção
-  } else {
-    // Múltipla escolha: primeiro tentar q.erradas (formato alternativo),
-    // depois construir a partir de q.a / q.b / q.c / q.d (formato padrão da app)
-    const erradas = q.erradas || q.respostas_erradas || q.wrongAnswers || null;
-    if (erradas && erradas.length > 0) {
-      answers = mpShuffleArray([correctText, ...erradas.slice(0, 3)].filter(Boolean));
-    } else {
-      // Formato padrão: as opções estão em q.a, q.b, q.c, q.d
-      const opcoes = [q.a, q.b, q.c, q.d].filter(Boolean);
-      answers = mpShuffleArray(opcoes);
-    }
-  }
-
-  const roundData = {
-    index,
-    question: questionText,
-    answers,
-    correct: correctText,
-    tipo: answerType,       // mantido para compatibilidade
-    answerType: answerType, // campo padrão
-    imageURL: q.imageURL || q.imagem || q.questionImg || q.imgQuestion || '',
-    total: questions.length,
-    playerTurn: modoPerg === 'realtime' ? null : playerTurn,
-    startedAt: firebase.database.ServerValue.TIMESTAMP,
-  };
-
-  await salaRef.child('currentRound').set(roundData);
-  await salaRef.child('liveAnswers').remove();
-}
-
-// ─── RENDERIZAR PERGUNTA ──────────────────────────────────
-function mpRenderQuestion(round) {
-  if (!round) return;
-
-  mpEl('mpSalaWaiting').style.display = 'none';
-  mpEl('mpSalaGame').style.display    = 'block';
-
-  const me       = mpGetMyInfoSync();
-  const isMyTurn = !round.playerTurn || round.playerTurn === me?.uid;
-
-  mpEl('mpQNum').textContent  = `${round.index + 1}/${round.total}`;
-  const turnEl = mpEl('mpQTurn');
-  if (turnEl) {
-    turnEl.innerHTML   = isMyTurn ? '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-8.5l-5.5 5.5-2.5-2.5-1 1 3.5 3.5 6.5-6.5-1-1z"/></svg>A tua vez!' : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Aguarda...';
-    turnEl.className   = 'mp-q-turn' + (isMyTurn ? ' my-turn' : '');
-    turnEl.style.display = 'inline-block';
-  }
-
-  MP.currentQ = round;
-  MP.answered = false;
-
-  const qText = mpEl('mpQText');
-  if (qText) qText.textContent = round.question;
-
-  // Imagem (modo imagem)
-  const imgWrap = mpEl('mpQImage');
-  if (imgWrap) {
-    if (round.imageURL) {
-      imgWrap.innerHTML = `<img src="${round.imageURL}" alt="Imagem da pergunta" style="max-width:100%;border-radius:10px;margin-bottom:8px">`;
-      imgWrap.style.display = 'block';
-    } else {
-      imgWrap.style.display = 'none';
-    }
-  }
-
-  const answersEl = mpEl('mpQAnswers');
-  if (!answersEl) return;
-
-  if (isMyTurn) {
-    if (round.tipo === 'lacunas') {
-      // Campo de texto para lacunas
-      answersEl.innerHTML = `
-        <div class="mp-lacuna-wrap">
-          <input type="text" id="mpLacunaInput" class="mp-lacuna-input" placeholder="Escreve a tua resposta..." autocomplete="off"/>
-          <button class="mp-lacuna-btn" id="mpLacunaBtn">Confirmar</button>
-        </div>`;
-      const lBtn = mpEl('mpLacunaBtn');
-      if (lBtn) lBtn.addEventListener('click', () => {
-        const val = (mpEl('mpLacunaInput').value || '').trim();
-        if (val) mpResponder(encodeURIComponent(val), round, lBtn);
-      });
-      const lInput = mpEl('mpLacunaInput');
-      if (lInput) lInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter') mpEl('mpLacunaBtn').click();
-      });
-    } else if (round.tipo === 'flashcard' || round.answerType === 'flashcard') {
-      // Flashcard em multiplayer: mostrar frente e campo de texto para responder
-      answersEl.innerHTML = `
-        <div style="background:rgba(99,102,241,0.08);border-radius:12px;padding:14px 16px;margin-bottom:10px;text-align:center;font-style:italic;color:var(--text2,#888);font-size:0.85rem">
-          <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-          Escreve a resposta do cartão
-        </div>
-        <div class="mp-lacuna-wrap">
-          <input type="text" id="mpLacunaInput" class="mp-lacuna-input" placeholder="A tua resposta..." autocomplete="off"/>
-          <button class="mp-lacuna-btn" id="mpLacunaBtn">Confirmar</button>
-        </div>`;
-      const lBtn = mpEl('mpLacunaBtn');
-      if (lBtn) lBtn.addEventListener('click', () => {
-        const val = (mpEl('mpLacunaInput').value || '').trim();
-        if (val) mpResponder(encodeURIComponent(val), round, lBtn);
-      });
-      const lInput = mpEl('mpLacunaInput');
-      if (lInput) {
-        lInput.addEventListener('keydown', e => {
-          if (e.key === 'Enter') mpEl('mpLacunaBtn').click();
-        });
-        setTimeout(() => lInput.focus(), 100);
-      }
-    } else {
-      answersEl.innerHTML = round.answers.map((a, i) => `
-        <button class="mp-q-answer" data-idx="${i}" data-val="${encodeURIComponent(a)}">${a}</button>
-      `).join('');
-      answersEl.querySelectorAll('.mp-q-answer').forEach(btn =>
-        btn.addEventListener('click', () => mpResponder(btn.dataset.val, round, btn))
-      );
-    }
-  } else {
-    answersEl.innerHTML = `<div class="mp-q-blocked"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>Aguarda a tua vez de responder</div>`;
-  }
-
-  // Timer
-  mpClearTimer();
-  if (MP.sala) {
-    MP.sala.once('value', s => {
-      const t = (s.val() && s.val().tempo) || 0;
-      if (t > 0 && isMyTurn) mpStartTimer(t, round);
-      else { const el = mpEl('mpSalaTimer'); if (el) el.textContent = '∞'; }
+async function mpAddStars(uid, n) {
+  if (!uid || n <= 0) return;
+  try {
+    db.ref(`users/${uid}/stats`).transaction(s => {
+      if (!s) s = { stars: 0, games: 0 };
+      s.stars = (s.stars || 0) + n;
+      s.games = (s.games || 0) + 1;
+      return s;
     });
-  }
+  } catch(e) {}
 }
 
-function mpStartTimer(seconds, round) {
-  let left = seconds;
-  const el = mpEl('mpSalaTimer');
-  if (el) { el.textContent = left; el.classList.remove('urgent'); }
-
-  MP.questionTimer = setInterval(() => {
-    left--;
-    if (el) {
-      el.textContent = left;
-      if (left <= 5) el.classList.add('urgent');
-      else           el.classList.remove('urgent');
-    }
-    if (left <= 0) {
-      mpClearTimer();
-      if (!MP.answered) mpResponder(encodeURIComponent('__timeout__'), round, null);
-    }
-  }, 1000);
-}
-
-function mpClearTimer() {
-  clearInterval(MP.questionTimer);
-  MP.questionTimer = null;
-  const el = mpEl('mpSalaTimer');
-  if (el) { el.textContent = '--'; el.classList.remove('urgent'); }
-}
-
-// ─── RESPONDER PERGUNTA ───────────────────────────────────
-async function mpResponder(encodedVal, round, btnEl) {
-  if (MP.answered) return;
-  MP.answered = true;
-
-  const me      = mpGetMyInfoSync();
-  const val     = decodeURIComponent(encodedVal);
-
-  // Normalização para lacunas/flashcard: ignorar acentos e maiúsculas
-  const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  const correct = norm(val) === norm(round.correct || '');
-  const points  = correct ? 10 : 0;
-
-  mpClearTimer();
-
-  // Feedback visual
-  if (btnEl) {
-    btnEl.classList.add(correct ? 'correct' : 'wrong');
-    const allBtns = mpEl('mpQAnswers').querySelectorAll('.mp-q-answer');
-    allBtns.forEach(b => {
-      if (decodeURIComponent(b.dataset.val).toLowerCase().trim() === (round.correct || '').toLowerCase().trim())
-        b.classList.add('correct');
-      b.disabled = true;
-    });
-  }
-
-  const salaRef = MP.sala;
-  if (!salaRef) return;
-
-  await salaRef.child(`liveAnswers/${me.uid}`).set({
-    uid: me.uid, name: me.name, correct, points, answer: val,
-    answeredAt: firebase.database.ServerValue.TIMESTAMP,
-  });
-
-  const scoreSnap = await salaRef.child(`scores/${me.uid}`).once('value');
-  const cur = scoreSnap.val() || { total: 0, answers: {} };
-  cur.total = (cur.total || 0) + points;
-  cur.answers[round.index] = { correct, points };
-  await salaRef.child(`scores/${me.uid}`).set(cur);
-
-  // Host verifica avanço
-  const snap = await salaRef.once('value');
-  const data = snap.val();
-  if (data && data.host === me.uid) mpCheckAdvance(data, round);
-}
-
-async function mpCheckAdvance(data, round) {
-  const salaRef = MP.sala;
-  if (!salaRef) return;
-
-  const players     = Object.values(data.players || {});
-  const liveAnswers = data.liveAnswers || {};
-  const expectedN   = data.modoPerg === 'realtime' ? players.length : 1;
-
-  if (Object.keys(liveAnswers).length < expectedN) return;
-
-  const histEntry = { ...liveAnswers, question: round.question, correct: round.correct };
-  await salaRef.child(`history/${round.index}`).set(histEntry);
-
-  const nextIndex = round.index + 1;
-  const questions = data.questions || [];
-
-  if (nextIndex >= questions.length) {
-    await salaRef.update({ status: 'finished' });
-  } else {
-    await salaRef.child('currentQIndex').set(nextIndex);
-    setTimeout(() => mpEmitirPergunta(nextIndex, questions, data.turnOrder, data.modoPerg), 1500);
-  }
-}
-
-// ─── LIVE FEED ────────────────────────────────────────────
-function mpRenderLiveFeed(answers) {
-  const feed = mpEl('mpLiveFeed');
-  if (!feed || !answers) return;
-  const items = Object.values(answers);
-  if (!items.length) return;
-
-  feed.innerHTML = `<div class="mp-section-title" style="font-size:0.75rem;margin:0 0 8px"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:#EF4444;vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="8"/></svg>Actividade em tempo real</div>` +
-    items.map(a => `
-      <div class="mp-feed-item">
-        <span class="mp-feed-dot ${a.correct ? 'ok' : 'err'}"></span>
-        <span class="mp-feed-msg"><strong>${a.name}</strong> ${a.correct ? '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>acertou' : '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>errou'} <span style="opacity:.6">(${a.points || 0} pts)</span></span>
-      </div>`).join('');
-}
-
-// ─── MOSTRAR RESULTADOS ───────────────────────────────────
-async function mpShowResults() {
-  const salaRef = MP.sala;
-  if (!salaRef) return;
-
-  mpClearTimer();
-  mpEl('mpSalaGame').style.display   = 'none';
-  mpEl('mpSalaResult').style.display = 'block';
-
-  const snap    = await salaRef.once('value');
-  const data    = snap.val();
-  const players = Object.values(data.players || {});
-  const scores  = data.scores || {};
-
-  const ranked = players.map(p => ({
-    ...p,
-    total:   (scores[p.uid] && scores[p.uid].total) || 0,
-    answers: (scores[p.uid] && scores[p.uid].answers) || {},
-  })).sort((a, b) => b.total - a.total);
-
-  const qtd    = data.qtd || ranked.reduce((acc, p) => acc + Object.keys(p.answers).length, 0) / players.length || 10;
-  const perQ   = 20 / qtd;
-  const medals = ['1º', '2º', '3º'];
-  const me     = mpGetMyInfoSync();
-
-  // Dar estrelas com base na posição
-  ranked.forEach((p, i) => {
-    const starsGanhas = i === 0 ? 5 : i === 1 ? 3 : i === 2 ? 2 : 1;
-    if (p.uid === me?.uid) {
-      mpAddStars(p.uid, starsGanhas);
-      MP.myStars += starsGanhas;
-      const starsEl = mpEl('mpUserStars');
-      if (starsEl) starsEl.textContent = MP.myStars;
-      mpShowToast(`+${starsGanhas} estrelas ganhas!`);
-    }
-  });
-
-  // Pódio
-  const podiumEl = mpEl('mpResultPodium');
-  if (podiumEl) {
-    podiumEl.innerHTML = ranked.slice(0, 3).map((p, i) => `
-      <div class="mp-podium-place p${i+1}">
-        <div class="mp-podium-medal">${medals[i] || (i + 1) + 'º'}</div>
-        <div class="mp-podium-name">${p.name}</div>
-        <div class="mp-podium-pts">${(p.total * perQ / 10).toFixed(1)} val.</div>
-      </div>`).join('');
-  }
-
-  // Tabela completa
-  const tableEl = mpEl('mpResultTable');
-  if (tableEl) {
-    tableEl.innerHTML = `
-      <table class="mp-history-table">
-        <thead><tr><th>#</th><th>Jogador</th><th>Pts</th><th>Nota (0-20)</th><th>Estrelas</th></tr></thead>
-        <tbody>
-          ${ranked.map((p, i) => `<tr class="${p.uid === me?.uid ? 'mp-my-row' : ''}">
-            <td>${i+1}</td>
-            <td>${p.name}</td>
-            <td>${p.total}</td>
-            <td class="mp-hist-score">${(p.total * perQ / 10).toFixed(1)}</td>
-            <td>${mpStarIcon()} ${[5,3,2,1][i] || 1}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>`;
-  }
-
-  const voltarBtn = mpEl('btnMpSalaVoltar');
-  if (voltarBtn) voltarBtn.onclick = () => {
-    mpClearListeners();
-    mpShowScreen('screen-multiplayer');
-    mpLoadSalas();
-  };
-}
-
-// ─── LISTENER GLOBAL DE DESAFIOS (funciona em qualquer ecrã) ─────
-// Guardamos referência para poder cancelar quando necessário
-let _mpDesafiosGlobalRef   = null;
-let _mpDesafiosGlobalFn    = null;
-let _mpDesafiosGlobalUid   = null;
-let _mpDesafiosVistos      = new Set(); // evita re-notificar o mesmo desafio
-
-function mpIniciarListenerGlobalDesafios(uid) {
-  if (!uid) return;
-  // Não duplicar listener para o mesmo uid
-  if (_mpDesafiosGlobalUid === uid) return;
-
-  // Cancelar listener anterior se existir
-  if (_mpDesafiosGlobalRef && _mpDesafiosGlobalFn) {
-    _mpDesafiosGlobalRef.off('child_added', _mpDesafiosGlobalFn);
-  }
-
-  _mpDesafiosGlobalUid = uid;
-  _mpDesafiosGlobalRef = db.ref('mp_desafios').orderByChild('targetUid').equalTo(uid);
-
-  _mpDesafiosGlobalFn = snap => {
-    const d = snap.val();
-    if (!d || d.status !== 'pending') return;
-    if (_mpDesafiosVistos.has(snap.key)) return;
-    _mpDesafiosVistos.add(snap.key);
-
-    // Se o ecrã multiplayer já estiver activo, o listener normal trata disso
-    // Caso contrário mostrar popup de notificação
-    mpMostrarPopupDesafio(snap.key, d);
-  };
-
-  _mpDesafiosGlobalRef.on('child_added', _mpDesafiosGlobalFn);
-}
-
-function mpMostrarPopupDesafio(key, d) {
-  // Remover popup anterior se existir
-  const antigo = document.getElementById('mp-desafio-popup');
-  if (antigo) antigo.remove();
-
-  const modoLabels = { aprendizado:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>Aprendizado', concurso:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg>Concurso', prova:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Prova', imagem:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>Imagem' };
-  const popup = document.createElement('div');
-  popup.id = 'mp-desafio-popup';
-  popup.style.cssText = `
-    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
-    background:var(--card,#fff); border-radius:16px;
-    box-shadow:0 8px 32px rgba(0,0,0,0.22); padding:18px 20px;
-    z-index:9999; min-width:300px; max-width:90vw;
-    border:2px solid var(--primary,#6366F1);
-    animation: mpSlideUp 0.3s ease;
-  `;
-  popup.innerHTML = `
-    <style>
-      @keyframes mpSlideUp { from { opacity:0; transform:translateX(-50%) translateY(30px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
-    </style>
-    <div style="font-weight:700;font-size:1rem;margin-bottom:4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M6.92 5H5L3 3l1-1 2 2v-.08l7 7-.71.71L6.92 5zM19.71 2.29l-2 2 .01.01-1.42 1.42-.01-.01-2.12 2.12.01.01-1.42 1.42-.01-.01-1.06 1.06 3.54 3.54 1.06-1.06-.01-.01 1.42-1.42.01.01 2.12-2.12-.01-.01 1.42-1.42.01.01 2-2L21 3l-1.29-.71zM3 17c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>Novo Desafio!</div>
-    <div style="font-size:0.85rem;margin-bottom:2px"><strong>${d.fromName || 'Jogador'}</strong> desafia-te!</div>
-    <div style="font-size:0.75rem;color:var(--text2,#888);margin-bottom:12px">
-      ${d.disciplina || 'Geral'} · ${modoLabels[d.modoJogo] || d.modoJogo || ''} · ${d.qtd || 10} perguntas
-    </div>
-    <div style="display:flex;gap:10px">
-      <button id="mpPopupAceitar" style="flex:1;padding:9px;border-radius:10px;background:var(--primary,#6366F1);color:#fff;border:none;font-weight:600;cursor:pointer;font-size:0.85rem"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>Aceitar</button>
-      <button id="mpPopupRecusar" style="flex:1;padding:9px;border-radius:10px;background:transparent;color:var(--text2,#888);border:1.5px solid var(--border,#ddd);font-weight:600;cursor:pointer;font-size:0.85rem"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>Recusar</button>
-    </div>
-  `;
-  document.body.appendChild(popup);
-
-  document.getElementById('mpPopupAceitar').onclick = async () => {
-    popup.remove();
-    // Se o multiplayer não estiver inicializado, inicializar primeiro
-    if (!MP.myUid) await mpInit();
-    await mpAceitarDesafio(key, d.salaId);
-  };
-  document.getElementById('mpPopupRecusar').onclick = async () => {
-    popup.remove();
-    await mpRecusarDesafio(key);
-  };
-
-  // Auto-fechar após 30 segundos
-  setTimeout(() => { if (popup.parentNode) popup.remove(); }, 30000);
-}
-
-
-function mpLoadDesafiosRecebidos() {
-  // Use MP.myUid set by mpInit — mpGetMyInfoSync() can return null at this point
-  const uid = MP.myUid;
-  if (!uid) return;
-
-  const ref = db.ref('mp_desafios').orderByChild('targetUid').equalTo(uid);
-  mpAddListener(ref, 'value', snap => {
-    const el = mpEl('mpDesafiosRecebidos');
-    if (!el) return;
-    const desafios = [];
-    snap.forEach(c => { const d = c.val(); if (d.status === 'pending') { d._key = c.key; desafios.push(d); } });
-
-    if (desafios.length === 0) {
-      el.innerHTML = `<p class="mp-sub-empty">Sem desafios pendentes</p>`;
-      return;
-    }
-
-    const modoLabels = { aprendizado:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>Aprendizado', concurso:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg>Concurso', prova:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Prova', imagem:'<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:2px"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>Imagem' };
-
-    el.innerHTML = desafios.map(d => `
-      <div class="mp-desafio-card">
-        <div class="mp-desafio-header">
-          <div class="mp-desafio-avatar">${mpAvatarLetter(d.fromName)}</div>
-          <div class="mp-desafio-info">
-            <div class="mp-desafio-name">${d.fromName || 'Jogador'}</div>
-            <div class="mp-desafio-meta">
-              ${d.disciplina || 'Geral'} · ${modoLabels[d.modoJogo] || d.modoJogo || ''} · Nível: ${d.nivel || 'Todos'}<br>
-              ${d.qtd} perguntas · ${d.modoPerg === 'realtime' ? '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Tempo Real' : '<svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;vertical-align:middle"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg> Assíncrono'}
-            </div>
-          </div>
-        </div>
-        <div class="mp-desafio-actions">
-          <button class="mp-btn-aceitar" data-key="${d._key}" data-sala="${d.salaId}"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>Aceitar</button>
-          <button class="mp-btn-recusar" data-key="${d._key}"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>Recusar</button>
-        </div>
-      </div>`).join('');
-
-    el.querySelectorAll('.mp-btn-aceitar').forEach(btn =>
-      btn.addEventListener('click', () => mpAceitarDesafio(btn.dataset.key, btn.dataset.sala))
-    );
-    el.querySelectorAll('.mp-btn-recusar').forEach(btn =>
-      btn.addEventListener('click', () => mpRecusarDesafio(btn.dataset.key))
-    );
-  });
-}
-
-async function mpAceitarDesafio(key, salaId) {
-  await db.ref(`mp_desafios/${key}`).update({ status: 'accepted' });
-  await mpEntrarSala(salaId);
-}
-
-async function mpRecusarDesafio(key) {
-  await db.ref(`mp_desafios/${key}`).update({ status: 'declined' });
-  mpShowToast('Desafio recusado.');
-}
-
-// ─── ENVIAR DESAFIO ───────────────────────────────────────
-const enviarBtn = mpEl('btnEnviarDesafio');
-if (enviarBtn) enviarBtn.addEventListener('click', async () => {
-  const me = mpGetMyInfoSync();
-  if (!me) { mpShowToast('Sessão necessária'); return; }
-  if (!MP.config.targetUid) { mpShowToast('Selecciona um jogador para desafiar.'); return; }
-  if (!MP.config.disciplina) { mpShowToast('Selecciona uma disciplina.'); return; }
-
-  // Ler tempo e qtd dos inputs
-  const tempoInput = mpEl('mpTempoInput');
-  const qtdInput   = mpEl('mpQtdInput');
-  if (tempoInput) MP.config.tempo = parseInt(tempoInput.value) || 30;
-  if (qtdInput)   MP.config.qtd   = parseInt(qtdInput.value) || 10;
-
-  const salaData = {
-    roomNum: mpAutoRoomNumber(), status: 'waiting',
-    modoJogo:   MP.config.modoJogo,
-    modoPerg:   MP.config.modoPerg,
-    nivel:      MP.config.nivel,
-    tipo:       MP.config.tipo,
-    tempo:      MP.config.tempo,
-    qtd:        MP.config.qtd,
-    maxplayers: MP.config.maxplayers,
-    disc:       MP.config.disc || MP.config.disciplina || '',
-    cat:        MP.config.cat  || MP.config.categoria  || '',
-    host: me.uid, invitedUid: MP.config.targetUid,
-    createdAt: firebase.database.ServerValue.TIMESTAMP,
-    players: { [me.uid]: { uid: me.uid, name: me.name, email: me.email || me.phone, stars: me.stars, score: 0, joined: true } },
-    scores: {}, history: {}, liveAnswers: {},
-  };
-
-  const salaRef = await db.ref('mp_salas').push(salaData);
-
-  await db.ref('mp_desafios').push({
-    fromUid: me.uid, fromName: me.name,
-    targetUid: MP.config.targetUid, targetName: MP.config.targetName,
-    salaId: salaRef.key,
-    modoJogo:   MP.config.modoJogo,
-    modoPerg:   MP.config.modoPerg,
-    nivel:      MP.config.nivel,
-    disciplina: MP.config.disciplina,
-    categoria:  MP.config.categoria,
-    qtd:        MP.config.qtd,
-    tempo:      MP.config.tempo,
-    status: 'pending',
-    createdAt: firebase.database.ServerValue.TIMESTAMP,
-  });
-
-  mpShowToast(`Desafio enviado para ${MP.config.targetName}!`);
-  await mpEntrarSala(salaRef.key);
-});
-
-// ─── PESQUISA DE JOGADORES ────────────────────────────────
-function mpBuscarJogador(query, onResults) {
-  if (!query || query.length < 2) { mpShowToast('Escreve pelo menos 2 caracteres.'); return; }
-  const q = query.trim().toLowerCase();
-
-  db.ref('users').once('value', snap => {
-    const results = [];
-    const me = mpGetMyInfoSync();
-    snap.forEach(child => {
-      const u = child.val();
-      if (child.key === me?.uid) return;
-      const nome  = (u.firstName || u.nome || '').toLowerCase() + ' ' + (u.lastName || '').toLowerCase();
-      const email = (u.email || '').toLowerCase();
-      const phone = (u.phone || u.telefone || '').toLowerCase();
-      if (nome.includes(q) || email.includes(q) || phone.includes(q)) {
-        results.push({ uid: child.key, ...u });
-      }
-    });
-    onResults(results.slice(0, 10));
-  });
-}
-
-function mpRenderSearchResults(results, container, onSelect) {
-  if (!container) return;
-  if (!results.length) {
-    container.innerHTML = `<div style="padding:10px;text-align:center;color:var(--text2);font-size:0.8rem">Nenhum jogador encontrado</div>`;
-    return;
-  }
-  container.innerHTML = results.map(u => {
-    const nome = ((u.firstName || '') + ' ' + (u.lastName || '')).trim() || u.nome || u.email || 'Jogador';
-    const stars = (u.stats && u.stats.stars) || u.moedas || 0;
-    return `
-    <div class="mp-search-result-item" data-uid="${u.uid}" data-name="${nome}">
-      <div class="mp-result-avatar">${mpAvatarLetter(nome)}</div>
-      <div>
-        <div class="mp-result-name">${nome}</div>
-        <div style="font-size:0.68rem;color:var(--text2)">${u.email || u.phone || ''}</div>
-      </div>
-      <div class="mp-result-stars">${mpStarIcon()} ${stars}</div>
-    </div>`;
-  }).join('');
-
-  container.querySelectorAll('.mp-search-result-item').forEach(item =>
-    item.addEventListener('click', () => onSelect(item.dataset.uid, item.dataset.name))
-  );
-}
-
-// Busca no formulário de desafio
-const buscaInlineBtn = mpEl('mpBuscarJogador');
-if (buscaInlineBtn) buscaInlineBtn.addEventListener('click', () => {
-  const q = (mpEl('mpDesafioTarget').value || '').trim();
-  mpBuscarJogador(q, results => {
-    mpRenderSearchResults(results, mpEl('mpSearchResults'), (uid, name) => {
-      MP.config.targetUid  = uid;
-      MP.config.targetName = name;
-      mpEl('mpDesafioTarget').value = name;
-      mpEl('mpSearchResults').innerHTML = '';
-      mpShowToast(`Jogador selecionado: ${name}`);
-    });
-  });
-});
-const desafioTargetInput = mpEl('mpDesafioTarget');
-if (desafioTargetInput) desafioTargetInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && buscaInlineBtn) buscaInlineBtn.click();
-});
-
-// Busca na tab Buscar — player cards com botão desafiar
-function mpRenderPlayerCards(results, container) {
-  if (!container) return;
-  if (!results.length) {
-    container.innerHTML = `<p style="color:var(--text2);font-size:0.8rem;text-align:center;padding:20px">Nenhum jogador encontrado</p>`;
-    return;
-  }
-  container.innerHTML = results.map(u => {
-    const nome   = ((u.firstName || '') + ' ' + (u.lastName || '')).trim() || u.nome || u.email || 'Jogador';
-    const stars  = (u.stats && u.stats.stars) || u.moedas || 0;
-    const photo  = u.photoURL || u.foto || '';
-    const avatar = photo ? `<img src="${photo}" alt="${nome}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : mpAvatarLetter(nome);
-    return `
-    <div class="mp-player-card">
-      <div class="mp-player-card-avatar">${avatar}</div>
-      <div class="mp-player-card-info">
-        <div class="mp-player-card-name">${nome}</div>
-        <div class="mp-player-card-meta">${u.email || u.phone || ''} &nbsp;·&nbsp; ${mpStarIcon()} ${stars} estrelas</div>
-      </div>
-      <button class="mp-player-challenge-btn" data-uid="${u.uid}" data-name="${nome}"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:3px"><path d="M6.92 5H5L3 3l1-1 2 2v-.08l7 7-.71.71L6.92 5zM19.71 2.29l-2 2 .01.01-1.42 1.42-.01-.01-2.12 2.12.01.01-1.42 1.42-.01-.01-1.06 1.06 3.54 3.54 1.06-1.06-.01-.01 1.42-1.42.01.01 2.12-2.12-.01-.01 1.42-1.42.01.01 2-2L21 3l-1.29-.71zM3 17c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>Desafiar</button>
-    </div>`;
-  }).join('');
-
-  container.querySelectorAll('.mp-player-challenge-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      MP.config.targetUid  = btn.dataset.uid;
-      MP.config.targetName = btn.dataset.name;
-      document.querySelectorAll('.mp-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.mp-tab-content').forEach(c => c.classList.remove('active'));
-      const desTab = document.querySelector('[data-tab="desafios"]');
-      if (desTab) desTab.classList.add('active');
-      const desContent = mpEl('mpTabDesafios');
-      if (desContent) desContent.classList.add('active');
-      const targetInput = mpEl('mpDesafioTarget');
-      if (targetInput) targetInput.value = btn.dataset.name;
-      mpShowToast(`${btn.dataset.name} selecionado para desafiar!`);
-    });
-  });
-}
-
-const buscarBtn = mpEl('mpBuscarBtn');
-if (buscarBtn) buscarBtn.addEventListener('click', () => {
-  const q = (mpEl('mpBuscarInput').value || '').trim();
-  mpBuscarJogador(q, results => mpRenderPlayerCards(results, mpEl('mpBuscarResultados')));
-});
-const buscarInput = mpEl('mpBuscarInput');
-if (buscarInput) buscarInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && buscarBtn) buscarBtn.click();
-});
-
-// ─── RANKING GLOBAL ───────────────────────────────────────
-function mpLoadRanking() {
-  const el = mpEl('mpRankingList');
-  if (!el) return;
-  el.innerHTML = `<div class="mp-loading-rank">A carregar ranking...</div>`;
-
-  // Buscar users com stats.stars — usar orderByChild em campo aninhado não é directo,
-  // então busca todos e ordena no cliente
-  db.ref('users').once('value', snap => {
-    const players = [];
-    snap.forEach(c => {
-      const u = c.val();
-      const stars = (u.stats && u.stats.stars) || u.moedas || 0;
-      // Excluir do ranking global quem não tem nenhuma estrela
-      if (stars <= 0) return;
-      players.push({ uid: c.key, ...u, _stars: stars });
-    });
-    players.sort((a, b) => b._stars - a._stars);
-    const top = players.slice(0, 50);
-
-    if (top.length === 0) {
-      el.innerHTML = `<p class="mp-sub-empty">Ranking sem dados ainda.</p>`;
-      return;
-    }
-
-    el.innerHTML = top.map((p, i) => {
-      const rank    = i + 1;
-      const pos     = rank + 'º';
-      const topCls  = rank <= 3 ? `top${rank}` : '';
-      const nome    = ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || p.nome || p.email || 'Jogador';
-      const contact = p.email || p.phone || p.telefone || '';
-      const photo   = p.photoURL || p.foto || '';
-      return `
-        <div class="mp-rank-item ${topCls}">
-          <div class="mp-rank-pos">${pos}</div>
-          <div class="mp-rank-avatar">${photo ? `<img src="${photo}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : mpAvatarLetter(nome)}</div>
-          <div class="mp-rank-info">
-            <div class="mp-rank-name">${nome}</div>
-            <div class="mp-rank-contact">${contact}</div>
-          </div>
-          <div class="mp-rank-stars">${mpStarIcon()} ${p._stars}</div>
-        </div>`;
-    }).join('');
-  });
-}
-
-// ─── DISCIPLINAS E CATEGORIAS ─────────────────────────────
-async function mpPreencherDisciplinas() {
-  const sel = mpEl('mpDesafioDisciplina');
+// ═══════════════════════════════════════════════════════════════
+// DISCIPLINAS E CATEGORIAS
+// ═══════════════════════════════════════════════════════════════
+async function mpFillDisciplinas(selId) {
+  const sel = mpEl(selId);
   if (!sel) return;
-  sel.innerHTML = `<option value="">-- Selecciona Disciplina --</option>`;
+  sel.innerHTML = `<option value="">Todas as Disciplinas</option>`;
   try {
     const snap = await db.ref('questions').once('value');
     const discs = new Set();
     if (snap.val()) Object.values(snap.val()).forEach(q => { if (q.disc) discs.add(q.disc); });
     [...discs].sort().forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d; opt.textContent = d; sel.appendChild(opt);
+      const o = document.createElement('option');
+      o.value = d; o.textContent = d; sel.appendChild(o);
     });
-  } catch(e) { console.error('mpPreencherDisciplinas:', e); }
-
-  sel.addEventListener('change', () => {
-    MP.config.disc = sel.value;
-    MP.config.disciplina = sel.value;
-    mpPreencherCategorias(sel.value);
-  });
+  } catch(e) {}
 }
 
-async function mpPreencherCategorias(disc) {
-  const sel = mpEl('mpDesafioCategoria');
+async function mpFillCategorias(disc, selId) {
+  const sel = mpEl(selId);
   if (!sel) return;
-  sel.innerHTML = `<option value="">-- Todas as Categorias --</option>`;
-  MP.config.cat = ''; MP.config.categoria = '';
+  sel.innerHTML = `<option value="">Todas as Categorias</option>`;
   if (!disc) return;
   try {
     const snap = await db.ref('questions').orderByChild('disc').equalTo(disc).once('value');
     const cats = new Set();
     snap.forEach(c => { const q = c.val(); if (q.cat) cats.add(q.cat); });
     [...cats].sort().forEach(cat => {
-      const opt = document.createElement('option');
-      opt.value = cat; opt.textContent = cat; sel.appendChild(opt);
+      const o = document.createElement('option');
+      o.value = cat; o.textContent = cat; sel.appendChild(o);
     });
-  } catch(e) { console.error('mpPreencherCategorias:', e); }
-  sel.onchange = () => { MP.config.cat = sel.value; MP.config.categoria = sel.value; };
+  } catch(e) {}
 }
 
-// ─── CARREGAR PERGUNTAS ───────────────────────────────────
-async function mpCarregarPerguntas(salaData) {
-  // Perguntas no Firebase usam 'disc' e 'cat' (não 'disciplina'/'categoria')
-  const disc  = salaData.disc  || salaData.disciplina || '';
-  const cat   = salaData.cat   || salaData.categoria  || '';
-  const nivel = salaData.nivel || '';
-  const tipo  = salaData.tipo  || 'todos';
+// ═══════════════════════════════════════════════════════════════
+// CARREGAR PERGUNTAS
+// ═══════════════════════════════════════════════════════════════
+async function mpCarregarPerguntas(cfg) {
+  const disc  = cfg.disc  || cfg.disciplina || '';
+  const cat   = cfg.cat   || cfg.categoria  || '';
+  const nivel = cfg.nivel || 'todos';
+  const tipo  = cfg.tipo  || 'todos';
+  const qtd   = parseInt(cfg.qtd) || 10;
 
-  let perguntas = [];
+  let pool = [];
   try {
     if (disc) {
       const snap = await db.ref('questions').orderByChild('disc').equalTo(disc).once('value');
-      snap.forEach(c => perguntas.push(c.val()));
+      snap.forEach(c => pool.push(c.val()));
     } else {
       const snap = await db.ref('questions').once('value');
-      if (snap.val()) perguntas = Object.values(snap.val());
+      if (snap.val()) pool = Object.values(snap.val());
     }
-  } catch(e) {
-    console.error('mpCarregarPerguntas:', e);
-  }
+  } catch(e) { console.error('mpCarregarPerguntas', e); }
 
-  const filtered = perguntas.filter(q => {
-    const matchCat  = !cat  || q.cat === cat;
-    const matchNiv  = !nivel || nivel === 'todos' || nivel === 'all' || q.nivel === nivel || q.dificuldade === nivel;
-    const matchTipo = !tipo || tipo === 'todos' || tipo === 'all'
-                    || q.tipo === tipo
-                    || (tipo.startsWith('multipla_img') && (q.tipo === 'multipla' || q.tipo === 'multipla_img') && (q.imageURL || q.questionImg));
-    return matchCat && matchNiv && matchTipo;
+  let filtered = pool.filter(q => {
+    const okCat  = !cat  || q.cat === cat;
+    const okNiv  = nivel === 'todos' || nivel === 'all' || !nivel || q.nivel === nivel || q.dificuldade === nivel;
+    const okTipo = tipo === 'todos' || tipo === 'all'  || !tipo  || q.tipo === tipo
+                   || (tipo === 'multipla_img' && (q.tipo === 'multipla' || q.tipo === 'multipla_img') && (q.imageURL || q.questionImg));
+    return okCat && okNiv && okTipo;
   });
 
-  // FIX: se os filtros não devolvem perguntas suficientes (< qtd definida),
-  // usar todas as perguntas da disciplina como fallback — o jogo nunca começa vazio
-  const qtdMin = salaData.qtd || 1;
-  if (filtered.length < qtdMin && perguntas.length > 0) {
-    console.warn(`mpCarregarPerguntas: filtros devolveram ${filtered.length} perguntas (precisava ${qtdMin}). A usar fallback com ${perguntas.length} perguntas.`);
-    return perguntas;
-  }
-  return filtered;
+  if (filtered.length < qtd && pool.length >= qtd) filtered = pool;
+  if (filtered.length === 0) filtered = pool;
+
+  return mpShuffle(filtered).slice(0, qtd);
 }
 
-// ─── BOTÃO PRINCIPAL + BOTÕES VOLTAR ─────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('btnMultiplayer');
-  if (btn) btn.addEventListener('click', mpInit);
+// ═══════════════════════════════════════════════════════════════
+// 1. ENTRAR NO HUB MULTIPLAYER
+// ═══════════════════════════════════════════════════════════════
+async function mpInit() {
+  const me = await mpGetMe();
+  if (!me) { mpToast('Inicia sessao para aceder ao Multiplayer.'); return; }
 
-  const backBtn = document.getElementById('mpBackBtn');
-  if (backBtn) backBtn.addEventListener('click', () => {
-    mpClearListeners();
-    if (typeof showScreen === 'function') showScreen('screen-mainmenu');
-    else {
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      const m = document.getElementById('screen-mainmenu');
-      if (m) m.classList.add('active');
+  mpScreen('screen-multiplayer');
+  mpUnlisten();
+
+  // Actualizar estrelas no header
+  const starsEl = mpEl('mpUserStars');
+  if (starsEl) starsEl.textContent = me.stars;
+
+  // Iniciar tabs
+  mpInitTabs();
+
+  // Carregar conteudo da aba activa
+  mpLoadSalas();
+  mpLoadDesafiosRecebidos();
+  mpLoadRankingGlobal();
+
+  // Preencher disciplinas no formulario de desafio
+  mpFillDisciplinas('mpDesafioDisciplina');
+
+  // Ligar disciplina -> categorias no formulario
+  const selDisc = mpEl('mpDesafioDisciplina');
+  if (selDisc && !selDisc._mpBound) {
+    selDisc._mpBound = true;
+    selDisc.addEventListener('change', e => mpFillCategorias(e.target.value, 'mpDesafioCategoria'));
+  }
+
+  // Botoes do formulario de desafio
+  mpInitDesafioForm();
+
+  // Buscar jogadores
+  mpInitBuscarTab();
+}
+
+// ─── TABS ─────────────────────────────────────────────────────
+function mpInitTabs() {
+  const tabMap = {
+    salas:    'mpTabSalas',
+    desafios: 'mpTabDesafios',
+    ranking:  'mpTabRanking',
+    buscar:   'mpTabBuscar',
+  };
+
+  mpQA('.mp-tab').forEach(tab => {
+    tab.onclick = () => {
+      mpQA('.mp-tab').forEach(t => t.classList.remove('active'));
+      mpQA('.mp-tab-content').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      const panelId = tabMap[tab.dataset.tab];
+      if (panelId) mpEl(panelId)?.classList.add('active');
+
+      // Recarregar conteudo ao mudar de aba
+      if (tab.dataset.tab === 'ranking') mpLoadRankingGlobal();
+      if (tab.dataset.tab === 'desafios') mpLoadDesafiosRecebidos();
+      if (tab.dataset.tab === 'salas') mpLoadSalas();
+    };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 2. SALAS ACTIVAS
+// ═══════════════════════════════════════════════════════════════
+function mpLoadSalas() {
+  const el = mpEl('mpSalasList');
+  if (!el) return;
+  el.innerHTML = `<div class="mp-loading-rank">A carregar salas...</div>`;
+
+  db.ref('mp_salas').orderByChild('status').equalTo('waiting').limitToLast(20)
+    .once('value', snap => {
+      const salas = [];
+      snap.forEach(c => salas.push({ ...c.val(), _key: c.key }));
+
+      if (!salas.length) {
+        el.innerHTML = `
+          <div class="mp-empty-state">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+            <p>Nenhuma sala activa de momento</p>
+            <button class="btn-mp-action" id="btnCriarSala">
+              ${SVG.play}Criar Sala
+            </button>
+          </div>`;
+        mpEl('btnCriarSala')?.addEventListener('click', mpAbrirAbaDesafios);
+        return;
+      }
+
+      el.innerHTML = salas.map(s => {
+        const players  = Object.values(s.players || {});
+        const nomes    = players.map(p => p.name.split(' ')[0]).join(', ');
+        const modo     = s.modoPerg === 'realtime' ? SVG.bolt + 'Tempo Real' : SVG.clock + 'Assincrono';
+        return `
+          <div class="mp-sala-card" style="background:var(--card,#161D30);border:1px solid var(--border,rgba(255,255,255,0.07));border-radius:14px;padding:14px 16px;margin-bottom:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span style="font-weight:700;color:var(--text,#F1F5F9);font-size:0.9rem">Sala #${s.roomNum || '?'}</span>
+              <span style="font-size:0.72rem;color:var(--text2,#94A3B8)">${modo}</span>
+            </div>
+            <div style="font-size:0.78rem;color:var(--text2,#94A3B8);margin-bottom:10px">
+              ${SVG.people}${players.length}/${s.maxplayers || 2} &middot; ${s.disc || 'Geral'} &middot; ${s.qtd || 10} perguntas
+            </div>
+            <div style="font-size:0.75rem;color:var(--text2,#94A3B8);margin-bottom:10px">${nomes}</div>
+          </div>`;
+      }).join('');
+    });
+}
+
+function mpAbrirAbaDesafios() {
+  const tab = mpQ('.mp-tab[data-tab="desafios"]');
+  if (tab) tab.click();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 3. DESAFIOS RECEBIDOS
+// ═══════════════════════════════════════════════════════════════
+function mpLoadDesafiosRecebidos() {
+  const me = MP.me;
+  if (!me) return;
+  const el = mpEl('mpDesafiosRecebidos');
+  if (!el) return;
+
+  el.innerHTML = `<div class="mp-loading-rank">A carregar...</div>`;
+
+  db.ref('mp_desafios')
+    .orderByChild('targetUid').equalTo(me.uid)
+    .once('value', snap => {
+      const lista = [];
+      snap.forEach(c => {
+        const d = c.val();
+        if (d.status === 'pending') lista.push({ ...d, _key: c.key });
+      });
+
+      if (!lista.length) {
+        el.innerHTML = `<p class="mp-sub-empty">Sem desafios pendentes</p>`;
+        return;
+      }
+
+      el.innerHTML = lista.map(d => `
+        <div class="mp-desafio-card" style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:14px;padding:14px 16px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div class="mp-rank-av" style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#4F46E5);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;color:#fff;flex-shrink:0">${mpAvatar(d.fromName)}</div>
+            <div>
+              <div style="font-weight:700;font-size:0.88rem;color:var(--text,#F1F5F9)">${d.fromName || 'Jogador'} desafia-te!</div>
+              <div style="font-size:0.75rem;color:var(--text2,#94A3B8)">${d.disciplina || 'Geral'} &middot; ${d.nivel || 'Todos'} &middot; ${d.qtd || 10} perguntas</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="mp-btn-aceitar btn-mp-action" data-key="${d._key}" data-sala="${d.salaId}" style="flex:1;padding:9px;font-size:0.82rem">${SVG.check}Aceitar</button>
+            <button class="mp-btn-recusar" data-key="${d._key}" style="flex:1;padding:9px;border-radius:10px;background:transparent;border:1px solid rgba(239,68,68,0.3);color:#EF4444;font-weight:700;cursor:pointer;font-size:0.82rem">${SVG.close}Recusar</button>
+          </div>
+        </div>`).join('');
+
+      el.querySelectorAll('.mp-btn-aceitar').forEach(b =>
+        b.addEventListener('click', () => mpAceitarDesafio(b.dataset.key, b.dataset.sala)));
+      el.querySelectorAll('.mp-btn-recusar').forEach(b =>
+        b.addEventListener('click', () => mpRecusarDesafio(b.dataset.key)));
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 4. RANKING GLOBAL
+// ═══════════════════════════════════════════════════════════════
+function mpLoadRankingGlobal() {
+  const el = mpEl('mpRankingList');
+  if (!el) return;
+  el.innerHTML = `<div class="mp-loading-rank">A carregar ranking...</div>`;
+
+  // Tambem carregar historico global (todos os jogos terminados) dentro do tab ranking
+  mpInjectHistoricoSection();
+
+  db.ref('users').once('value', snap => {
+    const lista = [];
+    snap.forEach(c => {
+      const u = c.val();
+      const stars = (u.stats && u.stats.stars) || 0;
+      if (stars <= 0) return;
+      const name = ((u.firstName || '') + ' ' + (u.lastName || '')).trim() || u.nome || u.email || 'Jogador';
+      lista.push({ uid: c.key, name, stars, photo: u.photoURL || '' });
+    });
+    lista.sort((a, b) => b.stars - a.stars);
+
+    if (!lista.length) {
+      el.innerHTML = `<div class="mp-empty-state"><p>Ranking sem dados ainda</p></div>`;
+      return;
+    }
+
+    const me = MP.me;
+    el.innerHTML = lista.slice(0, 50).map((p, i) => {
+      const medals = ['', '#FFD700', '#C0C0C0', '#CD7F32'];
+      const cor    = medals[i + 1] || 'transparent';
+      return `
+        <div class="mp-rank-row ${p.uid === me?.uid ? 'mp-rank-me' : ''}" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;margin-bottom:6px;background:${p.uid === me?.uid ? 'rgba(99,102,241,0.12)' : 'var(--card,#161D30)'};border:1px solid ${p.uid === me?.uid ? 'rgba(99,102,241,0.3)' : 'var(--border,rgba(255,255,255,0.06))'}">
+          <span style="font-weight:800;font-size:0.85rem;color:${cor || 'var(--text2,#94A3B8)'};min-width:24px">${i + 1}.</span>
+          <span style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#4F46E5);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:0.9rem;flex-shrink:0">
+            ${p.photo ? `<img src="${p.photo}" style="width:32px;height:32px;border-radius:50%;object-fit:cover">` : mpAvatar(p.name)}
+          </span>
+          <span style="flex:1;font-weight:600;font-size:0.88rem;color:var(--text,#F1F5F9)">${p.name}${p.uid === me?.uid ? ' (tu)' : ''}</span>
+          <span style="font-weight:700;font-size:0.88rem;color:var(--gold,#F59E0B)">${SVG.star} ${p.stars}</span>
+        </div>`;
+    }).join('');
+  });
+}
+
+// ─── HISTORICO GLOBAL (injectado no fim do tab ranking) ───────
+function mpInjectHistoricoSection() {
+  const container = mpEl('mpTabRanking');
+  if (!container) return;
+  let histEl = mpEl('mpHistoricoGlobal');
+  if (!histEl) {
+    histEl = document.createElement('div');
+    histEl.id = 'mpHistoricoGlobal';
+    container.appendChild(histEl);
+  }
+  histEl.innerHTML = `
+    <div class="mp-section-title" style="margin-top:20px">
+      <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+      Historico de Jogos
+    </div>
+    <div id="mpHistoricoLista"><div class="mp-loading-rank">A carregar...</div></div>`;
+
+  db.ref('mp_salas').orderByChild('status').equalTo('finished').limitToLast(20)
+    .once('value', snap => {
+      const lista = mpEl('mpHistoricoLista');
+      if (!lista) return;
+      const jogos = [];
+      snap.forEach(c => jogos.push({ ...c.val(), _key: c.key }));
+
+      if (!jogos.length) {
+        lista.innerHTML = `<p class="mp-sub-empty">Sem jogos no historico ainda</p>`;
+        return;
+      }
+
+      const me = MP.me;
+      lista.innerHTML = jogos.reverse().map(s => {
+        const players = Object.values(s.players || {});
+        const scores  = s.scores || {};
+        const ranked  = players.map(p => ({
+          name:  p.name,
+          pts:   (scores[p.uid] && scores[p.uid].total) || 0,
+          isMe:  p.uid === me?.uid,
+        })).sort((a, b) => b.pts - a.pts);
+        return `
+          <div style="background:var(--card,#161D30);border:1px solid var(--border,rgba(255,255,255,0.06));border-radius:12px;padding:12px 14px;margin-bottom:8px">
+            <div style="font-weight:700;font-size:0.82rem;color:var(--text2,#94A3B8);margin-bottom:6px">
+              Sala #${s.roomNum || '?'} &middot; ${s.disc || s.disciplina || 'Geral'} &middot; ${s.qtd || '?'} perguntas
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              ${ranked.map((p, i) => `
+                <span style="font-size:0.78rem;padding:3px 8px;border-radius:20px;background:${i === 0 ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)'};color:${i === 0 ? 'var(--gold,#F59E0B)' : 'var(--text2,#94A3B8)'};border:1px solid ${i === 0 ? 'rgba(245,158,11,0.25)' : 'transparent'};font-weight:${p.isMe ? 700 : 500}">
+                  ${i === 0 ? SVG.trophy : ''}${p.name}: ${p.pts} pts
+                </span>`).join('')}
+            </div>
+          </div>`;
+      }).join('');
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 5. BUSCAR JOGADORES (tab buscar)
+// ═══════════════════════════════════════════════════════════════
+function mpInitBuscarTab() {
+  const btn   = mpEl('mpBuscarBtn');
+  const input = mpEl('mpBuscarInput');
+  if (!btn || !input || btn._mpBound) return;
+  btn._mpBound = true;
+
+  const doSearch = () => mpBuscarJogadorGlobal(input.value.trim());
+  btn.addEventListener('click', doSearch);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+}
+
+function mpBuscarJogadorGlobal(query) {
+  const res = mpEl('mpBuscarResultados');
+  if (!res) return;
+  if (!query || query.length < 2) { mpToast('Escreve pelo menos 2 letras.'); return; }
+  res.innerHTML = `<div class="mp-loading-rank">A pesquisar...</div>`;
+
+  const q = query.toLowerCase();
+  db.ref('users').once('value', snap => {
+    const encontrados = [];
+    const me = MP.me;
+    snap.forEach(c => {
+      const u = c.val();
+      if (c.key === me?.uid) return;
+      const name  = ((u.firstName || '') + ' ' + (u.lastName || '')).trim() || u.nome || '';
+      const email = (u.email || '').toLowerCase();
+      if (name.toLowerCase().includes(q) || email.includes(q)) {
+        const stars = (u.stats && u.stats.stars) || 0;
+        encontrados.push({ uid: c.key, name: name || email, email: u.email || '', stars, photo: u.photoURL || '' });
+      }
+    });
+
+    if (!encontrados.length) {
+      res.innerHTML = `<p class="mp-sub-empty">Nenhum jogador encontrado</p>`;
+      return;
+    }
+
+    res.innerHTML = encontrados.slice(0, 12).map(u => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--card,#161D30);border:1px solid var(--border,rgba(255,255,255,0.06));margin-bottom:8px">
+        <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#4F46E5);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;color:#fff;flex-shrink:0">${mpAvatar(u.name)}</div>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:0.88rem;color:var(--text,#F1F5F9)">${u.name}</div>
+          <div style="font-size:0.72rem;color:var(--text2,#94A3B8)">${u.email} &middot; ${SVG.star}${u.stars} estrelas</div>
+        </div>
+        <button class="mp-btn-desafiar btn-mp-action" data-uid="${u.uid}" data-name="${u.name}" style="font-size:0.78rem;padding:7px 12px">${SVG.play}Desafiar</button>
+      </div>`).join('');
+
+    res.querySelectorAll('.mp-btn-desafiar').forEach(b => {
+      b.addEventListener('click', () => {
+        // Preencher campo de busca no form de desafios e ir para essa aba
+        const tab = mpQ('.mp-tab[data-tab="desafios"]');
+        if (tab) tab.click();
+        const targetInput = mpEl('mpDesafioTarget');
+        if (targetInput) targetInput.value = b.dataset.name;
+        // Preencher campos hidden via data
+        targetInput.dataset.uid  = b.dataset.uid;
+        targetInput.dataset.name = b.dataset.name;
+        mpToast(`${b.dataset.name} seleccionado. Configure e envie o desafio.`);
+      });
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 6. FORMULARIO DE DESAFIO (ja existente no HTML)
+// ═══════════════════════════════════════════════════════════════
+function mpInitDesafioForm() {
+  // Buscar jogador no form de desafio
+  const btnBuscar = mpEl('mpBuscarJogador');
+  if (btnBuscar && !btnBuscar._mpBound) {
+    btnBuscar._mpBound = true;
+    btnBuscar.addEventListener('click', () => {
+      const q = (mpEl('mpDesafioTarget')?.value || '').trim();
+      mpBuscarParaDesafio(q);
+    });
+    const inp = mpEl('mpDesafioTarget');
+    if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') btnBuscar.click(); });
+  }
+
+  // Opcoes de seleccao (mp-opt buttons)
+  mpQA('.mp-opt').forEach(btn => {
+    if (!btn._mpBound) {
+      btn._mpBound = true;
+      btn.addEventListener('click', () => {
+        const group = btn.dataset.mpopt;
+        mpQA(`.mp-opt[data-mpopt="${group}"]`).forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        // Actualizar tipos de pergunta se mudou o modo do jogo
+        if (group === 'modoJogo') mpUpdateTiposUI(btn.dataset.v);
+      });
     }
   });
 
-  const salaBack = document.getElementById('mpSalaBackBtn');
-  if (salaBack) salaBack.addEventListener('click', () => {
-    mpClearListeners();
-    mpShowScreen('screen-multiplayer');
-    mpLoadSalas();
+  // Enviar desafio
+  const btnEnviar = mpEl('btnEnviarDesafio');
+  if (btnEnviar && !btnEnviar._mpBound) {
+    btnEnviar._mpBound = true;
+    btnEnviar.addEventListener('click', mpSubmitDesafio);
+  }
+}
+
+function mpBuscarParaDesafio(query) {
+  const res = mpEl('mpSearchResults');
+  if (!res) return;
+  if (!query || query.length < 2) { mpToast('Escreve pelo menos 2 letras.'); return; }
+  res.innerHTML = `<div style="font-size:0.78rem;color:var(--text2)">A pesquisar...</div>`;
+
+  const q = query.toLowerCase();
+  db.ref('users').once('value', snap => {
+    const encontrados = [];
+    const me = MP.me;
+    snap.forEach(c => {
+      const u = c.val();
+      if (c.key === me?.uid) return;
+      const name  = ((u.firstName || '') + ' ' + (u.lastName || '')).trim() || u.nome || '';
+      const email = (u.email || '').toLowerCase();
+      if (name.toLowerCase().includes(q) || email.includes(q)) {
+        encontrados.push({ uid: c.key, name: name || email, email: u.email || '' });
+      }
+    });
+
+    if (!encontrados.length) {
+      res.innerHTML = `<div class="mp-search-result-item" style="font-size:0.8rem;padding:8px;color:var(--text2)">Nenhum jogador encontrado</div>`;
+      return;
+    }
+
+    res.innerHTML = encontrados.slice(0, 8).map(u => `
+      <div class="mp-search-result-item" data-uid="${u.uid}" data-name="${u.name}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;cursor:pointer;border-bottom:1px solid var(--border,rgba(255,255,255,0.05))">
+        <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#4F46E5);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;color:#fff">${mpAvatar(u.name)}</div>
+        <div style="flex:1">
+          <div style="font-size:0.82rem;font-weight:600;color:var(--text,#F1F5F9)">${u.name}</div>
+          <div style="font-size:0.7rem;color:var(--text2)">${u.email}</div>
+        </div>
+        <button class="mp-sel-btn" data-uid="${u.uid}" data-name="${u.name}" style="font-size:0.75rem;padding:5px 10px;border-radius:8px;background:var(--primary,#6366F1);color:#fff;border:none;cursor:pointer;font-weight:600">Sel.</button>
+      </div>`).join('');
+
+    res.querySelectorAll('.mp-sel-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        const input = mpEl('mpDesafioTarget');
+        if (input) {
+          input.value         = b.dataset.name;
+          input.dataset.uid   = b.dataset.uid;
+          input.dataset.name  = b.dataset.name;
+        }
+        res.innerHTML = `<div style="font-size:0.78rem;color:#22C55E;padding:6px 2px">${SVG.check}${b.dataset.name} seleccionado</div>`;
+      });
+    });
+  });
+}
+
+function mpUpdateTiposUI(modoJogo) {
+  const container = mpEl('mpTiposContainer');
+  if (!container) return;
+
+  const todosBtn  = `<button class="mp-opt active" data-mpopt="tipo" data-v="todos">Todos</button>`;
+  const multiBtn  = `<button class="mp-opt" data-mpopt="tipo" data-v="multipla">Multipla</button>`;
+  const vfBtn     = `<button class="mp-opt" data-mpopt="tipo" data-v="vf">V/F</button>`;
+  const lacunasBtn= `<button class="mp-opt" data-mpopt="tipo" data-v="lacunas">Lacunas</button>`;
+  const imgBtn    = `<button class="mp-opt" data-mpopt="tipo" data-v="multipla_img">Com Imagem</button>`;
+
+  if (modoJogo === 'imagem') {
+    container.innerHTML = `${todosBtn}${imgBtn}`;
+  } else {
+    container.innerHTML = `${todosBtn}${multiBtn}${vfBtn}${lacunasBtn}`;
+  }
+
+  // Re-bind click
+  container.querySelectorAll('.mp-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      container.querySelectorAll('.mp-opt').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+}
+
+// ─── SUBMETER DESAFIO ─────────────────────────────────────────
+async function mpSubmitDesafio() {
+  const me = MP.me;
+  if (!me) { mpToast('Sessao necessaria'); return; }
+
+  const targetInput = mpEl('mpDesafioTarget');
+  const targetUid   = targetInput?.dataset?.uid || '';
+  const targetName  = targetInput?.dataset?.name || targetInput?.value || 'Adversario';
+
+  if (!targetUid) { mpToast('Selecciona um jogador para desafiar.'); return; }
+
+  const activeOpt = grp => mpQ(`.mp-opt.active[data-mpopt="${grp}"]`)?.dataset?.v || '';
+
+  const disc      = mpEl('mpDesafioDisciplina')?.value || '';
+  const cat       = mpEl('mpDesafioCategoria')?.value  || '';
+  const nivel     = activeOpt('nivel')      || 'todos';
+  const tipo      = activeOpt('tipo')       || 'todos';
+  const modoJogo  = activeOpt('modoJogo')   || 'aprendizado';
+  const modoPerg  = activeOpt('modoPerg')   || 'realtime';
+  const maxP      = parseInt(activeOpt('maxplayers')) || 2;
+  const tempo     = parseInt(mpEl('mpTempoInput')?.value) || 30;
+  const qtd       = parseInt(mpEl('mpQtdInput')?.value)   || 10;
+
+  const btn = mpEl('btnEnviarDesafio');
+  if (btn) { btn.disabled = true; btn.textContent = 'A enviar...'; }
+
+  const salaData = {
+    roomNum:    Math.floor(1000 + Math.random() * 9000),
+    status:     'waiting',
+    host:       me.uid,
+    invitedUid: targetUid,
+    disc, cat, nivel, tipo,
+    modoJogo, modoPerg,
+    tempo, qtd,
+    maxplayers: maxP,
+    players:    { [me.uid]: { uid: me.uid, name: me.name, stars: me.stars, score: 0 } },
+    scores:     {},
+    liveAnswers:{},
+    createdAt:  firebase.database.ServerValue.TIMESTAMP,
+  };
+
+  try {
+    const salaRef = await db.ref('mp_salas').push(salaData);
+    await db.ref('mp_desafios').push({
+      fromUid: me.uid, fromName: me.name,
+      targetUid, targetName,
+      salaId:     salaRef.key,
+      disciplina: disc, categoria: cat,
+      nivel, tipo, modoJogo, modoPerg,
+      tempo, qtd, maxplayers: maxP,
+      status: 'pending',
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+    });
+    mpToast(`Desafio enviado para ${targetName}!`);
+    // Entrar na sala
+    await mpEntrarSala(salaRef.key, salaData);
+  } catch(e) {
+    console.error('mpSubmitDesafio', e);
+    mpToast('Erro ao enviar desafio. Tenta de novo.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg> ENVIAR DESAFIO`;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 7. ACEITAR / RECUSAR DESAFIO
+// ═══════════════════════════════════════════════════════════════
+async function mpAceitarDesafio(key, salaId) {
+  try { await db.ref(`mp_desafios/${key}`).update({ status: 'accepted' }); } catch(e) {}
+  await mpEntrarSala(salaId, null);
+}
+
+async function mpRecusarDesafio(key) {
+  try { await db.ref(`mp_desafios/${key}`).update({ status: 'declined' }); } catch(e) {}
+  mpToast('Desafio recusado.');
+  mpLoadDesafiosRecebidos();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 8. SALA DE ESPERA
+// ═══════════════════════════════════════════════════════════════
+async function mpEntrarSala(salaId, salaDataOuNull) {
+  const me = await mpGetMe();
+  if (!me) return;
+
+  mpUnlisten();
+  MP.salaId = salaId;
+  MP.sala   = db.ref(`mp_salas/${salaId}`);
+
+  // Passo 1: registar-me na sala
+  await MP.sala.child('players').child(me.uid).set({
+    uid: me.uid, name: me.name, stars: me.stars, score: 0,
   });
 
-  // Iniciar listener global de desafios assim que o utilizador estiver autenticado
-  // Também faz o pre-load do perfil para que mpGetMyInfoSync funcione em qualquer altura
+  // Passo 2: ler snapshot completo (ja tem todos os jogadores)
+  const snap = await MP.sala.once('value');
+  const sala = snap.val();
+  if (!sala) { mpToast('Sala nao encontrada.'); return; }
+
+  MP.salaData = sala;
+  MP.isHost   = sala.host === me.uid;
+
+  // Passo 3: renderizar ecrã de sala
+  mpRenderSala(sala);
+}
+
+// ─── RENDERIZAR SALA ──────────────────────────────────────────
+function mpRenderSala(sala) {
+  // Activar screen
+  mpQA('.screen').forEach(s => s.classList.remove('active'));
+  const screen = mpEl('screen-mp-sala');
+  if (!screen) return;
+  screen.classList.add('active');
+  window.scrollTo(0, 0);
+
+  const players = Object.values(sala.players || {});
+  const maxP    = sala.maxplayers || 2;
+  const me      = MP.me;
+
+  // Header info
+  const numEl  = mpEl('mpSalaNumDisplay');
+  const modeEl = mpEl('mpSalaModeDisplay');
+  if (numEl)  numEl.textContent  = `Sala #${sala.roomNum || '?'}`;
+  if (modeEl) modeEl.textContent = sala.modoPerg === 'realtime' ? 'Tempo Real' : 'Assincrono';
+
+  // Botao eliminar (so host)
+  const delBtn = mpEl('mpSalaDeleteBtn');
+  if (delBtn) delBtn.style.display = MP.isHost ? 'flex' : 'none';
+
+  // Zona de espera visivelmente activa
+  const waiting = mpEl('mpSalaWaiting');
+  const game    = mpEl('mpSalaGame');
+  const result  = mpEl('mpSalaResult');
+  if (waiting) waiting.style.display = 'block';
+  if (game)    game.style.display    = 'none';
+  if (result)  result.style.display  = 'none';
+
+  // Renderizar grid de jogadores
+  mpRenderGrid(players, maxP);
+  mpRenderScoreboard(players);
+  mpVerificarBotaoIniciar(players, maxP);
+
+  // Injectar zona de configuracao inline (se ainda nao existe)
+  mpInjectZonaCfg(sala);
+
+  // Listeners de sala
+  mpMontarListenersSala();
+}
+
+// ─── GRID DE JOGADORES ────────────────────────────────────────
+function mpRenderGrid(players, maxP) {
+  const grid = mpEl('mpPlayersGrid');
+  if (!grid) return;
+  const me     = MP.me;
+  const sorted = [
+    ...players.filter(p => p.uid === me?.uid),
+    ...players.filter(p => p.uid !== me?.uid),
+  ];
+  grid.innerHTML = Array.from({ length: maxP }, (_, i) => {
+    const p = sorted[i];
+    if (p) {
+      const isMe = p.uid === me?.uid;
+      return `<div class="mp-slot filled ${isMe ? 'me' : ''}" style="background:var(--card,#161D30);border:1px solid ${isMe ? 'rgba(99,102,241,0.4)' : 'var(--border,rgba(255,255,255,0.06))'};border-radius:12px;padding:12px;text-align:center;min-width:90px">
+        <div class="mp-slot-av" style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#4F46E5);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:#fff;margin:0 auto 6px">${mpAvatar(p.name)}</div>
+        <div class="mp-slot-name" style="font-size:0.75rem;font-weight:600;color:var(--text,#F1F5F9);word-break:break-all">${p.name.split(' ')[0]}${isMe ? '' : ''}</div>
+        <div class="mp-slot-stars" style="font-size:0.7rem;color:var(--gold,#F59E0B);margin-top:3px">${SVG.star} ${p.stars || 0}</div>
+      </div>`;
+    }
+    return `<div class="mp-slot empty" style="background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.1);border-radius:12px;padding:12px;text-align:center;min-width:90px;opacity:.5">
+      <div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;margin:0 auto 6px">
+        <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:var(--text2,#94A3B8)"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text2,#94A3B8)">Aguardando...</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── SCOREBOARD ───────────────────────────────────────────────
+function mpRenderScoreboard(players) {
+  const sb = mpEl('mpScoreboard');
+  if (!sb) return;
+  sb.innerHTML = players.map(p =>
+    `<div class="mp-score-chip" data-uid="${p.uid}" style="display:flex;flex-direction:column;align-items:center;padding:6px 12px;border-radius:10px;background:var(--card,#161D30);border:1px solid var(--border,rgba(255,255,255,0.06));min-width:60px">
+      <div class="mp-sc-name" style="font-size:0.7rem;font-weight:600;color:var(--text2,#94A3B8)">${p.name.split(' ')[0]}</div>
+      <div class="mp-sc-pts" style="font-size:1rem;font-weight:800;color:var(--text,#F1F5F9)">${p.score || 0}</div>
+      <div class="mp-sc-ind" style="width:6px;height:6px;border-radius:50%;margin-top:3px;background:var(--border)"></div>
+    </div>`
+  ).join('');
+}
+
+// ─── BOTAO INICIAR ────────────────────────────────────────────
+function mpVerificarBotaoIniciar(players, maxP) {
+  const btn = mpEl('btnIniciarDesafio');
+  if (!btn || !MP.isHost) return;
+  if (players.length >= 2) {
+    btn.style.display = 'inline-flex';
+    btn.disabled = false;
+    const adv = players.find(p => p.uid !== MP.me?.uid);
+    btn.innerHTML = `${SVG.settings}${adv ? adv.name.split(' ')[0] + ' entrou! ' : ''}Configurar Jogo`;
+    if (!btn._toasted && adv) {
+      btn._toasted = true;
+      mpToast(`${adv.name.split(' ')[0]} aceitou o desafio!`);
+    }
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+// ─── INJECTAR ZONA DE CONFIGURACAO ────────────────────────────
+function mpInjectZonaCfg(sala) {
+  // Remover zona antiga se existir
+  mpEl('mpZonaCfg')?.remove();
+  if (!MP.isHost) return;
+
+  const waiting = mpEl('mpSalaWaiting');
+  if (!waiting) return;
+
+  const zona = document.createElement('div');
+  zona.id    = 'mpZonaCfg';
+  zona.style.display = 'none';
+  zona.innerHTML = `
+    <div style="padding:0 0 24px">
+      <div style="font-weight:700;font-size:1rem;color:var(--text,#F1F5F9);margin-bottom:16px;display:flex;align-items:center;gap:6px">${SVG.settings}Configurar o Jogo</div>
+
+      <label class="mp-cfg-label" style="font-size:0.72rem;font-weight:700;color:var(--text2,#94A3B8);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Modo de Resposta</label>
+      <select id="mpGameModoPerg" class="mp-select" style="margin-bottom:12px">
+        <option value="realtime">Tempo Real (simultaneo)</option>
+        <option value="async">Assincrono (por turnos)</option>
+      </select>
+
+      <label class="mp-cfg-label" style="font-size:0.72rem;font-weight:700;color:var(--text2,#94A3B8);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Modo de Jogo</label>
+      <select id="mpGameModo" class="mp-select" style="margin-bottom:12px">
+        <option value="aprendizado">Aprendizado</option>
+        <option value="prova">Prova</option>
+        <option value="concurso">Concurso</option>
+        <option value="imagem">Imagem</option>
+      </select>
+
+      <label class="mp-cfg-label" style="font-size:0.72rem;font-weight:700;color:var(--text2,#94A3B8);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Tipo de Perguntas</label>
+      <select id="mpGameTipo" class="mp-select" style="margin-bottom:12px">
+        <option value="todos">Todos os Tipos</option>
+        <option value="multipla">Multipla Escolha</option>
+        <option value="vf">Verdadeiro / Falso</option>
+        <option value="lacunas">Preencher Lacunas</option>
+        <option value="multipla_img">Com Imagem</option>
+      </select>
+
+      <label class="mp-cfg-label" style="font-size:0.72rem;font-weight:700;color:var(--text2,#94A3B8);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Disciplina</label>
+      <select id="mpGameDisc" class="mp-select" style="margin-bottom:12px">
+        <option value="">Todas as Disciplinas</option>
+      </select>
+
+      <label class="mp-cfg-label" style="font-size:0.72rem;font-weight:700;color:var(--text2,#94A3B8);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Categoria</label>
+      <select id="mpGameCat" class="mp-select" style="margin-bottom:12px">
+        <option value="">Todas as Categorias</option>
+      </select>
+
+      <label class="mp-cfg-label" style="font-size:0.72rem;font-weight:700;color:var(--text2,#94A3B8);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Nivel</label>
+      <select id="mpGameNivel" class="mp-select" style="margin-bottom:12px">
+        <option value="todos">Todos</option>
+        <option value="facil">Facil</option>
+        <option value="medio">Medio</option>
+        <option value="dificil">Dificil</option>
+      </select>
+
+      <label class="mp-cfg-label" style="font-size:0.72rem;font-weight:700;color:var(--text2,#94A3B8);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Numero de Perguntas</label>
+      <input id="mpGameQtd" type="number" class="mp-select" min="1" max="50" value="${sala.qtd || 10}" style="margin-bottom:12px">
+
+      <label class="mp-cfg-label" style="font-size:0.72rem;font-weight:700;color:var(--text2,#94A3B8);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Tempo por Pergunta (seg, 0 = livre)</label>
+      <input id="mpGameTempo" type="number" class="mp-select" min="0" max="300" value="${sala.tempo || 30}" style="margin-bottom:20px">
+
+      <button id="mpBtnLancar" class="btn-mp-action" style="width:100%">${SVG.play}Lancar Jogo</button>
+      <button id="mpBtnCfgCancel" style="width:100%;margin-top:10px;padding:10px;border-radius:10px;background:transparent;border:1px solid var(--border);color:var(--text2);font-family:inherit;cursor:pointer;font-weight:600">${SVG.back}Voltar</button>
+    </div>`;
+
+  // Inserir apos o bloco de espera
+  waiting.after(zona);
+
+  // Preencher disciplinas
+  mpFillDisciplinas('mpGameDisc');
+  mpEl('mpGameDisc').addEventListener('change', e => mpFillCategorias(e.target.value, 'mpGameCat'));
+
+  // Pre-seleccionar config da sala
+  const set = (id, val) => { const el = mpEl(id); if (el && val) el.value = val; };
+  set('mpGameModoPerg', sala.modoPerg);
+  set('mpGameModo',     sala.modoJogo);
+  set('mpGameTipo',     sala.tipo);
+  set('mpGameNivel',    sala.nivel);
+
+  // Botao lancar
+  mpEl('mpBtnLancar').addEventListener('click', mpLancarJogo);
+
+  // Botao cancelar cfg
+  mpEl('mpBtnCfgCancel').addEventListener('click', () => {
+    zona.style.display    = 'none';
+    waiting.style.display = 'block';
+  });
+
+  // Botao iniciar desafio -> mostrar cfg
+  const btnIniciar = mpEl('btnIniciarDesafio');
+  if (btnIniciar) {
+    btnIniciar.onclick = () => {
+      waiting.style.display = 'none';
+      zona.style.display    = 'block';
+    };
+  }
+}
+
+// ─── LISTENERS DA SALA ────────────────────────────────────────
+function mpMontarListenersSala() {
+  const sala = MP.sala;
+
+  // Players
+  mpListen(sala.child('players'), 'value', snap => {
+    const players = [];
+    snap.forEach(c => players.push(c.val()));
+    const maxP = MP.salaData?.maxplayers || 2;
+    mpRenderGrid(players, maxP);
+    mpRenderScoreboard(players);
+    mpVerificarBotaoIniciar(players, maxP);
+  });
+
+  // Status
+  mpListen(sala.child('status'), 'value', snap => {
+    const status = snap.val();
+    if (status === 'countdown') mpMostrarContagem();
+    if (status === 'playing')   mpMostrarZonaJogo();
+    if (status === 'finished')  mpMostrarResultados();
+  });
+
+  // Pergunta actual
+  mpListen(sala.child('currentRound'), 'value', snap => {
+    const round = snap.val();
+    if (!round) return;
+    if (mpEl('mpSalaGame')?.style.display !== 'none') {
+      mpRenderPergunta(round);
+    }
+  });
+
+  // Live answers
+  mpListen(sala.child('liveAnswers'), 'value', snap => {
+    if (!snap.val()) return;
+    mpRenderLiveFeed(snap.val());
+    mpAtualizarChips(snap.val());
+  });
+
+  // Scores
+  mpListen(sala.child('scores'), 'value', snap => {
+    if (!snap.val()) return;
+    const scores = snap.val();
+    sala.child('players').once('value', ps => {
+      const players = [];
+      ps.forEach(c => {
+        const p = c.val();
+        p.score = (scores[p.uid] || {}).total || 0;
+        players.push(p);
+      });
+      mpRenderScoreboard(players);
+    });
+  });
+
+  // Sala eliminada
+  mpListen(sala, 'value', snap => {
+    if (snap.val() === null) {
+      mpUnlisten();
+      mpToast('A sala foi eliminada.');
+      mpInit();
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 9. LANCAR JOGO
+// ═══════════════════════════════════════════════════════════════
+async function mpLancarJogo() {
+  if (!MP.isHost) return;
+  const btn = mpEl('mpBtnLancar');
+  if (btn) { btn.disabled = true; btn.textContent = 'A preparar...'; }
+
+  const cfg = {
+    disc:     mpEl('mpGameDisc')?.value    || '',
+    cat:      mpEl('mpGameCat')?.value     || '',
+    nivel:    mpEl('mpGameNivel')?.value   || 'todos',
+    tipo:     mpEl('mpGameTipo')?.value    || 'todos',
+    modoJogo: mpEl('mpGameModo')?.value    || 'aprendizado',
+    modoPerg: mpEl('mpGameModoPerg')?.value || 'realtime',
+    tempo:    parseInt(mpEl('mpGameTempo')?.value) || 30,
+    qtd:      parseInt(mpEl('mpGameQtd')?.value)   || 10,
+  };
+
+  const perguntas = await mpCarregarPerguntas(cfg);
+  if (!perguntas.length) {
+    mpToast('Sem perguntas disponiveis com estes filtros.');
+    if (btn) { btn.disabled = false; btn.innerHTML = SVG.play + 'Lancar Jogo'; }
+    return;
+  }
+
+  try {
+    const snap      = await MP.sala.once('value');
+    const salaData  = snap.val();
+    const players   = Object.values(salaData.players || {});
+    const turnOrder = mpShuffle(players.map(p => p.uid));
+
+    await MP.sala.update({
+      ...cfg,
+      status:        'countdown',
+      questions:     perguntas,
+      turnOrder,
+      currentQIndex: 0,
+      scores:        Object.fromEntries(players.map(p => [p.uid, { total: 0, answers: {} }])),
+      liveAnswers:   {},
+      startedAt:     firebase.database.ServerValue.TIMESTAMP,
+    });
+  } catch(e) {
+    console.error('mpLancarJogo', e);
+    mpToast('Erro ao iniciar jogo. Tenta de novo.');
+    if (btn) { btn.disabled = false; btn.innerHTML = SVG.play + 'Lancar Jogo'; }
+  }
+}
+
+// ─── CONTAGEM REGRESSIVA ──────────────────────────────────────
+let _mpCountdown = null;
+
+function mpMostrarContagem() {
+  const old = mpEl('mp-countdown-overlay');
+  if (old) old.remove();
+  clearInterval(_mpCountdown);
+
+  const ov = document.createElement('div');
+  ov.id = 'mp-countdown-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(11,15,26,0.95);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+  ov.innerHTML = `
+    <div style="color:rgba(255,255,255,0.6);font-size:1rem;font-weight:600;margin-bottom:16px;letter-spacing:.05em">O JOGO COMECA EM</div>
+    <div id="mpCountNum" style="font-size:7rem;font-weight:900;color:#fff;line-height:1;transition:transform .15s;text-shadow:0 0 60px rgba(99,102,241,0.9)">3</div>
+    <div style="color:rgba(255,255,255,0.35);font-size:0.9rem;margin-top:20px">Prepara-te!</div>`;
+  document.body.appendChild(ov);
+
+  let n = 3;
+  const el = () => mpEl('mpCountNum');
+
+  _mpCountdown = setInterval(async () => {
+    n--;
+    if (el()) {
+      el().textContent = n <= 0 ? 'JA!' : n;
+      el().style.transform = 'scale(1.4)';
+      setTimeout(() => { if (el()) el().style.transform = 'scale(1)'; }, 140);
+    }
+    if (n <= 0) {
+      clearInterval(_mpCountdown);
+      _mpCountdown = null;
+      setTimeout(() => ov.remove(), 700);
+
+      if (MP.isHost) {
+        await MP.sala.child('status').set('playing');
+        const snap = await MP.sala.once('value');
+        const d    = snap.val();
+        if (d && d.questions) {
+          setTimeout(() => mpEmitirPergunta(0, d), 300);
+        }
+      }
+    }
+  }, 1000);
+}
+
+// ─── MOSTRAR ZONA DE JOGO ─────────────────────────────────────
+function mpMostrarZonaJogo() {
+  mpEl('mpSalaWaiting')?.style && (mpEl('mpSalaWaiting').style.display = 'none');
+  mpEl('mpZonaCfg')?.style      && (mpEl('mpZonaCfg').style.display    = 'none');
+  mpEl('mpSalaGame')?.style     && (mpEl('mpSalaGame').style.display    = 'block');
+  mpEl('mpSalaResult')?.style   && (mpEl('mpSalaResult').style.display  = 'none');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 10. PERGUNTA EM JOGO
+// ═══════════════════════════════════════════════════════════════
+async function mpEmitirPergunta(index, salaData) {
+  if (!MP.isHost) return;
+  const questions = salaData.questions || [];
+  const turnOrder = salaData.turnOrder  || [];
+  const modoPerg  = salaData.modoPerg   || 'realtime';
+  const q         = questions[index];
+  if (!q) return;
+
+  const playerTurn = turnOrder[index % turnOrder.length];
+  const tipo       = q.answerType || q.tipo || q.type || 'multipla';
+
+  let correct = '';
+  let questionText = q.pergunta || q.question || q.enunciado || '';
+  let answers = [];
+
+  if (tipo === 'lacunas') {
+    correct      = q.lacunaResposta || q.lacunaAnswer || q.correta || q.a || '';
+    questionText = q.lacunaFrase || questionText;
+  } else if (tipo === 'flashcard') {
+    correct      = q.flashBack || q.a || q.correta || '';
+    questionText = q.flashFront || questionText;
+  } else if (tipo === 'vf') {
+    correct  = String(q.answer || q.correta || '').trim();
+    answers  = ['Verdadeiro', 'Falso'];
+    if (correct === 'V' || correct === 'Verdadeiro' || correct === 'true') correct = 'Verdadeiro';
+    else correct = 'Falso';
+  } else {
+    const letter = String(q.answer || '').trim().toLowerCase();
+    if (letter.length === 1 && q[letter]) correct = q[letter];
+    else correct = q.correta || q.resposta_certa || q.a || '';
+    answers = [q.a, q.b, q.c, q.d].filter(Boolean);
+    if (!answers.length) answers = [q.answer1, q.answer2, q.answer3, q.answer4].filter(Boolean);
+  }
+
+  const round = {
+    index,
+    total:      questions.length,
+    question:   questionText,
+    tipo,
+    answers:    tipo === 'vf' ? answers : mpShuffle(answers),
+    correct,
+    imageURL:   q.imageURL || q.questionImg || '',
+    playerTurn,
+    modoPerg,
+    tempo:      salaData.tempo || 0,
+  };
+
+  try {
+    await MP.sala.child('liveAnswers').remove();
+    await MP.sala.child('currentRound').set(round);
+    await MP.sala.child('currentQIndex').set(index);
+  } catch(e) { console.error('mpEmitirPergunta', e); }
+}
+
+// ─── RENDERIZAR PERGUNTA (usa os mesmos IDs/classes do jogo normal) ───
+function mpRenderPergunta(round) {
+  // Usar o card de pergunta da sala (mpQuestionCard / mpQText / mpQAnswers / mpQNum)
+  const qText    = mpEl('mpQText');
+  const qAnswers = mpEl('mpQAnswers');
+  const qNum     = mpEl('mpQNum');
+  const qTurn    = mpEl('mpQTurn');
+  if (!qText || !qAnswers) return;
+
+  MP.answered   = false;
+  const me      = MP.me;
+  const isMyTurn = round.modoPerg === 'realtime' || round.playerTurn === me?.uid;
+
+  if (qNum)  qNum.textContent  = `${round.index + 1}/${round.total}`;
+  if (qTurn) qTurn.innerHTML   = isMyTurn
+    ? `<span style="color:#22C55E;font-weight:700;font-size:0.78rem">${SVG.play}A tua vez!</span>`
+    : `<span style="color:var(--text2);font-size:0.78rem">${SVG.lock}Aguarda...</span>`;
+
+  // Imagem
+  let imgHtml = '';
+  if (round.imageURL) imgHtml = `<img src="${round.imageURL}" alt="" style="max-width:100%;border-radius:10px;margin-bottom:10px;display:block">`;
+
+  qText.innerHTML = `${imgHtml}${round.question}`;
+
+  // Respostas
+  if (!isMyTurn) {
+    qAnswers.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text2);font-size:0.85rem">${SVG.lock}Aguarda a tua vez de responder</div>`;
+  } else if (round.tipo === 'lacunas' || round.tipo === 'flashcard') {
+    qAnswers.innerHTML = `
+      <div style="display:flex;gap:8px;padding:4px 0">
+        <input type="text" id="mpLacunaIn" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--border);background:var(--input-bg,#1A2035);color:var(--text);font-family:inherit;font-size:0.9rem" placeholder="A tua resposta..." autocomplete="off">
+        <button class="answer-btn" id="mpLacunaBtn" style="padding:12px 16px;flex-shrink:0">${SVG.check}OK</button>
+      </div>`;
+    mpEl('mpLacunaBtn').addEventListener('click', () => {
+      const v = (mpEl('mpLacunaIn')?.value || '').trim();
+      if (v) mpResponder(v, round);
+    });
+    mpEl('mpLacunaIn').addEventListener('keydown', e => { if (e.key === 'Enter') mpEl('mpLacunaBtn').click(); });
+    setTimeout(() => mpEl('mpLacunaIn')?.focus(), 80);
+  } else {
+    // Usar as mesmas classes CSS do jogo normal: answers-grid + answer-btn
+    qAnswers.className = 'mp-q-answers answers-grid';
+    qAnswers.innerHTML = round.answers.map((a, i) =>
+      `<button class="answer-btn" data-val="${encodeURIComponent(a)}" data-idx="${i}">${a}</button>`
+    ).join('');
+    qAnswers.querySelectorAll('.answer-btn').forEach(b =>
+      b.addEventListener('click', () => mpResponder(decodeURIComponent(b.dataset.val), round))
+    );
+  }
+
+  // Timer
+  mpClearTimer();
+  if (round.tempo > 0 && isMyTurn) {
+    mpStartTimer(round.tempo, round);
+  } else {
+    const t = mpEl('mpSalaTimer');
+    if (t) t.textContent = round.tempo > 0 ? `${round.tempo}s` : '\u221e';
+  }
+}
+
+// ─── RESPONDER ────────────────────────────────────────────────
+async function mpResponder(val, round) {
+  if (MP.answered) return;
+  MP.answered = true;
+  mpClearTimer();
+
+  const me   = MP.me;
+  const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const ok   = norm(val) === norm(round.correct || '');
+  const pts  = ok ? 10 : 0;
+
+  // Feedback visual
+  mpEl('mpQAnswers')?.querySelectorAll('.answer-btn').forEach(b => {
+    b.disabled = true;
+    const bVal = norm(decodeURIComponent(b.dataset.val || b.textContent));
+    if (bVal === norm(round.correct)) b.classList.add('correct');
+    else if (bVal === norm(val))      b.classList.add('wrong');
+  });
+
+  try {
+    await MP.sala.child(`liveAnswers/${me.uid}`).set({
+      uid: me.uid, name: me.name, correct: ok, points: pts, answer: val,
+      answeredAt: firebase.database.ServerValue.TIMESTAMP,
+    });
+
+    const sc = (await MP.sala.child(`scores/${me.uid}`).once('value')).val() || { total: 0, answers: {} };
+    sc.total = (sc.total || 0) + pts;
+    sc.answers[round.index] = { correct: ok, points: pts };
+    await MP.sala.child(`scores/${me.uid}`).set(sc);
+
+    if (MP.isHost) {
+      const snap = await MP.sala.once('value');
+      mpVerificarAvanco(snap.val(), round);
+    }
+  } catch(e) { console.error('mpResponder', e); }
+}
+
+async function mpVerificarAvanco(salaData, round) {
+  const players  = Object.values(salaData.players || {});
+  const liveAns  = salaData.liveAnswers || {};
+  const expected = salaData.modoPerg === 'realtime' ? players.length : 1;
+  if (Object.keys(liveAns).length < expected) return;
+
+  const next = round.index + 1;
+  const qs   = salaData.questions || [];
+
+  try {
+    if (next >= qs.length) {
+      await MP.sala.update({ status: 'finished' });
+    } else {
+      await MP.sala.child('liveAnswers').remove();
+      await MP.sala.child('currentQIndex').set(next);
+      setTimeout(async () => {
+        const snap = await MP.sala.once('value');
+        mpEmitirPergunta(next, snap.val());
+      }, 1500);
+    }
+  } catch(e) { console.error('mpVerificarAvanco', e); }
+}
+
+// ─── TIMER ────────────────────────────────────────────────────
+function mpClearTimer() {
+  clearInterval(MP.gameTimer);
+  MP.gameTimer = null;
+  const el = mpEl('mpSalaTimer');
+  if (el) { el.textContent = '--'; el.classList.remove('urgent'); }
+}
+
+function mpStartTimer(seconds, round) {
+  let left = seconds;
+  const el = mpEl('mpSalaTimer');
+  if (el) el.textContent = left + 's';
+
+  MP.gameTimer = setInterval(() => {
+    left--;
+    if (el) {
+      el.textContent = left + 's';
+      if (left <= 5) el.classList.add('urgent');
+    }
+    if (left <= 0) {
+      clearInterval(MP.gameTimer);
+      if (!MP.answered) mpResponder('', round);
+    }
+  }, 1000);
+}
+
+// ─── LIVE FEED ────────────────────────────────────────────────
+function mpRenderLiveFeed(answers) {
+  const el = mpEl('mpLiveFeed');
+  if (!el) return;
+  const items = Object.values(answers || {});
+  if (!items.length) return;
+
+  el.innerHTML = `<div class="mp-section-title" style="font-size:0.72rem;margin:0 0 8px">
+    <span style="width:8px;height:8px;border-radius:50%;background:#EF4444;display:inline-block;margin-right:6px;animation:pulse 1s infinite"></span>
+    Actividade em tempo real
+  </div>` + items.map(a => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${a.correct ? '#22C55E' : '#EF4444'}"></span>
+      <span style="font-size:0.8rem;color:var(--text)">
+        <strong>${a.name}</strong>
+        ${a.correct ? SVG.check + 'acertou' : SVG.close + 'errou'}
+        <span style="opacity:.6;font-size:0.72rem">(${a.points || 0} pts)</span>
+      </span>
+    </div>`).join('');
+}
+
+function mpAtualizarChips(answers) {
+  mpQA('.mp-score-chip').forEach(chip => {
+    chip.classList.remove('answered-right', 'answered-wrong');
+    const ind = chip.querySelector('.mp-sc-ind');
+    const uid = chip.dataset.uid;
+    if (answers[uid]) {
+      const ok = answers[uid].correct;
+      if (ind) ind.style.background = ok ? '#22C55E' : '#EF4444';
+      chip.classList.add(ok ? 'answered-right' : 'answered-wrong');
+    } else {
+      if (ind) ind.style.background = 'var(--border)';
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 11. RESULTADOS FINAIS
+// ═══════════════════════════════════════════════════════════════
+async function mpMostrarResultados() {
+  mpClearTimer();
+  mpEl('mpSalaWaiting')?.style && (mpEl('mpSalaWaiting').style.display = 'none');
+  mpEl('mpSalaGame')?.style     && (mpEl('mpSalaGame').style.display    = 'none');
+  mpEl('mpSalaResult')?.style   && (mpEl('mpSalaResult').style.display  = 'block');
+
+  try {
+    const snap    = await MP.sala.once('value');
+    const data    = snap.val();
+    const players = Object.values(data.players || {});
+    const scores  = data.scores || {};
+    const me      = MP.me;
+    const qtd     = data.qtd || 10;
+    const perQ    = qtd > 0 ? 20 / qtd : 1;
+
+    const ranked = players.map(p => ({
+      ...p,
+      total: (scores[p.uid] || {}).total || 0,
+    })).sort((a, b) => b.total - a.total);
+
+    // Dar estrelas
+    ranked.forEach((p, i) => {
+      const st = [5, 3, 2, 1][i] || 1;
+      if (p.uid === me?.uid) {
+        mpAddStars(p.uid, st);
+        mpToast(`+${st} estrelas ganhas!`);
+      }
+    });
+
+    // Podium
+    const podium = mpEl('mpResultPodium');
+    if (podium) {
+      const medals = ['1.', '2.', '3.'];
+      podium.innerHTML = ranked.slice(0, 3).map((p, i) => `
+        <div style="text-align:center;padding:12px 8px;border-radius:14px;background:${p.uid === me?.uid ? 'rgba(99,102,241,0.12)' : 'var(--card)'};border:1px solid ${p.uid === me?.uid ? 'rgba(99,102,241,0.3)' : 'var(--border)'};flex:1">
+          <div style="font-size:1.4rem;font-weight:900;color:${i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : '#CD7F32'};margin-bottom:6px">${medals[i]}</div>
+          <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#4F46E5);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;color:#fff;margin:0 auto 6px">${mpAvatar(p.name)}</div>
+          <div style="font-size:0.78rem;font-weight:700;color:var(--text)">${p.name.split(' ')[0]}</div>
+          <div style="font-size:1rem;font-weight:800;color:var(--text)">${p.total} pts</div>
+          <div style="font-size:0.72rem;color:var(--text2)">${(p.total * perQ / 10).toFixed(1)} val.</div>
+        </div>`).join('');
+      podium.style.cssText = 'display:flex;gap:8px;margin-bottom:16px';
+    }
+
+    // Tabela
+    const table = mpEl('mpResultTable');
+    if (table) {
+      table.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+          <thead>
+            <tr style="color:var(--text2);border-bottom:1px solid var(--border)">
+              <th style="padding:8px 6px;text-align:left">#</th>
+              <th style="padding:8px 6px;text-align:left">Jogador</th>
+              <th style="padding:8px 6px;text-align:right">Pts</th>
+              <th style="padding:8px 6px;text-align:right">Nota</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ranked.map((p, i) => `
+              <tr style="border-bottom:1px solid var(--border);${p.uid === me?.uid ? 'background:rgba(99,102,241,0.08)' : ''}">
+                <td style="padding:8px 6px;font-weight:700;color:${i < 3 ? 'var(--gold)' : 'var(--text2)'}">${i + 1}</td>
+                <td style="padding:8px 6px;font-weight:600;color:var(--text)">${p.name}${p.uid === me?.uid ? ' (tu)' : ''}</td>
+                <td style="padding:8px 6px;text-align:right;font-weight:700;color:var(--text)">${p.total}</td>
+                <td style="padding:8px 6px;text-align:right;color:var(--text2)">${(p.total * perQ / 10).toFixed(1)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    // Guardar no historico
+    await MP.sala.child('status').set('finished');
+
+  } catch(e) { console.error('mpMostrarResultados', e); }
+
+  // Botao voltar
+  mpEl('btnMpSalaVoltar')?.addEventListener('click', () => {
+    mpUnlisten();
+    mpInit();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 12. ELIMINAR SALA
+// ═══════════════════════════════════════════════════════════════
+async function mpEliminarSala() {
+  if (!MP.isHost || !MP.salaId) return;
+  mpConfirmDialog('Eliminar a sala? O desafio sera cancelado.', async () => {
+    try {
+      const dSnap = await db.ref('mp_desafios')
+        .orderByChild('salaId').equalTo(MP.salaId).once('value');
+      const upd = {};
+      dSnap.forEach(c => { upd[`mp_desafios/${c.key}/status`] = 'cancelled'; });
+      if (Object.keys(upd).length) await db.ref().update(upd);
+      await MP.sala.remove();
+    } catch(e) {}
+    mpUnlisten();
+    mpToast('Sala eliminada.');
+    mpInit();
+  });
+}
+
+// ─── MODAL DE CONFIRMACAO ─────────────────────────────────────
+function mpConfirmDialog(msg, onOk) {
+  mpEl('mp-confirm-modal')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'mp-confirm-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:flex-end;justify-content:center;padding-bottom:24px';
+  ov.innerHTML = `
+    <div style="background:var(--card,#161D30);border-radius:20px;padding:24px 20px 12px;width:calc(100% - 32px);max-width:420px;box-shadow:0 -4px 40px rgba(0,0,0,0.3)">
+      <div style="text-align:center;margin-bottom:18px">
+        <div style="font-weight:700;font-size:1rem;color:var(--text,#F1F5F9);margin-bottom:8px">Confirmar</div>
+        <div style="font-size:0.875rem;color:var(--text2,#94A3B8)">${msg}</div>
+      </div>
+      <button id="mpConfOk" style="width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#EF4444,#DC2626);color:#fff;border:none;font-weight:700;font-size:0.95rem;cursor:pointer;margin-bottom:8px">Confirmar</button>
+      <button id="mpConfCancel" style="width:100%;padding:12px;border-radius:12px;background:transparent;color:var(--text2);border:none;font-size:0.9rem;cursor:pointer;font-weight:600">Cancelar</button>
+    </div>`;
+  document.body.appendChild(ov);
+  mpEl('mpConfOk').onclick    = () => { ov.remove(); onOk(); };
+  mpEl('mpConfCancel').onclick = () => ov.remove();
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 13. LISTENER GLOBAL DE DESAFIOS (funciona em qualquer ecra)
+// ═══════════════════════════════════════════════════════════════
+let _globalDesafiosRef = null;
+let _globalDesafiosFn  = null;
+let _globalDesafiosUid = null;
+let _desafiosVistos    = new Set();
+
+function mpIniciarListenerGlobalDesafios(uid) {
+  if (!uid || _globalDesafiosUid === uid) return;
+  if (_globalDesafiosRef && _globalDesafiosFn)
+    _globalDesafiosRef.off('child_added', _globalDesafiosFn);
+
+  _globalDesafiosUid = uid;
+  _globalDesafiosRef = db.ref('mp_desafios').orderByChild('targetUid').equalTo(uid);
+  _globalDesafiosFn  = snap => {
+    const d = snap.val();
+    if (!d || d.status !== 'pending') return;
+    if (_desafiosVistos.has(snap.key)) return;
+    _desafiosVistos.add(snap.key);
+    mpPopupDesafio(snap.key, d);
+  };
+  _globalDesafiosRef.on('child_added', _globalDesafiosFn);
+}
+
+function mpPopupDesafio(key, d) {
+  mpEl('mp-desafio-popup')?.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'mp-desafio-popup';
+  popup.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--card,#161D30);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.4);padding:16px 18px;z-index:9999;min-width:300px;max-width:90vw;border:1.5px solid var(--primary,#6366F1)';
+  popup.innerHTML = `
+    <div style="font-weight:700;font-size:0.92rem;color:var(--text,#F1F5F9);margin-bottom:4px">
+      ${SVG.trophy}Novo Desafio!
+    </div>
+    <div style="font-size:0.82rem;color:var(--text2,#94A3B8);margin-bottom:12px">
+      <strong style="color:var(--text,#F1F5F9)">${d.fromName || 'Jogador'}</strong>
+      desafia-te em ${d.disciplina || 'Geral'} &middot; ${d.qtd || 10} perguntas
+    </div>
+    <div style="display:flex;gap:10px">
+      <button id="mpPopupOk" style="flex:1;padding:10px;border-radius:10px;background:var(--primary,#6366F1);color:#fff;border:none;font-weight:600;cursor:pointer;font-size:0.82rem">${SVG.check}Aceitar</button>
+      <button id="mpPopupNo" style="flex:1;padding:10px;border-radius:10px;background:transparent;color:var(--text2,#94A3B8);border:1px solid var(--border,rgba(255,255,255,0.08));font-weight:600;cursor:pointer;font-size:0.82rem">${SVG.close}Recusar</button>
+    </div>`;
+  document.body.appendChild(popup);
+
+  mpEl('mpPopupOk').onclick = async () => {
+    popup.remove();
+    if (!MP.me) await mpGetMe();
+    await mpAceitarDesafio(key, d.salaId);
+  };
+  mpEl('mpPopupNo').onclick = async () => {
+    popup.remove();
+    await mpRecusarDesafio(key);
+  };
+
+  setTimeout(() => { if (popup.parentNode) popup.remove(); }, 30000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 14. INICIALIZACAO
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+
+  // Botao principal Multiplayer (no menu)
+  const btnMain = mpEl('btnMultiplayer');
+  if (btnMain) btnMain.addEventListener('click', mpInit);
+
+  // Botao voltar do hub
+  const btnBack = mpEl('mpBackBtn');
+  if (btnBack) btnBack.addEventListener('click', () => {
+    mpUnlisten();
+    if (typeof showScreen === 'function') showScreen('screen-mainmenu');
+  });
+
+  // Botao voltar da sala
+  const btnSalaBack = mpEl('mpSalaBackBtn');
+  if (btnSalaBack) btnSalaBack.addEventListener('click', () => {
+    mpUnlisten();
+    mpInit();
+  });
+
+  // Botao eliminar sala
+  const btnDel = mpEl('mpSalaDeleteBtn');
+  if (btnDel) btnDel.addEventListener('click', mpEliminarSala);
+
+  // Auth listener
   firebase.auth().onAuthStateChanged(async user => {
     if (user) {
-      // Pré-carregar o perfil em cache (nome, estrelas) — necessário para utilizadores anónimos/telefone
-      await mpGetMyInfoAsync();
-      // Arrancar listener global de desafios com o uid real
-      const uid = MP.myUid || user.uid;
+      await mpGetMe();
+      const uid = MP.me?.uid || user.uid;
       mpIniciarListenerGlobalDesafios(uid);
     } else {
-      // Limpar cache ao fazer logout
-      MP.myProfile = null;
-      MP.myUid     = null;
+      MP.me             = null;
+      MP.salaId         = null;
+      _globalDesafiosUid = null;
     }
   });
 });
