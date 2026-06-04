@@ -303,7 +303,59 @@ const IDB = (() => {
     });
   }
 
-  return { getAll, setAll, addOne, clear };
+  // ─── Store separada para IDs de perguntas eliminadas pelo utilizador ───
+  const DEL_STORE = 'deleted_ids';
+
+  function openV2() {
+    // Usa versão 2 para criar a nova store se necessário
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(DB_NAME, 2);
+      req.onupgradeneeded = e => {
+        const db2 = e.target.result;
+        if (!db2.objectStoreNames.contains(STORE)) {
+          db2.createObjectStore(STORE, { keyPath: 'id' });
+        }
+        if (!db2.objectStoreNames.contains(DEL_STORE)) {
+          db2.createObjectStore(DEL_STORE, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = e => { _db = e.target.result; res(_db); };
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+
+  async function getDeletedIds() {
+    const db2 = await openV2();
+    return new Promise((res, rej) => {
+      const tx  = db2.transaction(DEL_STORE, 'readonly');
+      const req = tx.objectStore(DEL_STORE).getAllKeys();
+      req.onsuccess = () => res(req.result || []);
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+
+  async function addDeletedIds(ids) {
+    const db2 = await openV2();
+    return new Promise((res, rej) => {
+      const tx    = db2.transaction(DEL_STORE, 'readwrite');
+      const store = tx.objectStore(DEL_STORE);
+      for (const id of ids) store.put({ id });
+      tx.oncomplete = () => res();
+      tx.onerror    = e => rej(e.target.error);
+    });
+  }
+
+  async function clearDeletedIds() {
+    const db2 = await openV2();
+    return new Promise((res, rej) => {
+      const tx = db2.transaction(DEL_STORE, 'readwrite');
+      tx.objectStore(DEL_STORE).clear();
+      tx.oncomplete = () => res();
+      tx.onerror    = e => rej(e.target.error);
+    });
+  }
+
+  return { getAll, setAll, addOne, clear, getDeletedIds, addDeletedIds, clearDeletedIds };
 })();
 
 // ─── DISCIPLINAS PERSONALIZADAS (localStorage) ─────────────
@@ -351,16 +403,6 @@ async function saveLocalDB(qs) {
     console.warn('IDB.setAll falhou, fallback localStorage:', e);
     LS.set('eq_questions', qs);
   }
-}
-
-// Guarda quais IDs de perguntas da nuvem o utilizador eliminou manualmente
-function getDeletedCloudIds() {
-  return LS.get('eq_deleted_cloud_ids') || [];
-}
-function addDeletedCloudIds(ids) {
-  const existing = new Set(getDeletedCloudIds());
-  ids.forEach(id => existing.add(id));
-  LS.set('eq_deleted_cloud_ids', [...existing]);
 }
 
 async function addQuestionLocalDB(q) {
@@ -3209,13 +3251,14 @@ async function downloadFromCloud() {
     await loadLocalDB();
     const userLocalQs = State.localDB.filter(q => q.id && q.id.startsWith('local_'));
 
-    // Respeitar perguntas que o utilizador eliminou manualmente — não as restaurar
-    const deletedByUser = new Set(getDeletedCloudIds());
-    const filteredCloudQs = cloudQs.filter(q => !deletedByUser.has(q.id));
+    // Respeitar perguntas que o utilizador eliminou manualmente — não restaurar
+    let deletedIds = new Set();
+    try { deletedIds = new Set(await IDB.getDeletedIds()); } catch(e) {}
 
     // Mesclar: nuvem (sem as eliminadas) + locais do utilizador (sem duplicar IDs)
-    const cloudIds = new Set(filteredCloudQs.map(q => q.id));
-    const merged = [...filteredCloudQs, ...userLocalQs.filter(q => !cloudIds.has(q.id))];
+    const filteredCloud = cloudQs.filter(q => !deletedIds.has(q.id));
+    const cloudIds = new Set(filteredCloud.map(q => q.id));
+    const merged = [...filteredCloud, ...userLocalQs.filter(q => !cloudIds.has(q.id))];
 
     await saveLocalDB(merged);
     LS.set('eq_last_sync', Date.now());
@@ -3320,9 +3363,11 @@ document.getElementById('localElimVisBtn').onclick = async () => {
       { label: 'CANCELAR', cls: 'btn-outline' },
       { label: 'ELIMINAR', cls: 'btn-danger', action: async () => {
         const filteredIds = new Set(filtered.map(q => q.id));
-        // Guardar IDs eliminados para que o sync da nuvem não os restaure
-        const cloudDeletedIds = filtered.filter(q => q.id && !q.id.startsWith('local_')).map(q => q.id);
-        if (cloudDeletedIds.length) addDeletedCloudIds(cloudDeletedIds);
+        // Guardar IDs eliminados para que o sync da nuvem nunca os restaure
+        const idsToDelete = [...filteredIds].filter(id => id && !String(id).startsWith('local_'));
+        if (idsToDelete.length) {
+          try { await IDB.addDeletedIds(idsToDelete); } catch(e) { console.warn('addDeletedIds falhou:', e); }
+        }
         const remaining = State.localDB.filter(q => !filteredIds.has(q.id));
         await saveLocalDB(remaining);
         State.localDB = remaining;
@@ -3349,7 +3394,10 @@ async function checkCloudUpdates() {
     const snap = await db.ref('questions').once('value');
     const data = snap.val();
     if (!data) return;
-    const cloudCount = Object.keys(data).length;
+    // Respeitar perguntas eliminadas: não contar as que o utilizador eliminou
+    let deletedIdsForCheck = new Set();
+    try { deletedIdsForCheck = new Set(await IDB.getDeletedIds()); } catch(e) {}
+    const cloudCount = Object.keys(data).filter(k => !deletedIdsForCheck.has(k)).length;
     await loadLocalDB();
     // Contar apenas as perguntas da nuvem (excluir as criadas localmente pelo utilizador)
     const syncedCount = State.localDB.filter(q => !q.id || !q.id.startsWith('local_')).length;

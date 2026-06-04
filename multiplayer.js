@@ -531,14 +531,14 @@ async function mpEntrarSala(salaId) {
 
   mpClearListeners();
 
-  // 1. Escrever jogador no Firebase PRIMEIRO — garante que o snapshot
-  //    inicial já tem os 2 jogadores quando os listeners forem montados
+  // CORRECÇÃO: escrever jogador no Firebase ANTES de montar os listeners.
+  // Assim o primeiro snapshot do listener de players já tem os 2 jogadores,
+  // e o host não vê o grid oscilar entre 1 e 2 jogadores.
   await salaRef.child('players').child(me.uid).set({
     uid: me.uid, name: me.name, email: me.email || me.phone,
     stars: me.stars, score: 0, joined: true,
   });
 
-  // 2. Só depois montar ecrã e listeners — o primeiro snapshot já tem os 2 jogadores
   await mpShowSalaScreen(salaRef);
 }
 
@@ -592,9 +592,32 @@ async function mpShowSalaScreen(salaRef) {
   }
 
   // ── LISTENER PLAYERS ────────────────────────────────────────
+  // Renderizar imediatamente com os dados já presentes na sala (do sData lido acima)
+  // para que ambos os jogadores apareçam logo ao entrar, sem esperar pelo listener
+  {
+    const initialPlayers = sData.players ? Object.values(sData.players) : [];
+    const myUidNow = MP.myUid;
+    const sortedNow = [
+      ...initialPlayers.filter(p => p.uid === myUidNow),
+      ...initialPlayers.filter(p => p.uid !== myUidNow),
+    ];
+    mpRenderPlayersGrid(sortedNow, _maxP);
+    mpRenderScoreboard(sortedNow);
+  }
+
+  // Listener para actualizações em tempo real (novos jogadores, saídas)
+  // Usa um contador para ignorar o primeiro disparo redundante do Firebase SDK
+  // que às vezes devolve dados de cache mais antigos que o sData acima
+  let _playersFireCount = 0;
   mpAddListener(salaRef.child('players'), 'value', snap => {
+    _playersFireCount++;
     const players = [];
     snap.forEach(c => players.push(c.val()));
+
+    // Ignorar apenas se for o 1º disparo E tiver MENOS jogadores que o sData
+    // (significa que é cache local desactualizado)
+    const initialCount = sData.players ? Object.keys(sData.players).length : 0;
+    if (_playersFireCount === 1 && players.length < initialCount) return;
 
     // Eu sempre primeiro, adversário depois
     const myUid  = MP.myUid;
@@ -630,10 +653,8 @@ async function mpShowSalaScreen(salaRef) {
   });
 
   // ── SALA ELIMINADA ────────────────────────────────────────────
-  // Usar child_removed no nó pai para detectar sala eliminada
-  // em vez de 'value' que disparava em QUALQUER mudança na sala
-  mpAddListener(db.ref('mp_salas'), 'child_removed', snap => {
-    if (snap.key === salaRef.key) {
+  mpAddListener(salaRef, 'value', snap => {
+    if (snap.val() === null) {
       mpClearListeners();
       mpShowToast('A sala foi eliminada.');
       mpShowScreen('screen-multiplayer');
