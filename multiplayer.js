@@ -531,10 +531,8 @@ async function mpEntrarSala(salaId) {
 
   mpClearListeners();
 
-  // CORRECÇÃO DEFINITIVA: escrever jogador no Firebase ANTES de chamar
-  // mpShowSalaScreen. Assim o salaRef.once('value') dentro dessa função
-  // já devolve um snapshot com os 2 jogadores, e o grid mostra ambos
-  // imediatamente sem depender do listener assíncrono.
+  // FIX: escrever jogador ANTES de ler o snapshot da sala —
+  // garante que salaRef.once('value') já devolve 2 jogadores
   await salaRef.child('players').child(me.uid).set({
     uid: me.uid, name: me.name, email: me.email || me.phone,
     stars: me.stars, score: 0, joined: true,
@@ -553,8 +551,7 @@ async function mpShowSalaScreen(salaRef) {
   const deleteBtn = mpEl('mpSalaDeleteBtn');
   const initBtn   = mpEl('btnIniciarDesafio');
 
-  // Ler dados actuais da sala — neste ponto já tem os 2 jogadores
-  // porque mpEntrarSala escreveu o jogador antes de chamar esta função
+  // Ler dados da sala UMA vez com await — evita callbacks aninhados
   const sSnap = await salaRef.once('value');
   const sData = sSnap.val();
   if (!sData) return;
@@ -574,7 +571,7 @@ async function mpShowSalaScreen(salaRef) {
     deleteBtn.onclick = () => mpEliminarSalaFromRoom(salaRef.key);
   }
 
-  // Botão iniciar — só para o host
+  // Botão iniciar — só visível ao host, desabilitado até adversário entrar
   if (initBtn) {
     if (isHost) {
       initBtn.style.display   = 'inline-flex';
@@ -593,9 +590,8 @@ async function mpShowSalaScreen(salaRef) {
     };
   }
 
-  // ── RENDER IMEDIATO dos jogadores já presentes ──────────────
-  // Não espera pelo listener — usa os dados já lidos em sData
-  const renderPlayers = (playersList) => {
+  // ── RENDER IMEDIATO — usa sData já lido (não espera listener) ──
+  const _renderGrid = (playersList) => {
     const myUid  = MP.myUid;
     const sorted = [
       ...playersList.filter(p => p.uid === myUid),
@@ -604,18 +600,24 @@ async function mpShowSalaScreen(salaRef) {
     mpRenderPlayersGrid(sorted, _maxP);
     mpRenderScoreboard(sorted);
   };
-
-  const initialPlayers = sData.players ? Object.values(sData.players) : [];
-  renderPlayers(initialPlayers);
-
-  // Se já há 2 jogadores no snapshot inicial, activar botão imediatamente
-  if (isHost && initBtn && initialPlayers.length >= 2) {
-    const adv  = initialPlayers.find(p => p.uid !== MP.myUid);
-    const nome = adv ? adv.name.split(' ')[0] : 'Adversário';
+  const _activateInitBtn = (playersList) => {
+    if (!isHost || !initBtn) return;
+    const adv  = playersList.find(p => p.uid !== MP.myUid);
+    if (!adv) return;
+    const nome = adv.name.split(' ')[0];
     initBtn.disabled      = false;
     initBtn.style.opacity = '1';
     initBtn.style.cursor  = 'pointer';
     initBtn.innerHTML     = `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>${nome} entrou! Iniciar`;
+    return nome;
+  };
+
+  // Renderizar imediatamente com os dados do snapshot inicial
+  const initialPlayers = Object.values(sData.players || {});
+  _renderGrid(initialPlayers);
+  // Se já há 2 jogadores no snapshot E status é waiting → activar botão já
+  if (initialPlayers.length >= 2 && _status === 'waiting') {
+    _activateInitBtn(initialPlayers);
   }
 
   // ── LISTENER PLAYERS ────────────────────────────────────────
@@ -623,16 +625,16 @@ async function mpShowSalaScreen(salaRef) {
   mpAddListener(salaRef.child('players'), 'value', snap => {
     const players = [];
     snap.forEach(c => players.push(c.val()));
-    renderPlayers(players);
+    _renderGrid(players);
 
-    if (isHost && initBtn && players.length >= 2 && initBtn.disabled) {
-      const adv  = players.find(p => p.uid !== MP.myUid);
-      const nome = adv ? adv.name.split(' ')[0] : 'Adversário';
-      initBtn.disabled      = false;
-      initBtn.style.opacity = '1';
-      initBtn.style.cursor  = 'pointer';
-      initBtn.innerHTML     = `<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>${nome} entrou! Iniciar`;
-      if (!_toastDone) { _toastDone = true; mpShowToast(`${nome} aceitou! Clica em Iniciar para começar.`); }
+    // Activar botão se: sou host, há 2+ jogadores, status ainda é waiting,
+    // e o botão ainda está desabilitado (evita re-activar após re-entrar)
+    if (isHost && initBtn && players.length >= 2 && _status === 'waiting' && initBtn.disabled) {
+      const nome = _activateInitBtn(players);
+      if (nome && !_toastDone) {
+        _toastDone = true;
+        mpShowToast(`${nome} aceitou! Clica em Iniciar para começar.`);
+      }
     }
   });
 
@@ -644,10 +646,8 @@ async function mpShowSalaScreen(salaRef) {
     if (status === 'countdown') mpMostrarContagem(salaRef);
     if (status === 'playing')   mpStartGame();
     if (status === 'finished')  mpShowResults();
-    if (status !== 'waiting') {
-      if (deleteBtn) deleteBtn.style.display = 'none';
-      if (initBtn)   initBtn.style.display   = 'none';
-    }
+    if (deleteBtn && status !== 'waiting') deleteBtn.style.display = 'none';
+    if (initBtn   && status !== 'waiting') initBtn.style.display   = 'none';
   });
 
   // ── SALA ELIMINADA ────────────────────────────────────────────
@@ -817,7 +817,10 @@ async function mpIniciarJogo() {
     startedAt: firebase.database.ServerValue.TIMESTAMP,
   });
 
-  mpEmitirPergunta(0, selected, turnOrder, salaData.modoPerg);
+  // FIX: status listener já chama mpStartGame() para todos os jogadores.
+  // O host agora emite a 1ª pergunta com um pequeno delay para garantir
+  // que o ecrã de jogo já está visível antes do round chegar.
+  setTimeout(() => mpEmitirPergunta(0, selected, turnOrder, salaData.modoPerg), 500);
 }
 
 async function mpEmitirPergunta(index, questions, turnOrder, modoPerg) {
@@ -1590,7 +1593,7 @@ async function mpCarregarPerguntas(salaData) {
     console.error('mpCarregarPerguntas:', e);
   }
 
-  return perguntas.filter(q => {
+  const filtered = perguntas.filter(q => {
     const matchCat  = !cat  || q.cat === cat;
     const matchNiv  = !nivel || nivel === 'todos' || nivel === 'all' || q.nivel === nivel || q.dificuldade === nivel;
     const matchTipo = !tipo || tipo === 'todos' || tipo === 'all'
@@ -1598,6 +1601,15 @@ async function mpCarregarPerguntas(salaData) {
                     || (tipo.startsWith('multipla_img') && (q.tipo === 'multipla' || q.tipo === 'multipla_img') && (q.imageURL || q.questionImg));
     return matchCat && matchNiv && matchTipo;
   });
+
+  // FIX: se os filtros não devolvem perguntas suficientes (< qtd definida),
+  // usar todas as perguntas da disciplina como fallback — o jogo nunca começa vazio
+  const qtdMin = salaData.qtd || 1;
+  if (filtered.length < qtdMin && perguntas.length > 0) {
+    console.warn(`mpCarregarPerguntas: filtros devolveram ${filtered.length} perguntas (precisava ${qtdMin}). A usar fallback com ${perguntas.length} perguntas.`);
+    return perguntas;
+  }
+  return filtered;
 }
 
 // ─── BOTÃO PRINCIPAL + BOTÕES VOLTAR ─────────────────────
