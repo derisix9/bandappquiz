@@ -108,7 +108,8 @@ const MultiplayerSystem = (() => {
         const id = 'mpTab' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1);
         const el = $i(id);
         if (el) el.classList.add('active');
-        if (tab.dataset.tab === 'ranking') loadMpRanking();
+        if (tab.dataset.tab === 'ranking')   loadMpRanking();
+        if (tab.dataset.tab === 'historico') loadMpChallengeHistory();
       };
     });
 
@@ -713,7 +714,7 @@ const MultiplayerSystem = (() => {
     }
   }
 
-  // ── Renderizar Pergunta MP ───────────────────────────────
+  // ── Renderizar Pergunta MP (design idêntico ao jogo normal) ─
   function renderMpQuestion(room) {
     const q = MP.questions[MP.qIndex];
     if (!q) return;
@@ -721,58 +722,140 @@ const MultiplayerSystem = (() => {
     stopMpTimer();
     MP.answered = false;
 
-    const total     = MP.questions.length;
-    const numEl     = $i('mpQNum');
-    const textEl    = $i('mpQText');
-    const answersEl = $i('mpQAnswers');
-    const turnEl    = $i('mpQTurn');
+    const total  = MP.questions.length;
+    const atype  = q.answerType || 'multipla';
 
-    if (numEl)  numEl.textContent = (MP.qIndex + 1) + ' / ' + total;
+    // ── Número da questão + badge de tipo (igual ao jogo normal) ──
+    const numEl = $i('mpQNum');
+    if (numEl) {
+      const typeBadgeMap = {
+        multipla:  { label: 'Múltipla Escolha',   cls: 'type-multipla',  icon: '<path d="M18 7l-1.41-1.41-6.34 6.34-2.83-2.83L6 10.5l4.24 4.24L18 7z"/>' },
+        vf:        { label: 'Verdadeiro/Falso',    cls: 'type-vf',        icon: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>' },
+        lacunas:   { label: 'Preencher Lacuna',    cls: 'type-lacunas',   icon: '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>' },
+        multipla2: { label: 'Múltipla c/ Imagem',  cls: 'type-multipla',  icon: '<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>' },
+        flashcard: { label: 'Flashcard',           cls: 'type-flashcard', icon: '<path d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.51 15.5 0 12.36 0c-1.9 0-3.56.98-4.56 2.44L6.5 4.5 4.18 2.18A2.5 2.5 0 000 4v16a2 2 0 002 2h16l4-4V8a2 2 0 00-2-2zm-9 11l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/>' },
+      };
+      const tb = typeBadgeMap[atype] || typeBadgeMap.multipla;
+      numEl.innerHTML = `Questão ${MP.qIndex + 1}/${total} <span class="qtype-badge ${tb.cls}"><svg viewBox="0 0 24 24">${tb.icon}</svg>${tb.label}</span>`;
+    }
+
+    // ── Texto da questão ──
+    const textEl = $i('mpQText');
     if (textEl) {
-      const atype = q.answerType || 'multipla';
-      if (atype === 'lacunas') {
-        textEl.textContent = q.lacunaFrase || q.question || '';
-      } else if (atype === 'flashcard') {
-        textEl.textContent = q.flashFront || q.question || '';
+      if (atype === 'lacunas' || atype === 'flashcard') {
+        textEl.textContent = '';
       } else {
         textEl.textContent = q.question || '';
       }
     }
-    if (turnEl) {
-      turnEl.textContent = 'Responda!';
-      turnEl.className = 'mp-q-turn my-turn';
-    }
-    if (answersEl) answersEl.innerHTML = '';
 
-    // Imagem da pergunta
-    const qCard      = $i('mpQuestionCard');
-    const existingImg = qCard?.querySelector('.mp-q-image');
+    // ── Indicador de turno ──
+    const turnEl = $i('mpQTurn');
+    if (turnEl) { turnEl.textContent = 'Responda!'; turnEl.className = 'mp-q-turn my-turn'; }
+
+    // ── Limpar área de respostas ──
+    const answersEl = $i('mpQAnswers');
+    if (answersEl) {
+      answersEl.innerHTML = '';
+      answersEl.style.display = '';
+      answersEl.classList.remove('image-mode');
+    }
+
+    // ── Imagem da pergunta ──
+    const qCard = $i('mpQuestionCard');
+    const existingImg = qCard?.querySelector('.mp-q-image, .question-image-wrap');
     if (existingImg) existingImg.remove();
-    const qImg = q.questionImg || q.imgQuestion || (q.answerType === 'multipla2' ? q.img : null);
-    if (qImg && qCard && answersEl) {
-      const img = document.createElement('img');
-      img.className = 'mp-q-image';
-      img.src = qImg;
-      img.alt = 'Imagem da pergunta';
-      img.style.cssText = 'width:100%;border-radius:10px;margin-bottom:10px;max-height:200px;object-fit:contain';
-      qCard.insertBefore(img, answersEl);
+
+    // ── Lacunas: ocultar área normal, mostrar área de lacunas ──
+    let mpLacunasArea = $i('mpLacunasArea');
+    if (!mpLacunasArea) {
+      // Criar a área de lacunas se não existir
+      mpLacunasArea = document.createElement('div');
+      mpLacunasArea.id = 'mpLacunasArea';
+      mpLacunasArea.className = 'lacunas-area';
+      mpLacunasArea.style.display = 'none';
+      mpLacunasArea.innerHTML = `
+        <div class="lacunas-question" id="mpLacunasQuestion"></div>
+        <div class="lacunas-input-wrap">
+          <input type="text" class="lacunas-input" id="mpLacunasInput"
+            placeholder="Escreva aqui..." autocomplete="off" autocorrect="off" spellcheck="false">
+          <button class="btn-lacunas-check" id="mpLacunasCheckBtn">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          </button>
+        </div>
+        <div class="lacunas-feedback" id="mpLacunasFeedback"></div>`;
+      if (qCard && answersEl) qCard.insertBefore(mpLacunasArea, answersEl);
     }
 
-    const atype = q.answerType || 'multipla';
+    // ── Flashcard: área ──
+    let mpFcArea = $i('mpFlashcardArea');
+    if (!mpFcArea) {
+      mpFcArea = document.createElement('div');
+      mpFcArea.id = 'mpFlashcardArea';
+      mpFcArea.className = 'flashcard-area';
+      mpFcArea.style.display = 'none';
+      mpFcArea.innerHTML = `
+        <div class="flashcard-container">
+          <div class="flashcard" id="mpFlashcard">
+            <div class="flashcard-front">
+              <div class="flashcard-label">FRENTE</div>
+              <div class="flashcard-front-text" id="mpFcFront"></div>
+              <div class="flashcard-tap-hint">Toque para ver a resposta</div>
+            </div>
+            <div class="flashcard-back">
+              <div class="flashcard-label">VERSO</div>
+              <div class="flashcard-back-text" id="mpFcBack"></div>
+            </div>
+          </div>
+        </div>
+        <div class="flashcard-actions" id="mpFcActions" style="display:none">
+          <button class="fc-btn fc-btn-wrong" data-res="wrong">
+            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            Não sabia
+          </button>
+          <button class="fc-btn fc-btn-hard" data-res="hard">
+            <svg viewBox="0 0 24 24"><path d="M11.5 2C6.81 2 3 5.81 3 10.5S6.81 19 11.5 19h.5v3c4.86-2.34 8-7 8-11.5C20 5.81 16.19 2 11.5 2zm1 14.5h-2v-2h2v2zm0-4h-2c0-3.25 3-3 3-5 0-1.1-.9-2-2-2s-2 .9-2 2h-2c0-2.21 1.79-4 4-4s4 1.79 4 4c0 2.5-3 2.75-3 5z"/></svg>
+            Difícil
+          </button>
+          <button class="fc-btn fc-btn-good" data-res="good">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            Sabia!
+          </button>
+        </div>`;
+      if (qCard && answersEl) qCard.insertBefore(mpFcArea, answersEl);
+    }
+
+    // Esconder áreas especiais por defeito
+    mpLacunasArea.style.display = 'none';
+    mpFcArea.style.display      = 'none';
+    if (answersEl) answersEl.style.display = '';
+
+    // Imagem da pergunta (reutiliza classes do jogo normal)
+    const qImg = q.questionImg || q.imgQuestion || (atype === 'multipla2' ? q.img : null);
+    if (qImg && qCard && answersEl) {
+      const wrap = document.createElement('div');
+      wrap.className = 'question-image-wrap mp-q-image';
+      wrap.innerHTML = `<img class="question-image" src="${escHtml(qImg)}" alt="Imagem da pergunta">`;
+      qCard.insertBefore(wrap, mpLacunasArea);
+    }
+
+    // ── Despachar para o tipo correcto ──
     if (atype === 'lacunas') {
+      if (answersEl) answersEl.style.display = 'none';
       _renderMpLacuna(q);
     } else if (atype === 'flashcard') {
+      if (answersEl) answersEl.style.display = 'none';
       _renderMpFlashcard(q);
     } else {
       _renderMpMultipla(q, answersEl);
     }
 
-    // Timer
+    // ── Timer ──
     const timerSecs = MP.config.timerSecs || 0;
     const timerEl   = $i('mpSalaTimer');
     if (timerSecs > 0) {
       startMpTimer(timerSecs);
-      if (timerEl) { timerEl.textContent = timerSecs + 's'; timerEl.style.color = ''; }
+      if (timerEl) { timerEl.textContent = timerSecs + 's'; timerEl.style.color = ''; timerEl.classList.remove('urgent'); }
     } else {
       if (timerEl) timerEl.textContent = 'Livre';
     }
@@ -783,127 +866,149 @@ const MultiplayerSystem = (() => {
     const atype = q.answerType || 'multipla';
     const isVF  = atype === 'vf';
 
-    let options;
+    // Construir opções (igual ao jogo normal: shuffle + optionMap)
+    let originalOpts;
     if (isVF) {
-      options = [
-        { letter: 'A', text: 'Verdadeiro' },
-        { letter: 'B', text: 'Falso' },
+      originalOpts = [
+        { letter: 'A', text: q.a || 'Verdadeiro', img: null },
+        { letter: 'B', text: q.b || 'Falso',      img: null },
       ];
     } else {
-      options = ['A','B','C','D']
-        .map(l => ({ letter: l, text: q[l.toLowerCase()] || '' }))
-        .filter(o => o.text);
-      options = shuffle(options);
+      originalOpts = ['A','B','C','D'].map(letter => {
+        const raw  = q[letter.toLowerCase()];
+        const img  = (typeof raw === 'string' && raw.startsWith('data:image')) ? raw : (q['img' + letter] || null);
+        const text = (typeof raw === 'string' && raw.startsWith('data:image')) ? '' : (raw || '');
+        return { letter, text, img };
+      }).filter(o => o.img || o.text);
     }
 
-    const isImg2 = atype === 'multipla2';
-    if (isImg2) container.classList.add('image-mode');
-    else        container.classList.remove('image-mode');
+    const hasImages = originalOpts.some(o => o.img);
+    const isImg2    = atype === 'multipla2';
 
-    const displayLabels = ['A','B','C','D'];
+    const shuffledOpts   = isVF ? originalOpts : shuffle(originalOpts);
+    const displayLetters = ['A','B','C','D'];
+    const optionMap      = {};
+    shuffledOpts.forEach((opt, i) => { if (i < displayLetters.length) optionMap[displayLetters[i]] = opt; });
 
-    options.forEach((opt, idx) => {
+    if (hasImages || isImg2) container.classList.add('image-mode');
+    else container.classList.remove('image-mode');
+
+    displayLetters.forEach(displayLetter => {
+      const mappedOpt = optionMap[displayLetter];
+      if (!mappedOpt) return;
       const btn = document.createElement('button');
-      btn.className = 'mp-q-answer';
-      btn.dataset.letter = opt.letter;
 
-      if (isImg2) {
-        const imgSrc = q['img' + opt.letter] || '';
-        btn.innerHTML = imgSrc
-          ? `<img src="${escHtml(imgSrc)}" alt="${escHtml(opt.letter)}" class="mp-ans-img" style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;margin-bottom:4px"><span>${escHtml(opt.letter)}</span>`
-          : `<span>${escHtml(opt.text)}</span>`;
+      if (hasImages || isImg2) {
+        btn.className = 'option-btn image-option';
+        btn.dataset.displayLetter  = displayLetter;
+        btn.dataset.originalLetter = mappedOpt.letter;
+        btn.dataset.optionText     = mappedOpt.text || '';
+        if (mappedOpt.img) {
+          btn.innerHTML = `<div class="option-badge">${displayLetter}</div><img class="option-img" src="${escHtml(mappedOpt.img)}" alt="Opção ${displayLetter}">`;
+        } else {
+          btn.innerHTML = `<div class="option-badge">${displayLetter}</div><span class="option-text">${escHtml(mappedOpt.text)}</span>`;
+        }
       } else {
-        btn.innerHTML = `<span class="mp-ans-letter">${displayLabels[idx]}</span><span class="mp-ans-text">${escHtml(opt.text)}</span>`;
+        btn.className = 'option-btn';
+        btn.dataset.displayLetter  = displayLetter;
+        btn.dataset.originalLetter = mappedOpt.letter;
+        btn.dataset.optionText     = mappedOpt.text || '';
+        btn.innerHTML = `<div class="option-badge">${displayLetter}</div><span class="option-text">${escHtml(mappedOpt.text)}</span>`;
       }
 
-      btn.onclick = () => handleMpAnswer(opt.letter, q, btn, container);
+      btn.onclick = () => handleMpAnswer(displayLetter, q, btn, container, null, optionMap);
       container.appendChild(btn);
     });
   }
 
   function _renderMpLacuna(q) {
-    const answersEl = $i('mpQAnswers');
-    if (!answersEl) return;
-    const resposta = q.lacunaResposta || q.lacunaAnswer || q.a || '';
-    answersEl.innerHTML = `
-      <div class="mp-lacuna-wrap">
-        <input type="text" class="mp-lacuna-input" id="mpLacunaInput"
-          placeholder="Escreva a resposta..." autocomplete="off" autocorrect="off" spellcheck="false">
-        <button class="btn-mp-action" id="mpLacunaCheck" style="margin-top:8px;width:100%">
-          <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px">
-            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-          </svg>
-          Confirmar
-        </button>
-        <div id="mpLacunaFeedback" class="mp-lacuna-feedback" style="display:none"></div>
-      </div>`;
-    const checkBtn = $i('mpLacunaCheck');
-    const input    = $i('mpLacunaInput');
-    const feedback = $i('mpLacunaFeedback');
+    const la = $i('mpLacunasArea');
+    if (!la) return;
+    la.style.display = 'flex';
 
-    if (checkBtn) checkBtn.onclick = () => {
-      const val     = input?.value?.trim() || '';
-      const isRight = val.toLowerCase() === resposta.toLowerCase();
+    const resposta  = q.lacunaResposta || q.lacunaAnswer || q.a || '';
+    const frase     = q.lacunaFrase || q.question || '';
+    const parts     = frase.split('___');
+    const lqEl      = $i('mpLacunasQuestion');
+    const input     = $i('mpLacunasInput');
+    const checkBtn  = $i('mpLacunasCheckBtn');
+    const feedback  = $i('mpLacunasFeedback');
+
+    if (lqEl) {
+      lqEl.innerHTML = '';
+      parts.forEach((part, i) => {
+        lqEl.appendChild(document.createTextNode(part));
+        if (i < parts.length - 1) {
+          const blank = document.createElement('span');
+          blank.className = 'blank'; blank.id = 'mpLacunaBlank'; blank.textContent = '___';
+          lqEl.appendChild(blank);
+        }
+      });
+    }
+    if (feedback) { feedback.className = 'lacunas-feedback'; feedback.textContent = ''; }
+    if (input)    { input.value = ''; input.className = 'lacunas-input'; input.disabled = false; setTimeout(() => input.focus(), 100); }
+    if (checkBtn) { checkBtn.disabled = false; }
+
+    const doCheck = () => {
+      if (MP.answered) return;
+      const userAns    = input?.value?.trim() || '';
+      const norm       = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+      const isRight    = norm(userAns) === norm(resposta);
+      if (input)    { input.disabled = true; input.classList.add(isRight ? 'correct' : 'wrong'); }
+      if (checkBtn) { checkBtn.disabled = true; }
+      const blank = document.getElementById('mpLacunaBlank');
+      if (blank)    { blank.textContent = resposta; blank.classList.add(isRight ? 'filled-correct' : 'filled-wrong'); }
       if (feedback) {
-        feedback.style.display = '';
-        feedback.textContent   = isRight ? 'Correcto!' : ('Resposta correcta: ' + resposta);
-        feedback.style.color   = isRight ? '#22C55E' : '#EF4444';
+        feedback.classList.add('show');
+        feedback.className = 'lacunas-feedback show ' + (isRight ? 'correct-fb' : 'wrong-fb');
+        feedback.textContent = isRight ? ('✓ Correcto! ' + resposta) : ('✗ Errado! A resposta era: ' + resposta);
       }
-      if (input)    input.disabled    = true;
-      if (checkBtn) checkBtn.disabled = true;
-      handleMpAnswer(val, q, null, answersEl, isRight);
+      handleMpAnswer(userAns, q, null, null, isRight);
     };
-    if (input) input.addEventListener('keypress', e => {
-      if (e.key === 'Enter') checkBtn?.click();
-    });
+
+    if (checkBtn) checkBtn.onclick = doCheck;
+    if (input)    input.onkeydown  = e => { if (e.key === 'Enter' && !MP.answered) doCheck(); };
   }
 
   function _renderMpFlashcard(q) {
-    const answersEl = $i('mpQAnswers');
-    if (!answersEl) return;
-    const front = q.flashFront || q.question || '';
-    const back  = q.flashBack  || q.a || '';
-    answersEl.innerHTML = `
-      <div class="mp-flashcard-wrap">
-        <div class="mp-flashcard" id="mpFlashcard">
-          <div class="mp-fc-front">${escHtml(front)}</div>
-          <div class="mp-fc-back">${escHtml(back)}</div>
-        </div>
-        <p class="mp-fc-hint">Toque para virar</p>
-        <div class="mp-fc-actions" id="mpFcActions" style="display:none">
-          <button class="mp-fc-btn mp-fc-wrong" data-res="wrong">
-            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-            Não sabia
-          </button>
-          <button class="mp-fc-btn mp-fc-hard" data-res="hard">
-            <svg viewBox="0 0 24 24"><path d="M11.5 2C6.81 2 3 5.81 3 10.5S6.81 19 11.5 19h.5v3c4.86-2.34 8-7 8-11.5C20 5.81 16.19 2 11.5 2zm1 14.5h-2v-2h2v2zm0-4h-2c0-3.25 3-3 3-5 0-1.1-.9-2-2-2s-2 .9-2 2h-2c0-2.21 1.79-4 4-4s4 1.79 4 4c0 2.5-3 2.75-3 5z"/></svg>
-            Difícil
-          </button>
-          <button class="mp-fc-btn mp-fc-good" data-res="good">
-            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-            Sabia!
-          </button>
-        </div>
-      </div>`;
-    const fc = $i('mpFlashcard');
+    const fcArea = $i('mpFlashcardArea');
+    if (!fcArea) return;
+    fcArea.style.display = 'flex';
+
+    const fc      = $i('mpFlashcard');
+    const actions = $i('mpFcActions');
+    if (fc) {
+      fc.classList.remove('flipped');
+      const hint = fc.querySelector('.flashcard-tap-hint');
+      if (hint) hint.style.display = '';
+    }
+    const frontEl = $i('mpFcFront');
+    const backEl  = $i('mpFcBack');
+    if (frontEl) frontEl.textContent = q.flashFront || q.question || '';
+    if (backEl)  backEl.textContent  = q.flashBack  || q.a || '';
+    if (actions) actions.style.display = 'none';
+
     if (fc) fc.onclick = () => {
-      fc.classList.toggle('flipped');
-      const hint = answersEl.querySelector('.mp-fc-hint');
-      if (hint) hint.style.display = 'none';
-      const acts = $i('mpFcActions');
-      if (acts) acts.style.display = 'flex';
+      if (!fc.classList.contains('flipped')) {
+        fc.classList.add('flipped');
+        const hint = fc.querySelector('.flashcard-tap-hint');
+        if (hint) hint.style.display = 'none';
+        setTimeout(() => { if (actions) actions.style.display = 'flex'; }, 300);
+      }
     };
-    answersEl.querySelectorAll('.mp-fc-btn').forEach(btn => {
+
+    // Bind buttons
+    fcArea.querySelectorAll('.fc-btn').forEach(btn => {
       btn.onclick = () => {
         const res     = btn.dataset.res;
         const isRight = res === 'good' || res === 'hard';
-        handleMpAnswer(res, q, null, answersEl, isRight);
+        handleMpAnswer(res, q, null, null, isRight);
       };
     });
   }
 
   // ── Resposta MP ──────────────────────────────────────────
-  async function handleMpAnswer(value, q, clickedBtn, container, forcedRight) {
+  async function handleMpAnswer(value, q, clickedBtn, container, forcedRight, optionMap) {
     if (MP.answered) return;
     MP.answered = true;
     stopMpTimer();
@@ -917,19 +1022,40 @@ const MultiplayerSystem = (() => {
     if (typeof forcedRight === 'boolean') {
       isRight = forcedRight;
     } else {
-      const correctLetter = q.answer;
-      const correctText   = q[correctLetter?.toLowerCase()] || '';
-      isRight = value === correctLetter ||
-                (value && correctText && value.trim().toLowerCase() === correctText.trim().toLowerCase());
+      const correctLetter  = q.answer;
+      const correctText    = q[correctLetter?.toLowerCase()] || '';
+      // value pode ser displayLetter (mapeado) ou texto directamente
+      const selectedOpt    = optionMap ? optionMap[value] : null;
+      const selectedOrigLetter = selectedOpt ? selectedOpt.letter : value;
+      const selectedText   = selectedOpt ? (selectedOpt.text || '') : '';
+      isRight = selectedOrigLetter === correctLetter ||
+                (!!(selectedText && correctText) && selectedText.trim().toLowerCase() === correctText.trim().toLowerCase());
     }
 
-    // Marcar visual
-    if (container && atype !== 'lacunas' && atype !== 'flashcard') {
-      container.querySelectorAll('.mp-q-answer').forEach(b => {
+    // ── Marcar visual com as mesmas classes do jogo normal (option-btn) ──
+    const answersEl = $i('mpQAnswers');
+    if (answersEl && atype !== 'lacunas' && atype !== 'flashcard') {
+      const correctOriginalLetter = q.answer;
+      const correctOriginalText   = q[correctOriginalLetter?.toLowerCase()] || '';
+
+      // Encontrar o displayLetter que corresponde à resposta correcta
+      let correctDisplayLetter = null;
+      answersEl.querySelectorAll('.option-btn').forEach(b => {
+        const bOrigLetter = b.dataset.originalLetter;
+        const bText       = b.dataset.optionText || '';
+        const isCorrectBtn = bOrigLetter === correctOriginalLetter ||
+          (!!(correctOriginalText && bText) && bText.trim().toLowerCase() === correctOriginalText.trim().toLowerCase());
+        if (isCorrectBtn) correctDisplayLetter = b.dataset.displayLetter;
+      });
+
+      answersEl.querySelectorAll('.option-btn').forEach(b => {
         b.disabled = true;
-        const bLetter = b.dataset.letter;
-        if (bLetter === q.answer) b.classList.add('correct');
-        else if (b === clickedBtn && !isRight) b.classList.add('wrong');
+        const dl = b.dataset.displayLetter;
+        if (dl === correctDisplayLetter) {
+          b.classList.add('correct');
+        } else if (b === clickedBtn && !isRight) {
+          b.classList.add('wrong');
+        }
       });
     }
 
@@ -1019,7 +1145,18 @@ const MultiplayerSystem = (() => {
         stopMpTimer();
         if (!MP.answered) {
           const q = MP.questions[MP.qIndex];
-          if (q) handleMpAnswer('', q, null, $i('mpQAnswers'), false);
+          if (q) {
+            // Mostrar resposta correcta visualmente (classes do jogo normal)
+            const answersEl = $i('mpQAnswers');
+            if (answersEl) {
+              answersEl.querySelectorAll('.option-btn').forEach(b => {
+                b.disabled = true;
+                if (b.dataset.originalLetter === q.answer) b.classList.add('correct');
+              });
+            }
+            if (typeof showToast === 'function') showToast('Tempo esgotado! A resposta era ' + (q[q.answer?.toLowerCase()] || q.answer || '—') + '.');
+            handleMpAnswer('', q, null, null, false);
+          }
         }
       }
     }, 1000);
@@ -1106,52 +1243,138 @@ const MultiplayerSystem = (() => {
     _renderHistory(room);
   }
 
-  // ── Histórico de Perguntas (pós-jogo) ────────────────────
+  // ── Histórico de Perguntas (pós-jogo) — para todos os jogadores ──
   function _renderHistory(room) {
     const el = $i('mpSalaHistory');
     if (!el) return;
 
     const questions = room.questions || MP.questions;
     const answers   = room.answers   || {};
-    const myUid     = MP.myUid;
+    const players   = room.players   || {};
+    const sorted    = Object.entries(players)
+      .map(([uid, p]) => ({ uid, name: p.name || 'Jogador' }))
+      .sort((a, b) => (players[b.uid]?.score || 0) - (players[a.uid]?.score || 0));
 
     if (!questions.length) { el.innerHTML = ''; return; }
 
-    const myAnswers = answers[myUid] || {};
+    // Cabeçalho com jogadores (todas as colunas)
+    const playerCols = sorted.map(p => `<th style="padding:4px 6px;font-size:0.65rem;color:var(--text3);text-align:center;white-space:nowrap;max-width:60px;overflow:hidden;text-overflow:ellipsis" title="${escHtml(p.name)}">${escHtml(p.name.split(' ')[0])}${p.uid === MP.myUid ? ' ★' : ''}</th>`).join('');
+
     const rows = questions.map((q, idx) => {
-      const myAns  = myAnswers[idx];
-      const isRight = myAns?.isRight;
-      const icon = myAns
-        ? (isRight
-            ? '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#22C55E;flex-shrink:0"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
-            : '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#EF4444;flex-shrink:0"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>')
-        : '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:var(--text3);flex-shrink:0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
-      const correctAns = q[q.answer?.toLowerCase()] || q.lacunaResposta || q.flashBack || '—';
-      return `
-        <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
-          ${icon}
-          <div style="flex:1;min-width:0">
-            <div style="font-size:0.78rem;color:var(--text);font-weight:600;margin-bottom:2px">${idx+1}. ${escHtml((q.question || q.flashFront || '').slice(0, 80))}${(q.question || '').length > 80 ? '…' : ''}</div>
-            <div style="font-size:0.7rem;color:var(--text3)">Correcto: <span style="color:var(--text2)">${escHtml(correctAns.slice(0,60))}</span></div>
-          </div>
-        </div>`;
+      const correctAns = q[q.answer?.toLowerCase()] || q.lacunaResposta || q.flashBack || q.answer || '—';
+      const qText = (q.question || q.flashFront || q.lacunaFrase || '').slice(0, 70);
+
+      const playerCells = sorted.map(p => {
+        const ans = (answers[p.uid] || {})[idx];
+        if (!ans) return `<td style="padding:4px 6px;text-align:center"><span style="color:var(--text3);font-size:0.7rem">—</span></td>`;
+        return ans.isRight
+          ? `<td style="padding:4px 6px;text-align:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:#22C55E"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></td>`
+          : `<td style="padding:4px 6px;text-align:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:#EF4444"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></td>`;
+      }).join('');
+
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+        <td style="padding:5px 6px;font-size:0.7rem;color:var(--text3);font-weight:700;white-space:nowrap">${idx+1}</td>
+        <td style="padding:5px 6px;font-size:0.72rem;color:var(--text);max-width:140px">
+          <div style="font-weight:600;margin-bottom:2px">${escHtml(qText)}${qText.length >= 70 ? '…' : ''}</div>
+          <div style="font-size:0.67rem;color:var(--text3)">✓ ${escHtml(correctAns.slice(0,40))}</div>
+        </td>
+        ${playerCells}
+      </tr>`;
     }).join('');
 
     el.innerHTML = `
       <div style="margin-top:16px">
-        <div class="mp-section-title" style="font-size:0.75rem;margin-bottom:8px">
-          <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px">
+        <div class="mp-section-title" style="font-size:0.75rem;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0">
             <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
           </svg>
-          Revisão de Perguntas
+          Revisão de Perguntas — Todos os Jogadores
         </div>
-        ${rows}
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;min-width:280px">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(99,102,241,0.2)">
+                <th style="padding:4px 6px;text-align:left;font-size:0.65rem;color:var(--text3)">#</th>
+                <th style="padding:4px 6px;text-align:left;font-size:0.65rem;color:var(--text3)">Pergunta / Resposta</th>
+                ${playerCols}
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
       </div>`;
   }
 
   function _clearHistory() {
     const el = $i('mpSalaHistory');
     if (el) el.innerHTML = '';
+  }
+
+  // ── Histórico Global de Desafios ─────────────────────────
+  async function loadMpChallengeHistory() {
+    const uid = _auth.currentUser?.uid;
+    if (!uid) return;
+    const el = $i('mpHistoricoList');
+    if (!el) return;
+
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:0.85rem">A carregar histórico...</div>';
+
+    try {
+      const snap = await _db.ref('users/' + uid + '/mpHistory')
+        .orderByChild('ts').limitToLast(30).once('value');
+      const data = snap.val();
+
+      if (!data) {
+        el.innerHTML = `<div class="mp-empty-state" style="padding:24px 0">
+          <svg viewBox="0 0 24 24" style="width:36px;height:36px;fill:var(--text3)"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6c0-3.86 3.13-7 7-7s7 3.14 7 7-3.14 7-7 7a6.97 6.97 0 01-4.9-2.02L6.69 18.4A8.97 8.97 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+          <p>Ainda sem desafios concluídos</p>
+        </div>`;
+        return;
+      }
+
+      const entries = Object.values(data).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+      const modeNames = { aprendizado: 'Aprendizado', concurso: 'Concurso', prova: 'Prova', imagem: 'Imagem' };
+
+      const rankEmojis = ['🥇', '🥈', '🥉'];
+      el.innerHTML = entries.map(e => {
+        const date = e.ts ? new Date(e.ts).toLocaleDateString('pt-AO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+        const rankLabel = e.myRank <= 3 ? (rankEmojis[e.myRank - 1] + ' ' + e.myRank + 'º lugar') : (e.myRank + 'º lugar');
+        const starsHtml = Array.from({ length: 5 }, (_, i) =>
+          `<svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:${i < (e.starsEarned || 0) ? 'var(--gold)' : 'rgba(255,255,255,0.15)'}"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`
+        ).join('');
+        const pct = e.myCorrect != null && (e.myCorrect + e.myWrong) > 0
+          ? Math.round((e.myCorrect / (e.myCorrect + e.myWrong)) * 100)
+          : null;
+
+        return `
+          <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px">
+              <div>
+                <div style="font-size:0.78rem;font-weight:700;color:var(--text)">${escHtml(modeNames[e.mode] || e.mode || '—')} · Sala #${escHtml(e.roomId || '—')}</div>
+                <div style="font-size:0.68rem;color:var(--text3);margin-top:2px">${escHtml(date)} · ${e.totalPlayers || '?'} jogadores</div>
+              </div>
+              <div style="font-size:1rem;font-weight:800;color:var(--gold);font-family:var(--font-display);white-space:nowrap">${typeof formatScore === 'function' ? formatScore(e.myScore || 0) : ((e.myScore || 0)/10).toFixed(1)} val</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <div style="display:flex;gap:3px;align-items:center">
+                ${starsHtml}
+                <span style="font-size:0.68rem;color:var(--gold);margin-left:3px;font-weight:700">+${e.starsEarned || 0}★</span>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center">
+                <span style="font-size:0.72rem;color:#22C55E;font-weight:700">${e.myCorrect || 0}✓</span>
+                <span style="font-size:0.72rem;color:#EF4444;font-weight:700">${e.myWrong || 0}✗</span>
+                ${pct != null ? `<span style="font-size:0.72rem;color:var(--text2);font-weight:600">${pct}%</span>` : ''}
+              </div>
+              <span style="font-size:0.72rem;font-weight:700;color:var(--indigo)">${rankLabel}</span>
+            </div>
+            ${e.winner ? `<div style="margin-top:6px;font-size:0.67rem;color:var(--text3)">Vencedor: <span style="color:var(--text2);font-weight:600">${escHtml(e.winner)}</span></div>` : ''}
+          </div>`;
+      }).join('');
+
+    } catch (err) {
+      el.innerHTML = '<p style="text-align:center;color:var(--text3);font-size:0.82rem;padding:16px">Erro ao carregar histórico</p>';
+      console.warn('loadMpChallengeHistory error:', err);
+    }
   }
 
   // ── Actualizar Estatísticas após Jogo ────────────────────
@@ -1168,6 +1391,7 @@ const MultiplayerSystem = (() => {
     const isWinner  = myRank === 1;
     const starsEarned = Math.max(0, 4 - myRank); // 1º=3, 2º=2, 3º=1, restantes=0
 
+    // ── Firebase stats ───────────────────────────────────────
     try {
       await _db.ref('users/' + uid + '/stats').transaction(stats => {
         if (!stats) stats = {};
@@ -1181,7 +1405,75 @@ const MultiplayerSystem = (() => {
         return stats;
       });
     } catch (e) {
-      console.warn('updateMpStatsAfterGame error:', e);
+      console.warn('updateMpStatsAfterGame Firebase error:', e);
+    }
+
+    // ── localStorage stats (para perfil e configurações) ─────
+    try {
+      const LS_get = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+      const LS_set = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} };
+      const statsKey = 'eq_stats_' + uid;
+      const ls = LS_get(statsKey) || { games: 0, best: 0, stars: 0 };
+      ls.games  = (ls.games  || 0) + 1;
+      ls.stars  = (ls.stars  || 0) + starsEarned;
+      ls.mpGames= (ls.mpGames|| 0) + 1;
+      ls.mpWins = (ls.mpWins || 0) + (isWinner ? 1 : 0);
+      if ((myData.score || 0) > (ls.best || 0)) ls.best = myData.score || 0;
+      LS_set(statsKey, ls);
+    } catch (e) {
+      console.warn('updateMpStatsAfterGame localStorage error:', e);
+    }
+
+    // ── Guardar histórico do desafio no Firebase (visível a todos) ──
+    try {
+      const histEntry = {
+        roomId:    MP.roomId,
+        ts:        Date.now(),
+        mode:      MP.config.mode || 'aprendizado',
+        disc:      MP.config.disc || 'all',
+        qtdQs:     (room.questions || MP.questions).length,
+        players:   Object.entries(players).map(([pUid, p]) => ({
+          uid:     pUid,
+          name:    p.name || 'Jogador',
+          score:   p.score || 0,
+          correct: p.correct || 0,
+          wrong:   p.wrong   || 0,
+          rank:    sorted.findIndex(s => s === p) + 1,
+        })),
+        answers:   room.answers || {},
+        questions: (room.questions || MP.questions).map(q => ({
+          question: q.question || q.flashFront || q.lacunaFrase || '',
+          answer:   q[q.answer?.toLowerCase()] || q.lacunaResposta || q.flashBack || q.answer || '',
+          answerType: q.answerType || 'multipla',
+        })),
+        starsEarned,
+        myRank,
+        winner: sorted[0]?.name || '',
+      };
+      // Guardar em /roomHistory/{roomId} (acessível a todos os jogadores)
+      await _db.ref('roomHistory/' + MP.roomId).set(histEntry).catch(() => {});
+      // E no perfil de cada jogador participante
+      for (const [pUid] of Object.entries(players)) {
+        await _db.ref('users/' + pUid + '/mpHistory/' + MP.roomId).set({
+          ts:         histEntry.ts,
+          roomId:     MP.roomId,
+          mode:       histEntry.mode,
+          myScore:    (players[pUid]?.score || 0),
+          myCorrect:  (players[pUid]?.correct || 0),
+          myWrong:    (players[pUid]?.wrong || 0),
+          myRank:     sorted.findIndex(s => s === players[pUid]) + 1,
+          totalPlayers: sorted.length,
+          winner:     histEntry.winner,
+          starsEarned: Math.max(0, 4 - (sorted.findIndex(s => s === players[pUid]) + 1)),
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('updateMpStatsAfterGame history error:', e);
+    }
+
+    // ── Actualizar UI de perfil se disponível ─────────────────
+    if (typeof updateProfileUI === 'function') {
+      try { updateProfileUI(); } catch(e) {}
     }
   }
 
