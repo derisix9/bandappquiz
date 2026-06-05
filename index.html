@@ -1795,135 +1795,238 @@
 
   <!-- Tab Navigation -->
   <div class="mp-tabs">
-    <button class="mp-tab active" data-tab="desafios"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M6.92 5H5L3 3l1-1 2 2v-.08l7 7-.71.71L6.92 5zM19.71 2.29l-2 2 .01.01-1.42 1.42-.01-.01-2.12 2.12.01.01-1.42 1.42-.01-.01-1.06 1.06 3.54 3.54 1.06-1.06-.01-.01 1.42-1.42.01.01 2.12-2.12-.01-.01 1.42-1.42.01.01 2-2L21 3l-1.29-.71zM3 17c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>Desafios</button>
-    <button class="mp-tab" data-tab="historico"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>Histórico</button>
+    <button class="mp-tab active" data-tab="salas"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>Salas</button>
+    <button class="mp-tab" data-tab="desafios"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M6.92 5H5L3 3l1-1 2 2v-.08l7 7-.71.71L6.92 5zM19.71 2.29l-2 2 .01.01-1.42 1.42-.01-.01-2.12 2.12.01.01-1.42 1.42-.01-.01-1.06 1.06 3.54 3.54 1.06-1.06-.01-.01 1.42-1.42.01.01 2.12-2.12-.01-.01 1.42-1.42.01.01 2-2L21 3l-1.29-.71zM3 17c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>Desafios</button>
     <button class="mp-tab" data-tab="ranking"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg>Ranking</button>
-    <button class="mp-tab" data-tab="novoDesafio"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Novo Desafio</button>
+    <button class="mp-tab" data-tab="buscar"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>Buscar</button>
   </div>
 
   <div class="scroll-content mp-scroll">
 
-    <!-- TAB: DESAFIOS — id aliás para o novo multiplayer.js -->
-    <div class="mp-tab-content active" id="mp-panel-desafios">
+    <!-- TAB: SALAS ACTIVAS -->
+    <div class="mp-tab-content active" id="mpTabSalas">
+      <div class="mp-section-title">Salas em jogo agora</div>
+      <div id="mpSalasList" class="mp-salas-list">
+        <div class="mp-empty-state">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+          <p>Nenhuma sala activa de momento</p>
+          <button class="btn-mp-action" id="btnCriarSala">Criar Sala</button>
+        </div>
+      </div>
+    </div>
 
-      <!-- Notificações de desafios recebidos -->
+    <!-- TAB: DESAFIOS -->
+    <div class="mp-tab-content" id="mpTabDesafios">
+
+      <!-- Desafios Recebidos -->
       <div class="mp-section-title" style="margin-top:0">
-        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--gold,#F59E0B);vertical-align:middle;margin-right:6px"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--gold)"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 11.5v-3h-4v3H9v-3H7v-1.5h2v-3h2v3h4v-3h2v3h2v1.5h-2v3h-2z"/></svg>
         Desafios Recebidos
       </div>
-      <!-- id=mp-desafios-lista é o que o novo JS procura -->
-      <div id="mp-desafios-lista" class="mp-desafios-list">
+      <div id="mpDesafiosRecebidos" class="mp-desafios-list">
         <p class="mp-sub-empty">Sem desafios pendentes</p>
       </div>
-    </div>
 
-    <!-- TAB: HISTÓRICO -->
-    <div class="mp-tab-content" id="mp-panel-historico">
-      <div class="mp-section-title" style="margin-top:0">
-        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
-        Histórico de Jogos
-      </div>
-      <!-- id=mp-historico-lista é o que o novo JS procura -->
-      <div id="mp-historico-lista" class="mp-hist-list">
-        <div class="mp-empty">A carregar histórico...</div>
-      </div>
-    </div>
-
-    <!-- TAB: RANKING -->
-    <div class="mp-tab-content" id="mp-panel-ranking">
-      <div class="mp-section-title" style="margin-top:0">
-        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--gold,#F59E0B);vertical-align:middle;margin-right:6px"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg>
-        Ranking Global — Estrelas
-      </div>
-      <!-- id=mp-ranking-lista é o que o novo JS procura -->
-      <div id="mp-ranking-lista" class="mp-ranking-list">
-        <div class="mp-loading-rank">A carregar ranking...</div>
-      </div>
-    </div>
-
-    <!-- TAB: NOVO DESAFIO -->
-    <div class="mp-tab-content" id="mp-panel-novoDesafio">
-      <div class="mp-section-title" style="margin-top:0">
-        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--primary,#6366F1);vertical-align:middle;margin-right:6px"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      <!-- Enviar Desafio -->
+      <div class="mp-section-title">
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--blue)"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         Enviar Desafio
       </div>
       <div class="mp-challenge-form">
-
-        <!-- Pesquisar jogador -->
+        <!-- Jogador alvo -->
         <div class="mp-form-row">
-          <label>Pesquisar Jogador</label>
-          <div class="mp-search-box" style="display:flex;gap:8px">
-            <input type="text" id="mpCfgSearch" placeholder="Nome ou email..." style="flex:1" />
-            <button id="mpCfgSearchBtn" class="mp-btn-secondary" style="white-space:nowrap">
-              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <label>Jogador alvo</label>
+          <div class="mp-search-box">
+            <input type="text" id="mpDesafioTarget" placeholder="Nome, email ou telefone..." />
+            <button id="mpBuscarJogador">
+              <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
             </button>
           </div>
-          <div id="mpCfgSearchRes" style="margin-top:8px"></div>
-          <input type="hidden" id="mpCfgTargetUid">
-          <input type="hidden" id="mpCfgTargetName">
+          <div id="mpSearchResults" class="mp-search-results"></div>
         </div>
 
-        <!-- Nº de Jogadores -->
+        <!-- Modo do Jogo (novo) -->
         <div class="mp-form-row">
-          <label>Nº Máx. Jogadores</label>
-          <select id="mpCfgMaxP" class="mp-select">
-            <option value="2">2 Jogadores</option>
-            <option value="4">4 Jogadores</option>
-            <option value="6">6 Jogadores</option>
-            <option value="8">8 Jogadores</option>
-            <option value="10">10 Jogadores</option>
-          </select>
+          <label>Modo do Jogo</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt active" data-mpopt="modoJogo" data-v="aprendizado"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>Aprendizado</button>
+            <button class="mp-opt" data-mpopt="modoJogo" data-v="concurso"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg>Concurso</button>
+            <button class="mp-opt" data-mpopt="modoJogo" data-v="prova"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Prova</button>
+            <button class="mp-opt" data-mpopt="modoJogo" data-v="imagem"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>Imagem</button>
+          </div>
         </div>
 
-        <!-- Disciplina e Categoria -->
+        <!-- Modo de Pergunta (renomeado de "Modo") -->
+        <div class="mp-form-row">
+          <label>Modo de Pergunta</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt active" data-mpopt="modoPerg" data-v="realtime"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>Tempo Real</button>
+            <button class="mp-opt" data-mpopt="modoPerg" data-v="async"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>Assíncrono</button>
+          </div>
+        </div>
+
+        <!-- Nível (com opção "Todos") -->
+        <div class="mp-form-row">
+          <label>Nível</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt active" data-mpopt="nivel" data-v="todos">Todos</button>
+            <button class="mp-opt" data-mpopt="nivel" data-v="fácil">Fácil</button>
+            <button class="mp-opt" data-mpopt="nivel" data-v="médio">Médio</button>
+            <button class="mp-opt" data-mpopt="nivel" data-v="difícil">Difícil</button>
+          </div>
+        </div>
+
+        <!-- Disciplina e Categoria (da BD) -->
         <div class="mp-form-row">
           <label>Disciplina</label>
-          <select id="mpCfgDisc" class="mp-select"></select>
+          <select id="mpDesafioDisciplina" class="mp-select"></select>
         </div>
         <div class="mp-form-row">
           <label>Categoria</label>
-          <select id="mpCfgCat" class="mp-select"><option value="">Todas as Categorias</option></select>
+          <select id="mpDesafioCategoria" class="mp-select"></select>
         </div>
 
-        <!-- Nível -->
+        <!-- Tipos de Perguntas dinâmicos — actualizados por mpUpdateTiposUI() -->
         <div class="mp-form-row">
-          <label>Nível</label>
-          <select id="mpCfgNivel" class="mp-select">
-            <option value="todos">Todos</option>
-            <option value="facil">Fácil</option>
-            <option value="medio">Médio</option>
-            <option value="dificil">Difícil</option>
-          </select>
+          <label>Tipo de Perguntas</label>
+          <div id="mpTiposContainer" class="mp-opts-row">
+            <!-- Preenchido dinamicamente pelo JS conforme o Modo do Jogo -->
+            <button class="mp-opt active" data-mpopt="tipo" data-v="todos">Todos</button>
+            <button class="mp-opt" data-mpopt="tipo" data-v="multipla">Múltipla</button>
+            <button class="mp-opt" data-mpopt="tipo" data-v="vf">V/F</button>
+            <button class="mp-opt" data-mpopt="tipo" data-v="lacunas">Lacunas</button>
+          </div>
         </div>
 
-        <!-- Nº de Perguntas -->
-        <div class="mp-form-row">
-          <label>Nº de Perguntas</label>
-          <input type="number" id="mpCfgQtd" class="mp-input-num" min="1" max="100" value="10" placeholder="10" />
-        </div>
-
-        <!-- Tempo por pergunta -->
+        <!-- Tempo por pergunta — input numérico livre -->
         <div class="mp-form-row">
           <label>Tempo por pergunta (seg, 0 = livre)</label>
-          <input type="number" id="mpCfgTempo" class="mp-input-num" min="0" max="300" value="30" placeholder="30" />
+          <input type="number" id="mpTempoInput" class="mp-input-num" min="0" max="300" value="30" placeholder="30" />
         </div>
 
-        <!-- Botão enviar -->
-        <button class="btn-mp-send" id="mpCfgEnviar">
+        <!-- Nº de Perguntas — input numérico livre -->
+        <div class="mp-form-row">
+          <label>Nº de Perguntas</label>
+          <input type="number" id="mpQtdInput" class="mp-input-num" min="1" max="100" value="10" placeholder="10" />
+        </div>
+
+        <!-- Jogadores máx. — opções 2, 4, 6, 8, 10 -->
+        <div class="mp-form-row">
+          <label>Nº Máx. Jogadores</label>
+          <div class="mp-opts-row">
+            <button class="mp-opt active" data-mpopt="maxplayers" data-v="2">2</button>
+            <button class="mp-opt" data-mpopt="maxplayers" data-v="4">4</button>
+            <button class="mp-opt" data-mpopt="maxplayers" data-v="6">6</button>
+            <button class="mp-opt" data-mpopt="maxplayers" data-v="8">8</button>
+            <button class="mp-opt" data-mpopt="maxplayers" data-v="10">10</button>
+          </div>
+        </div>
+
+        <button class="btn-mp-send" id="btnEnviarDesafio">
           <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           ENVIAR DESAFIO
         </button>
       </div>
     </div>
 
-  </div><!-- /scroll-content mp-scroll -->
-</div><!-- /screen-multiplayer -->
+    <!-- TAB: RANKING -->
+    <div class="mp-tab-content" id="mpTabRanking">
+      <div class="mp-section-title"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg>Ranking Global — Estrelas</div>
+      <div id="mpRankingList" class="mp-ranking-list">
+        <div class="mp-loading-rank">A carregar ranking...</div>
+      </div>
+    </div>
+
+    <!-- TAB: BUSCAR JOGADORES -->
+    <div class="mp-tab-content" id="mpTabBuscar">
+      <div class="mp-section-title"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>Encontrar Jogadores</div>
+      <div class="mp-search-box" style="margin-bottom:16px">
+        <input type="text" id="mpBuscarInput" placeholder="Nome, email ou telefone..." />
+        <button id="mpBuscarBtn">
+          <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        </button>
+      </div>
+      <div id="mpBuscarResultados" class="mp-player-results"></div>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
 <!-- SCREEN: SALA DE JOGO MULTIPLAYER                          -->
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-mp-sala">
-  <!-- O conteúdo desta sala é gerado dinamicamente pelo multiplayer.js (mpMostrarSalaEspera) -->
+  <div class="mp-sala-bg">
+    <div class="mp-sala-bg-grid"></div>
+  </div>
+
+  <div class="mp-sala-header">
+    <button class="icon-btn" id="mpSalaBackBtn">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <div>
+      <div class="mp-sala-num" id="mpSalaNumDisplay">Sala #0000</div>
+      <div class="mp-sala-mode" id="mpSalaModeDisplay">Tempo Real</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="icon-btn" id="mpSalaDeleteBtn" style="display:none;color:#EF4444" title="Eliminar Sala">
+        <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:#EF4444"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+      </button>
+      <div class="mp-sala-timer-wrap">
+        <div class="mp-sala-timer" id="mpSalaTimer">--</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scoreboard barra no topo -->
+  <div class="mp-scoreboard" id="mpScoreboard"></div>
+
+  <div class="scroll-content mp-sala-scroll">
+
+    <!-- Estado: Aguardando jogadores -->
+    <div id="mpSalaWaiting" class="mp-sala-state">
+      <div class="mp-waiting-anim">
+        <div class="mp-waiting-ring"></div>
+        <div class="mp-waiting-ring"></div>
+        <div class="mp-waiting-ring"></div>
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+      </div>
+      <p class="mp-waiting-txt">Aguardando jogadores...</p>
+      <div class="mp-players-grid" id="mpPlayersGrid"></div>
+      <button class="btn-mp-action" id="btnIniciarDesafio" style="display:none"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;vertical-align:middle;margin-right:4px"><path d="M8 5v14l11-7z"/></svg>INICIAR DESAFIO</button>
+    </div>
+
+    <!-- Estado: Em jogo -->
+    <div id="mpSalaGame" style="display:none">
+      <!-- Pergunta -->
+      <div class="mp-question-card" id="mpQuestionCard">
+        <div class="mp-q-header">
+          <span class="mp-q-num" id="mpQNum">1/10</span>
+          <span class="mp-q-turn" id="mpQTurn"></span>
+        </div>
+        <p class="mp-q-text" id="mpQText">Carregando pergunta...</p>
+        <div class="mp-q-answers" id="mpQAnswers"></div>
+      </div>
+
+      <!-- Feed ao vivo das respostas dos outros -->
+      <div class="mp-live-feed" id="mpLiveFeed">
+        <div class="mp-section-title" style="font-size:0.75rem;margin:0 0 8px">Actividade em tempo real</div>
+      </div>
+
+      <!-- Histórico da sala -->
+      <div class="mp-sala-history" id="mpSalaHistory"></div>
+    </div>
+
+    <!-- Estado: Resultado final -->
+    <div id="mpSalaResult" style="display:none">
+      <div class="mp-result-header">
+        <div class="mp-result-trophy"><svg viewBox="0 0 24 24" style="width:40px;height:40px;fill:var(--gold,#F59E0B)"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V18H9v2h6v-2h-2v-2.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg></div>
+        <h2 class="mp-result-title">Desafio Concluído!</h2>
+      </div>
+      <div class="mp-result-podium" id="mpResultPodium"></div>
+      <div class="mp-result-table" id="mpResultTable"></div>
+      <button class="btn-mp-action" id="btnMpSalaVoltar">Voltar ao Hub</button>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
